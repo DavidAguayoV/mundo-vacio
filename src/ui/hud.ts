@@ -26,7 +26,8 @@ export class Hud {
       if (this.showFps) items.push(this.fps);
       this.el.replaceChildren(...items);
     }
-    if (simEnabled) setText(this.t, `t = ${fmt(sim.t)} s`);
+    const slow = sim.timeScale === 0.5 ? ' · cámara lenta ×½' : sim.timeScale === 0.25 ? ' · cámara lenta ×¼' : '';
+    if (simEnabled) setText(this.t, `t = ${fmt(sim.t)} s${slow}`);
     if (world.g) setText(this.g, `g = ${fmtVec((world.frame ?? IDENTITY_FRAME).toUser(world.g), 'm/s²')}`);
     if (this.showFps) setText(this.fps, `${fmt(fps, 0)} fps · ${world.particles.length} part.`);
   }

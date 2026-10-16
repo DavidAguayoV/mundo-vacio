@@ -2,6 +2,7 @@ import { EventBus, type GameEvent } from './core/events';
 import { dist } from './core/vec';
 import { SurfaceConstraint } from './physics/constraints';
 import { FrictionForce, NormalForce, Spring, UniformGravity } from './physics/forces';
+import { Lab } from './lab/lab';
 import { Simulation } from './physics/simulation';
 import { Painter } from './render/painter';
 import { drawScene } from './render/renderer';
@@ -55,6 +56,7 @@ export class Game {
   private hud: Hud;
   private toast = new Toast();
   private tree: TreeView;
+  private lab: Lab;
 
   private pointerId: number | null = null;
   private frameDrag: FrameDrag | null = null;
@@ -105,12 +107,14 @@ export class Game {
       next: () => this.bus.emit({ type: 'next' }),
       openTree: () => this.openTree(),
       goFree: () => this.setFree(true),
+      openLab: () => this.lab.show(),
     });
     this.toolbar = new Toolbar({
       selectTool: (id) => this.setTool(id),
       togglePlay: () => this.togglePlay(),
       reset: () => this.sim.reset(),
       openTree: () => this.openTree(),
+      openLab: () => this.lab.show(),
     });
     this.inspector = new Inspector(this.world, {
       changeMass: (id, k) => {
@@ -142,6 +146,21 @@ export class Game {
     });
     this.hud = new Hud(!!opts.debug || stress > 0);
     this.tree = new TreeView(() => this.tree.hide());
+    this.lab = new Lab(
+      {
+        world: this.world,
+        sim: this.sim,
+        isFree: () => this.story.free,
+        enterFree: () => this.setFree(true),
+        afterWorldReplaced: () => {
+          this.select(null);
+          this.highlighted.clear();
+          this.refreshUI();
+        },
+        toast: (m) => this.toast.show(m),
+      },
+      stress === 0,
+    );
 
     this.activeTool = this.tools[this.initialTool()];
     // ?debug deja el juego a mano en la consola para inspeccionarlo
@@ -153,9 +172,15 @@ export class Game {
   start(): void {
     this.resize();
     if (this.opts.stress) this.seedStress(this.opts.stress);
-    else if (this.story.free) seedFree(this.story.ctx);
-    else this.story.resume();
+    else if (this.story.free) {
+      if (!this.lab.restoreSlot('lab')) seedFree(this.story.ctx);
+    } else {
+      // el mundo autoguardado del relato; los capítulos agregan lo que falte
+      this.lab.restoreSlot('story');
+      this.story.resume();
+    }
     this.refreshUI();
+    void this.lab.loadFromHash();
     this.activeTool.onActivate?.(this.ctx);
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
@@ -179,6 +204,7 @@ export class Game {
       tools: TOOL_ORDER.filter((id) => unlocked.has(id)).map((id) => this.tools[id]),
       active: this.activeTool.id,
       simEnabled: this.story.simEnabled(),
+      labEnabled: this.story.free,
       running: this.sim.running,
       fresh,
     });
@@ -214,22 +240,34 @@ export class Game {
     this.tree.show(this.story.reachedChapters(), this.story.nextChapter());
   }
 
+  /** El relato y el laboratorio tienen cada uno su propio mundo: al cambiar de modo se guarda uno y se recupera el otro. */
   private setFree(free: boolean): void {
+    if (free === this.story.free) return;
+    this.lab.autosaveNow(this.story.free ? 'lab' : 'story');
     this.story.setFree(free);
+    this.sim.clearRun();
+    this.select(null);
+    this.highlighted.clear();
     if (free) {
-      seedFree(this.story.ctx);
+      if (!this.lab.restoreSlot('lab')) {
+        this.world.clear();
+        seedFree(this.story.ctx);
+      }
       this.setTool('move', false);
-      this.toast.show('Todas las herramientas desbloqueadas');
+      this.toast.show('Laboratorio: todas las herramientas');
     } else {
+      if (!this.lab.restoreSlot('story')) this.world.clear();
       this.story.resume();
       this.setTool(this.initialTool(), false);
     }
     this.tree.hide();
+    this.lab.hide();
     this.refreshUI();
   }
 
   private restart(): void {
     this.sim.clearRun();
+    this.lab.forget('story');
     this.world.clear();
     this.select(null);
     this.highlighted.clear();
@@ -300,6 +338,11 @@ export class Game {
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('resize', () => this.resize());
+    // guardar al salir o al cambiar de pestaña (en el celular la página puede no volver)
+    window.addEventListener('pagehide', () => this.lab.autosaveNow());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.lab.autosaveNow();
+    });
     window.addEventListener('keydown', (e) => this.onKey(e));
   }
 
@@ -327,7 +370,7 @@ export class Game {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (this.tree.open) return;
+    if (this.tree.open || this.lab.open) return;
     const el = document.activeElement;
     const typing = el && el !== document.body && el !== this.canvas;
     if (e.key === ' ' && !typing) {
@@ -366,6 +409,7 @@ export class Game {
     this.last = now;
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
 
+    this.lab.tick(now);
     this.sim.advance(dt);
     this.monitor.update();
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
@@ -391,6 +435,7 @@ export class Game {
       highlighted: this.highlighted,
       hitFlash: this.hitFlash,
       draft: tool.renderDraft ? (p) => tool.renderDraft!(p, this.ctx) : null,
+      display: this.lab.display(),
     });
     requestAnimationFrame((t) => this.loop(t));
   }

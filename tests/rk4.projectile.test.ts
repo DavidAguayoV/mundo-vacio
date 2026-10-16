@@ -55,6 +55,23 @@ describe('proyectil con RK4', () => {
     expect(even.sim.trails.get('p')!.length).toBe(21);
   });
 
+  it('en cámara lenta avanza la mitad de tiempo simulado y la trayectoria es la misma', () => {
+    const run = (timeScale: number, seconds: number) => {
+      const p = { id: 'p', pos: { ...r0 }, vel: { ...v0 }, mass: 1 };
+      const sim = new Simulation({ g, particles: [p] });
+      sim.forces.push(new UniformGravity());
+      sim.timeScale = timeScale;
+      sim.start();
+      for (let k = 0; k < seconds * 60; k++) sim.advance(1 / 60);
+      return { p, sim };
+    };
+    const slow = run(0.5, 2);
+    const normal = run(1, 1);
+    expect(slow.sim.t).toBeCloseTo(1, 9);
+    expect(slow.p.pos.x).toBeCloseTo(normal.p.pos.x, 12);
+    expect(slow.p.pos.y).toBeCloseTo(normal.p.pos.y, 12);
+  });
+
   it('reiniciar devuelve el estado inicial', () => {
     const p = { id: 'p', pos: { ...r0 }, vel: { ...v0 }, mass: 1 };
     const sim = new Simulation({ g, particles: [p] });

@@ -16,6 +16,8 @@ export interface Scene {
   hitFlash: number;
   /** borrador de la herramienta activa (flecha en construcción, etc.) */
   draft: ((p: Painter) => void) | null;
+  /** qué dibujar (el laboratorio permite ocultar r y las trayectorias cuando hay muchas partículas) */
+  display: { positions: boolean; trails: boolean };
 }
 
 export type Layer = (scene: Scene) => void;

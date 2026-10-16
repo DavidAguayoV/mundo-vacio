@@ -5,6 +5,7 @@ import type { Scene } from '../scene';
 
 /** Trayectorias estroboscópicas: un punto cada 0,1 s. */
 export function trailsLayer(scene: Scene): void {
+  if (!scene.display.trails) return;
   const p = scene.painter;
   const { ctx, pal } = p;
   const { view } = scene;
@@ -56,10 +57,11 @@ export function particlesLayer(scene: Scene): void {
   const { pal } = p;
   const { world, sim, view } = scene;
   const O = world.frame?.origin;
+  const showR = scene.display.positions;
   const showG = !!world.g && (sim.running || sim.hasRun);
 
   for (const q of world.particles) {
-    if (O) {
+    if (O && showR) {
       p.alpha(0.7, () => p.line(O, q.pos, pal.pos, 1.2, [4, 4]));
       if (Math.hypot(q.pos.x - O.x, q.pos.y - O.y) > 0.8) p.midLabel(`r${subscript(q.label)}`, O, q.pos, pal.pos);
     }

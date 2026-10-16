@@ -5,6 +5,7 @@ export interface CardActions {
   next(): void;
   openTree(): void;
   goFree(): void;
+  openLab(): void;
 }
 
 /** Tarjeta de relato (contraíble). */
@@ -41,8 +42,8 @@ export class StoryCard {
       this.dots.replaceChildren();
       this.title.textContent = 'Laboratorio abierto';
       this.text.textContent =
-        'Todas las herramientas disponibles. Arma tu propio experimento: coloca partículas, dales velocidad, define g y presiona Lanzar.';
-      this.row.append(this.button('Ver árbol', false, this.actions.openTree));
+        'Todas las herramientas disponibles. Arma tu propio experimento y presiona Lanzar. En Lab puedes guardarlo, compartirlo o abrir uno de los ejemplos.';
+      this.row.append(this.button('Abrir Lab', true, this.actions.openLab), this.button('Ver árbol', false, this.actions.openTree));
       return;
     }
     const { chapter, step } = story;

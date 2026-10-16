@@ -24,6 +24,8 @@ export class Simulation {
   readonly strobeSteps = 24; // 24 · (1/240 s) = 0,1 s, sin errores de redondeo
   /** Tiempo real máximo que se simula por cuadro (evita la "espiral de la muerte" tras una pestaña oculta). */
   maxFrameTime = 0.05;
+  /** Cámara lenta: segundos simulados por segundo real (1 = tiempo real). */
+  timeScale = 1;
   /** Duración máxima de un lanzamiento, s. */
   maxTime = 10;
 
@@ -124,7 +126,7 @@ export class Simulation {
   /** Avanza la simulación según el tiempo real transcurrido. */
   advance(realDt: number): void {
     if (!this.running) return;
-    this.acc += Math.min(Math.max(realDt, 0), this.maxFrameTime);
+    this.acc += Math.min(Math.max(realDt, 0), this.maxFrameTime) * this.timeScale;
     // tolerancia: 1/60 s debe dar exactamente 4 pasos aunque la resta en punto flotante deje 1e-18 de menos
     const due = this.dt * (1 - 1e-9);
     if (this.acc < due) return;

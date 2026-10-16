@@ -4,7 +4,7 @@ import { G_EARTH } from '../world/world';
 import { ICONS } from './icons';
 import type { Tool, ToolContext, WorldPointer } from './tool';
 
-/** El jugador arrastra en la dirección en que cree que caen las cosas; |g| = 9,80 m/s². */
+/** El jugador arrastra en la dirección en que cree que caen las cosas; |g| = 9,80 m/s² salvo que el laboratorio lo cambie. */
 export class GravityTool implements Tool {
   readonly id = 'gravity' as const;
   readonly name = 'Gravedad';
@@ -29,7 +29,10 @@ export class GravityTool implements Tool {
     const L = dist(a, b);
     if (L < 0.3) return;
     if (ctx.sim.hasRun) ctx.sim.reset();
-    ctx.world.g = { x: ((b.x - a.x) / L) * G_EARTH, y: ((b.y - a.y) / L) * G_EARTH };
+    // se cambia la dirección y se conserva la magnitud (la del laboratorio puede ser la de la Luna)
+    const g0 = ctx.world.g;
+    const mag = g0 && (g0.x || g0.y) ? Math.hypot(g0.x, g0.y) : G_EARTH;
+    ctx.world.g = { x: ((b.x - a.x) / L) * mag, y: ((b.y - a.y) / L) * mag };
     ctx.emit({ type: 'g-set' });
   }
 

@@ -632,3 +632,95 @@ button {
     transition: none;
   }
 }
+
+/* ---------- laboratorio ---------- */
+
+.lab .tier > .row,
+.lab .tier > .seg {
+  margin-top: 2px;
+}
+
+.field {
+  width: 100%;
+  font: 500 15px var(--body);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--vel);
+  outline-offset: 1px;
+}
+
+.lab .hint,
+.linkout small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.linkout {
+  display: grid;
+  gap: 6px;
+}
+
+.linkout:empty {
+  display: none;
+}
+
+.linkout .field {
+  font: 400 12px var(--mono);
+}
+
+.saved {
+  display: grid;
+  gap: 6px;
+}
+
+.saved-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.saved-row b {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lab .nodes .node .row {
+  margin-top: 6px;
+}
+
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seg .btn[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--vel);
+}

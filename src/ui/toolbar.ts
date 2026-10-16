@@ -6,6 +6,8 @@ export interface ToolbarState {
   tools: Tool[];
   active: ToolId;
   simEnabled: boolean;
+  /** botón Laboratorio (solo en modo libre) */
+  labEnabled?: boolean;
   running: boolean;
   /** herramientas recién desbloqueadas: brillan un momento */
   fresh?: readonly ToolId[];
@@ -16,6 +18,7 @@ export interface ToolbarActions {
   togglePlay(): void;
   reset(): void;
   openTree(): void;
+  openLab(): void;
 }
 
 /** Caja de herramientas: herramientas desbloqueadas, controles de simulación y acceso al árbol. */
@@ -52,6 +55,7 @@ export class Toolbar {
       this.setRunning(s.running);
     }
     items.push(h('span', { class: 'sep' }));
+    if (s.labEnabled) items.push(this.button(ICONS.lab, 'Lab', this.actions.openLab, { 'data-cmd': 'lab' }));
     items.push(this.button(ICONS.tree, 'Árbol', this.actions.openTree, { 'data-cmd': 'tree' }));
     this.bar.replaceChildren(...items);
   }
