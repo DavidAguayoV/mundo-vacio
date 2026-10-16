@@ -4,10 +4,13 @@ import { FrictionForce } from './friction';
 import { Gravitation } from './gravitation';
 import { NormalForce } from './normal';
 import { Spring } from './spring';
+import { SpringForces } from './springs';
 import { UniformGravity } from './uniformGravity';
 
 export * from './force';
-export { Drag, FrictionForce, Gravitation, NormalForce, Spring, UniformGravity };
+export { Drag, FrictionForce, Gravitation, NormalForce, Spring, SpringForces, UniformGravity };
+export type { SpringLike } from './springs';
+export { endpointPos } from './springs';
 
 /** Reconstruye una fuerza desde su JSON (guardar/cargar experimentos). */
 export function forceFromJSON(j: ForceJSON): Force {

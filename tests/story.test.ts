@@ -37,7 +37,7 @@ describe('relato', () => {
 
   it('el orden de los actos: velocidad antes que gravedad', () => {
     const ids = CHAPTERS.map((c) => c.id);
-    expect(ids).toEqual(['vacio', 'particula', 'vectores', 'tiempo', 'abajo', 'blanco', 'superficies']);
+    expect(ids).toEqual(['vacio', 'particula', 'vectores', 'tiempo', 'abajo', 'blanco', 'superficies', 'resortes']);
     expect(ids.indexOf('tiempo')).toBeLessThan(ids.indexOf('abajo'));
   });
 
@@ -110,6 +110,9 @@ describe('relato', () => {
     expect(s.timeline).toBe('disponible');
     expect(s.normal).toBe('disponible');
     expect(s.spring).toBe('próxima');
+    s = states(at('resortes', 0));
+    expect(s.spring).toBe('disponible');
+    expect(s.gravitation).toBe('próxima');
   });
 
   it('el blanco del capítulo «Al blanco» queda dentro de la pantalla', () => {
@@ -165,5 +168,23 @@ describe('progreso guardado', () => {
   it('un capítulo que ya no existe vuelve al comienzo', () => {
     store.set('mundoVacio.progress', JSON.stringify(at('no-existe', 2)));
     expect(loadProgress(ids).chapter).toBe('vacio');
+  });
+});
+
+describe('capítulo de resortes', () => {
+  it('al retomarlo quedan un resorte colgado, gravedad y nada de suelo', () => {
+    const { story, world } = setup(at('resortes', 4));
+    world.addSurface({ x: -5, y: -1 }, { x: 5, y: -1 });
+    story.chapter.seed?.(story.ctx);
+    story.resume();
+    expect(world.surfaces).toHaveLength(0);
+    expect(world.springs).toHaveLength(1);
+    expect(world.g).not.toBeNull();
+    expect('anchor' in world.springs[0].a).toBe(true);
+  });
+
+  it('la predicción sobre la masa contrasta con la caída libre', () => {
+    const { story } = setup(at('resortes', 11, { masa: 'igual' }));
+    expect(story.text()).toMatch(/caída libre/);
   });
 });

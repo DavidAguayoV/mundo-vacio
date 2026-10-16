@@ -1,4 +1,5 @@
 import { fieldLayer } from './layers/field';
+import { springsLayer } from './layers/springs';
 import { surfacesLayer } from './layers/surfaces';
 import { axesLayer, gridLayer } from './layers/frame';
 import { particlesLayer, trailsLayer } from './layers/particles';
@@ -14,6 +15,7 @@ const LAYERS: Layer[] = [
   surfacesLayer,
   targetLayer,
   trailsLayer,
+  springsLayer,
   vectorsLayer,
   particlesLayer,
   (s) => s.draft?.(s.painter),

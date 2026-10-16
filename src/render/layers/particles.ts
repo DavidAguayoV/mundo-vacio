@@ -24,8 +24,8 @@ export function trailsLayer(scene: Scene): void {
   });
 }
 
-const FORCE_LABEL: Record<string, string> = { gravity: 'mg', normal: 'N', friction: 'f' };
-const FORCE_SIDE: Record<string, 1 | -1> = { gravity: -1, normal: 1, friction: 1 };
+const FORCE_LABEL: Record<string, string> = { gravity: 'mg', normal: 'N', friction: 'f', spring: 'Fe' };
+const FORCE_SIDE: Record<string, 1 | -1> = { gravity: -1, normal: 1, friction: 1, spring: 1 };
 
 /**
  * Fuerzas sobre una partícula apoyada. Se dibujan como F/m con la escala de las aceleraciones:
@@ -65,10 +65,10 @@ export function particlesLayer(scene: Scene): void {
       p.alpha(0.7, () => p.line(O, q.pos, pal.pos, 1.2, [4, 4]));
       if (Math.hypot(q.pos.x - O.x, q.pos.y - O.y) > 0.8) p.midLabel(`r${subscript(q.label)}`, O, q.pos, pal.pos);
     }
-    // Apoyada en una superficie: diagrama de fuerzas (ámbar) y la aceleración resultante a (rosa).
+    // Apoyada en una superficie o colgada de un resorte: diagrama de fuerzas (ámbar) y la aceleración resultante a (rosa).
     // Libre: g primero y v encima (al caer desde el reposo son paralelas y v crece más allá de g),
     // con rótulos en costados opuestos para que no choquen.
-    const contact = sim.contactNormal(q.id);
+    const contact = sim.contactNormal(q.id) || world.springsOf(q.id).length > 0;
     if (contact) {
       forceDiagram(scene, q.id, q.pos, q.mass);
     } else if (showG && world.g) {

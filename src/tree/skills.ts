@@ -34,7 +34,7 @@ export const SKILLS: SkillNode[] = [
   { id: 'surface', tier: 4, grant: 'tool:surface', name: 'Superficie', desc: 'Un plano que las partículas no pueden atravesar.' },
   { id: 'normal', tier: 4, chapter: 'superficies', name: 'Normal', desc: 'La fuerza que hace la superficie.' },
   { id: 'friction', tier: 4, chapter: 'superficies', name: 'Roce', desc: 'Estático y cinético.' },
-  { id: 'spring', tier: 5, name: 'Resorte', desc: 'Ley de Hooke entre dos partículas.', requires: ['vector'] },
+  { id: 'spring', tier: 5, grant: 'tool:spring', name: 'Resorte', desc: 'Ley de Hooke y oscilaciones.' },
   { id: 'gravitation', tier: 5, name: 'Gravitación', desc: 'Masas que se atraen entre sí: órbitas.', requires: ['velocity'] },
   { id: 'drag', tier: 5, name: 'Arrastre', desc: 'Fuerza que depende de la velocidad.', requires: ['velocity'] },
   { id: 'accel-frame', tier: 6, name: 'Marco acelerado', desc: '¿Qué ve alguien dentro de un ascensor?', requires: ['gravity'] },
@@ -42,7 +42,7 @@ export const SKILLS: SkillNode[] = [
 ];
 
 /** Primer nodo de la hoja de ruta cuando ya no quedan capítulos. */
-const ROADMAP_NEXT = 'spring';
+const ROADMAP_NEXT = 'gravitation';
 
 export interface TreeProgress {
   /** herramientas y habilidades ya ganadas */

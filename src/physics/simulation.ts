@@ -49,6 +49,8 @@ export class Simulation {
 
   /** Llamado después de cada paso fijo. */
   onStep: ((sim: Simulation) => void)[] = [];
+  /** Llamado al quedar en t = 0 de un lanzamiento (al empezar o al volver), no al recalcular para la línea de tiempo. */
+  onRestart: ((sim: Simulation) => void)[] = [];
   /** Si devuelve true, el lanzamiento termina. */
   shouldStop: (() => boolean) | null = null;
   /** Avisa cuando cambia running/finished (para la barra de herramientas). */
@@ -106,6 +108,7 @@ export class Simulation {
     this.acc = 0;
     const s = stateFromBodies(this.world.particles, 0);
     for (const c of this.constraints) c.begin?.(s, this.world);
+    if (!this.replaying) for (const fn of this.onRestart) fn(this);
   }
 
   start(): void {
@@ -172,9 +175,9 @@ export class Simulation {
     if (!this.snapshot) return;
     const target = Math.max(0, Math.min(this.furthestSteps, Math.round(t / this.dt)));
     const keep = this.furthestSteps;
-    this.restart();
     this.replaying = true;
     try {
+      this.restart();
       this.integrate(target);
     } finally {
       this.replaying = false;

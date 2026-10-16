@@ -1,7 +1,8 @@
 import { EventBus, type GameEvent } from './core/events';
 import { dist } from './core/vec';
 import { SurfaceConstraint } from './physics/constraints';
-import { FrictionForce, NormalForce, Spring, UniformGravity } from './physics/forces';
+import { FrictionForce, NormalForce, Spring, SpringForces, UniformGravity } from './physics/forces';
+import { OscillationMeter } from './physics/oscillationMeter';
 import { Lab } from './lab/lab';
 import { Simulation } from './physics/simulation';
 import { Painter } from './render/painter';
@@ -20,7 +21,7 @@ import { TreeView } from './tree/treeView';
 import { StoryCard } from './ui/card';
 import { $ } from './ui/dom';
 import { Hud } from './ui/hud';
-import { Inspector, MU_MAX, clampMass } from './ui/inspector';
+import { Inspector, K_MAX, K_MIN, L0_MAX, L0_MIN, MU_MAX, clampMass } from './ui/inspector';
 import { Toast } from './ui/toast';
 import { Timeline } from './ui/timeline';
 import { TIME_NAMES, Toolbar } from './ui/toolbar';
@@ -67,6 +68,7 @@ export class Game {
   private frameDrag: FrameDrag | null = null;
   private hitFlash = 0;
   private monitor: RunMonitor;
+  private meter: OscillationMeter;
   private structure = '';
   private last = 0;
   private fps = 60;
@@ -81,7 +83,15 @@ export class Game {
     // superficies: la restricción decide quién está apoyado; la normal y el roce leen esos contactos
     const surfaces = new SurfaceConstraint(() => this.world.surfaces);
     this.sim.constraints.push(surfaces);
-    this.sim.forces.push(new UniformGravity(), new NormalForce(surfaces.contacts), new FrictionForce(surfaces.contacts));
+    this.sim.forces.push(
+      new UniformGravity(),
+      new SpringForces(() => this.world.springs),
+      new NormalForce(surfaces.contacts),
+      new FrictionForce(surfaces.contacts),
+    );
+    // cronómetro de oscilaciones de cada resorte
+    this.meter = new OscillationMeter(this.sim, () => this.world.springs.map((s) => ({ id: s.id, length: this.world.springLength(s) })));
+    this.meter.onFirstPeriod = () => this.bus.emit({ type: 'oscillated' });
     this.monitor = new RunMonitor(this.world, this.sim, (ev) => this.bus.emit(ev));
 
     const stress = opts.stress ?? 0;
@@ -144,9 +154,18 @@ export class Game {
           sf.muK = round(Math.min(sf.muS, Math.max(0, sf.muK + delta)));
         }
       },
+      changeSpring: (id, which, delta) => {
+        const sp = this.world.spring(id);
+        if (!sp) return;
+        if (this.sim.hasRun) this.sim.reset();
+        const round = (x: number) => Math.round(x * 100) / 100;
+        if (which === 'k') sp.k = round(Math.min(K_MAX, Math.max(K_MIN, sp.k + delta)));
+        else sp.restLength = round(Math.min(L0_MAX, Math.max(L0_MIN, sp.restLength + delta)));
+      },
+      period: (id) => this.meter.period(id),
       remove: (ref) => {
         this.world.remove(ref);
-        if (ref.kind === 'surface') this.sim.clearRun();
+        if (ref.kind === 'surface' || ref.kind === 'spring') this.sim.clearRun();
         this.select(null);
       },
       forces: (id) => this.sim.forcesOn(id)?.parts ?? null,
@@ -494,7 +513,7 @@ export class Game {
     if (this.opts.stress && this.sim.finished) this.sim.start();
 
     // el inspector agrega filas cuando aparece el origen, la primera superficie o g
-    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${!!this.world.g}`;
+    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.g}`;
     if (structure !== this.structure) {
       this.structure = structure;
       this.inspector.rebuild();

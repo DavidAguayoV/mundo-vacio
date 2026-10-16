@@ -32,6 +32,16 @@ function ensureSurface({ world }: StoryContext): void {
   if (!world.surfaces.length) world.addSurface({ x: -5, y: -1 }, { x: 5, y: -1 });
 }
 
+/** Un resorte colgando de un punto fijo, con la primera partícula en reposo en su extremo. */
+function ensureSpring(ctx: StoryContext): void {
+  const { world } = ctx;
+  ensureParticles(ctx);
+  if (world.springs.length) return;
+  const p = world.particles[0];
+  p.vel = { x: 0, y: 0 };
+  world.addSpring({ anchor: { x: p.pos.x, y: p.pos.y + 2 } }, { particle: p.id }, 20, 2);
+}
+
 function ensureG({ world }: StoryContext): void {
   if (!world.g) world.g = { x: 0, y: -G_EARTH };
 }
@@ -433,9 +443,124 @@ export const CHAPTERS: Chapter[] = [
       },
       engineering('El ángulo en que una pila de arena o de áridos deja de sostenerse depende del roce entre los granos: con eso se diseñan taludes y acopios.'),
       {
-        text: 'Ya tienes las fuerzas de contacto. Fíjate en que a, la flecha rosa, es la suma de las fuerzas dividida por m: es la segunda ley de Newton. Lo que sigue: resortes, gravitación entre masas y arrastre.',
-        on: 'end',
+        text: 'Ya tienes las fuerzas de contacto. Fíjate en que a, la flecha rosa, es la suma de las fuerzas dividida por m: es la **segunda ley de Newton**. Ahora, una fuerza que depende de dónde está la partícula.',
+        on: 'next',
         enter: ensureSurface,
+      },
+    ],
+  },
+  {
+    id: 'resortes',
+    act: III,
+    title: 'Resortes',
+    grants: ['tool:spring'],
+    seed: (ctx) => {
+      ensureFrame(ctx);
+      ensureParticles(ctx);
+      ensureG(ctx);
+      stopAll(ctx);
+      // sin suelo: que nada estorbe la oscilación
+      ctx.world.surfaces = [];
+      ctx.world.targets = [];
+    },
+    steps: [
+      {
+        text: 'Un resorte hace algo que ninguna fuerza anterior hacía: tira o empuja según cuánto lo deformes. Quitamos el suelo para que nada estorbe. Elige Resorte y arrastra desde un punto vacío, que quedará fijo, hasta una partícula.',
+        on: 'spring-made',
+      },
+      {
+        text: 'Antes de estirarlo: si lo estiras el doble, ¿con cuánta fuerza tira?',
+        on: 'end',
+        ask: 'hooke',
+        enter: ensureSpring,
+        choices: [
+          { id: 'doble', label: 'El doble' },
+          { id: 'mas', label: 'Más del doble' },
+          { id: 'igual', label: 'La misma' },
+        ],
+      },
+      {
+        text: 'Compruébalo con el tiempo detenido: con Mover, arrastra la partícula para estirar el resorte y toca el resorte para ver ΔL y |F| en el panel. Estíralo un poco, y después el doble.',
+        on: 'spring-stretched',
+        when: (ctx) => ctx.count('spring-stretched') >= 2,
+        enter: ensureSpring,
+      },
+      {
+        text: reveal('hooke', '|F| = k ΔL: el doble de estiramiento, el doble de fuerza. Es la **ley de Hooke**, y k, la **constante del resorte**, dice qué tan duro es. La fuerza apunta siempre hacia donde el resorte recupera su largo natural L₀.', {
+          doble: 'Lo predijiste bien.',
+          mas: 'Dijiste que más del doble. Un resorte real estirado en exceso puede hacerlo, pero el resorte ideal es proporcional: exactamente el doble.',
+          igual: 'Dijiste que la misma. Mira el panel: |F| crece con ΔL.',
+        }),
+        on: 'next',
+        enter: ensureSpring,
+      },
+      {
+        text: 'Deja fluir el tiempo y mira el panel del resorte.',
+        on: 'oscillated',
+        enter: ensureSpring,
+      },
+      {
+        text: 'La partícula **oscila**: el resorte la tira hacia el equilibrio, ella se pasa de largo por inercia, y vuelve. El panel mide cuánto tarda una ida y vuelta: el **período** T.',
+        on: 'next',
+        enter: ensureSpring,
+      },
+      {
+        text: 'Si la estiras el doble antes de soltarla, ¿cuánto tarda una oscilación?',
+        on: 'end',
+        ask: 'amplitud',
+        enter: ensureSpring,
+        choices: [
+          { id: 'doble', label: 'El doble de tiempo' },
+          { id: 'mismo', label: 'Lo mismo' },
+          { id: 'mitad', label: 'La mitad' },
+        ],
+      },
+      {
+        text: 'Compruébalo: vuelve a t = 0, arrastra la partícula para estirar más el resorte y deja fluir el tiempo. Compara T.',
+        on: 'oscillated',
+        when: (ctx) => ctx.seen('spring-stretched'),
+        enter: ensureSpring,
+      },
+      {
+        text: reveal('amplitud', 'Tarda lo mismo: el período no depende de cuánto la estires. Recorre más camino, pero también va más rápido. Por eso un resorte, o un péndulo, sirve para medir el tiempo.', {
+          doble: 'Dijiste el doble: recorre el doble de camino, pero el resorte también tira el doble, y las dos cosas se compensan.',
+          mismo: 'Lo predijiste bien.',
+          mitad: 'Dijiste la mitad. Tira más fuerte, sí, pero también tiene más camino que recorrer.',
+        }),
+        on: 'next',
+        enter: ensureSpring,
+      },
+      {
+        text: '¿Y si la partícula tiene cuatro veces más masa?',
+        on: 'end',
+        ask: 'masa',
+        enter: ensureSpring,
+        choices: [
+          { id: 'rapido', label: 'Oscila más rápido' },
+          { id: 'igual', label: 'Igual' },
+          { id: 'lento', label: 'Oscila más lento' },
+        ],
+      },
+      {
+        text: 'Compruébalo: vuelve a t = 0, toca la partícula del resorte y duplica su masa dos veces con +. Deja fluir el tiempo.',
+        on: 'oscillated',
+        when: (ctx) => ctx.seen('mass-changed'),
+        enter: ensureSpring,
+      },
+      {
+        text: reveal('masa', 'Más lento: con cuatro veces la masa, el período se duplica, T = 2π√(m/k). Con la misma fuerza, una masa mayor acelera menos.', {
+          rapido: 'Dijiste más rápido. Con el mismo resorte, una masa mayor acelera menos, así que va más lento.',
+          igual: 'Dijiste igual. Eso vale para la caída libre del capítulo 5, donde la fuerza crece con la masa; la del resorte, no.',
+          lento: 'Lo predijiste bien.',
+        }),
+        on: 'next',
+        enter: ensureSpring,
+      },
+      engineering('La suspensión de un auto es un resorte: su período decide si el viaje se siente firme o blando.'),
+      {
+        text: 'Ya tienes una fuerza que depende de la posición, y con ella, el movimiento que se repite. Lo que sigue: gravitación entre masas y arrastre.',
+        on: 'end',
+        enter: ensureSpring,
       },
     ],
   },

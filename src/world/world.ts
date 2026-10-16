@@ -1,5 +1,7 @@
 import type { Vec2 } from '../core/vec';
 import type { SurfaceLike } from '../physics/contact';
+import type { Endpoint } from '../physics/forces/force';
+import type { SpringLike } from '../physics/forces/springs';
 import type { Body, ForceWorld } from '../physics/state';
 import { ReferenceFrame } from './frame';
 
@@ -33,6 +35,10 @@ export interface Target {
 /** Superficie plana y rígida (segmento) con roce estático μₛ y cinético μc. */
 export type Surface = SurfaceLike;
 
+/** Resorte ideal entre dos extremos (partícula o punto fijo). */
+export type SpringLink = SpringLike;
+
+export const DEFAULT_K = 20; // N/m
 export const DEFAULT_MU_S = 0.6;
 export const DEFAULT_MU_K = 0.4;
 
@@ -40,7 +46,8 @@ export type EntityRef =
   | { kind: 'particle'; id: string }
   | { kind: 'vector'; id: string }
   | { kind: 'sum'; id: string }
-  | { kind: 'surface'; id: string };
+  | { kind: 'surface'; id: string }
+  | { kind: 'spring'; id: string };
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -56,6 +63,7 @@ export class World implements ForceWorld {
   g: Vec2 | null = null;
   targets: Target[] = [];
   surfaces: Surface[] = [];
+  springs: SpringLink[] = [];
 
   private nextId = 1;
 
@@ -79,6 +87,7 @@ export class World implements ForceWorld {
     this.g = null;
     this.targets = [];
     this.surfaces = [];
+    this.springs = [];
   }
 
   // ----- partículas -----
@@ -98,6 +107,7 @@ export class World implements ForceWorld {
 
   removeParticle(id: string): void {
     this.particles = this.particles.filter((p) => p.id !== id);
+    this.springs = this.springs.filter((sp) => !(('particle' in sp.a && sp.a.particle === id) || ('particle' in sp.b && sp.b.particle === id)));
   }
 
   // ----- vectores -----
@@ -160,6 +170,46 @@ export class World implements ForceWorld {
     this.surfaces = this.surfaces.filter((s) => s.id !== id);
   }
 
+  // ----- resortes -----
+
+  /** Crea un resorte; si no se da el largo natural, es el largo actual (sin estirar). */
+  addSpring(a: Endpoint, b: Endpoint, k = DEFAULT_K, restLength?: number): SpringLink {
+    const L = restLength ?? Math.hypot(...this.endDelta(a, b));
+    const sp: SpringLink = { id: this.newId('k'), a: copyEnd(a), b: copyEnd(b), k, restLength: L };
+    this.springs.push(sp);
+    return sp;
+  }
+
+  spring(id: string): SpringLink | undefined {
+    return this.springs.find((s) => s.id === id);
+  }
+
+  removeSpring(id: string): void {
+    this.springs = this.springs.filter((s) => s.id !== id);
+  }
+
+  /** Posición de un extremo (null si su partícula ya no existe). */
+  endPos(e: Endpoint): Vec2 | null {
+    if ('anchor' in e) return e.anchor;
+    return this.particle(e.particle)?.pos ?? null;
+  }
+
+  private endDelta(a: Endpoint, b: Endpoint): [number, number] {
+    const pa = this.endPos(a);
+    const pb = this.endPos(b);
+    return pa && pb ? [pb.x - pa.x, pb.y - pa.y] : [0, 0];
+  }
+
+  /** Largo actual de un resorte. */
+  springLength(sp: SpringLink): number {
+    return Math.hypot(...this.endDelta(sp.a, sp.b));
+  }
+
+  /** Resortes que tocan una partícula. */
+  springsOf(particleId: string): SpringLink[] {
+    return this.springs.filter((s) => ('particle' in s.a && s.a.particle === particleId) || ('particle' in s.b && s.b.particle === particleId));
+  }
+
   // ----- selección -----
 
   exists(ref: EntityRef | null): boolean {
@@ -167,6 +217,7 @@ export class World implements ForceWorld {
     if (ref.kind === 'particle') return !!this.particle(ref.id);
     if (ref.kind === 'vector') return !!this.vector(ref.id);
     if (ref.kind === 'surface') return !!this.surface(ref.id);
+    if (ref.kind === 'spring') return !!this.spring(ref.id);
     return !!this.sum(ref.id);
   }
 
@@ -174,6 +225,9 @@ export class World implements ForceWorld {
     if (ref.kind === 'particle') this.removeParticle(ref.id);
     else if (ref.kind === 'vector') this.removeVector(ref.id);
     else if (ref.kind === 'surface') this.removeSurface(ref.id);
+    else if (ref.kind === 'spring') this.removeSpring(ref.id);
     else this.removeSum(ref.id);
   }
 }
+
+const copyEnd = (e: Endpoint): Endpoint => ('anchor' in e ? { anchor: { ...e.anchor } } : { particle: e.particle });

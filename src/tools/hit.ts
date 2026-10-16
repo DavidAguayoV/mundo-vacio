@@ -2,7 +2,7 @@ import { dist, segmentDistance, type Vec2 } from '../core/vec';
 import { HANDLE_DIST, VEL_SCALE, particleRadiusPx } from '../render/scales';
 import type { View } from '../render/view';
 import { surfaceCoords, surfaceFrame } from '../physics/contact';
-import type { FreeVector, Particle, Surface, VectorSum, World } from '../world/world';
+import type { FreeVector, Particle, SpringLink, Surface, VectorSum, World } from '../world/world';
 
 // Búsqueda de objetos bajo el puntero. Se recorre de atrás hacia adelante: gana lo dibujado encima.
 
@@ -84,4 +84,24 @@ export function snapToSurface(world: World, p: Vec2, tol: number): Vec2 {
     if (Math.abs(d) <= tol && u >= 0 && u <= f.length) return { x: s.a.x + u * f.t.x, y: s.a.y + u * f.t.y };
   }
   return p;
+}
+
+/** Punto fijo de un resorte bajo el puntero. */
+export function hitSpringAnchor(world: World, p: Vec2, tol: number): { sp: SpringLink; end: 'a' | 'b' } | undefined {
+  for (let i = world.springs.length - 1; i >= 0; i--) {
+    const sp = world.springs[i];
+    if ('anchor' in sp.b && dist(sp.b.anchor, p) <= tol) return { sp, end: 'b' };
+    if ('anchor' in sp.a && dist(sp.a.anchor, p) <= tol) return { sp, end: 'a' };
+  }
+  return undefined;
+}
+
+export function hitSpring(world: World, p: Vec2, tol: number): SpringLink | undefined {
+  for (let i = world.springs.length - 1; i >= 0; i--) {
+    const sp = world.springs[i];
+    const a = world.endPos(sp.a);
+    const b = world.endPos(sp.b);
+    if (a && b && segmentDistance(p, a, b) <= tol) return sp;
+  }
+  return undefined;
 }

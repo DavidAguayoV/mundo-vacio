@@ -30,7 +30,8 @@ export class ParticleTool implements Tool {
     this.drag?.move(p, ctx);
   }
 
-  onPointerUp(): void {
+  onPointerUp(_e: WorldPointer, ctx: ToolContext): void {
+    this.drag?.finish(ctx);
     this.drag = null;
   }
 }

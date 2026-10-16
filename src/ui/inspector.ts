@@ -8,6 +8,9 @@ import { $, h, setText } from './dom';
 export interface InspectorActions {
   changeMass(id: string, factor: number): void;
   changeMu(id: string, which: 'muS' | 'muK', delta: number): void;
+  changeSpring(id: string, which: 'k' | 'restLength', delta: number): void;
+  /** período medido de un resorte (null si todavía no completa una oscilación) */
+  period(springId: string): number | null;
   remove(ref: EntityRef): void;
   close(): void;
   /** fuerzas sobre una partícula en el estado actual (null si no hay simulación que consultar) */
@@ -33,6 +36,12 @@ export const MASS_MIN = 0.25;
 export const MASS_MAX = 64;
 export const MU_MAX = 1.5;
 export const MU_STEP = 0.05;
+export const K_MIN = 5;
+export const K_MAX = 200;
+export const K_STEP = 5;
+export const L0_MIN = 0.25;
+export const L0_MAX = 10;
+export const L0_STEP = 0.25;
 
 /**
  * Inspector del objeto seleccionado. Todo se expresa en los ejes del usuario.
@@ -116,6 +125,7 @@ export class Inspector {
 
     if (ref.kind === 'particle') this.buildParticle(ref.id, dl, del, close);
     else if (ref.kind === 'surface') this.buildSurface(ref.id, dl, del, close);
+    else if (ref.kind === 'spring') this.buildSpring(ref.id, dl, del, close);
     else if (ref.kind === 'vector') {
       const v = () => this.world.vector(ref.id);
       const label = v()?.label ?? '';
@@ -173,8 +183,14 @@ export class Inspector {
       const q = p();
       return q && len(q.vel) > 1e-9 ? fmtDeg(angleDeg(this.frame.toUser(q.vel))) : '—';
     });
+    const part = (kind: string) => this.actions.forces(id)?.find((f) => f.kind === kind);
+    if (this.world.springs.length) {
+      this.row(dl, '|Fe|', 'vec', () => {
+        const F = part('spring');
+        return F ? `${fmt(len(F.F))} N` : '—';
+      });
+    }
     if (this.world.surfaces.length) {
-      const part = (kind: string) => this.actions.forces(id)?.find((f) => f.kind === kind);
       this.row(dl, '|N|', 'vec', () => {
         const N = part('normal');
         return N ? `${fmt(len(N.F))} N` : '—';
@@ -233,6 +249,39 @@ export class Inspector {
     });
     const note = h('p', { class: 'note' }, 'α: inclinación respecto de la horizontal (perpendicular a g). Arrastra un extremo con Mover para cambiarla.');
     this.el.replaceChildren(close, h('h2', {}, 'Superficie'), muS, muK, dl, note, del);
+  }
+
+  private buildSpring(id: string, dl: HTMLElement, del: HTMLElement, close: HTMLElement): void {
+    const sp = () => this.world.spring(id);
+    const L = () => {
+      const s = sp();
+      return s ? this.world.springLength(s) : 0;
+    };
+    const k = this.stepper(
+      () => `k = ${fmt(sp()?.k ?? 0, 0)} N/m`,
+      ['Resorte más blando', 'Resorte más duro'],
+      () => this.actions.changeSpring(id, 'k', -K_STEP),
+      () => this.actions.changeSpring(id, 'k', K_STEP),
+      () => (sp()?.k ?? 0) > K_MIN,
+      () => (sp()?.k ?? 0) < K_MAX,
+    );
+    const L0 = this.stepper(
+      () => `L₀ = ${fmt(sp()?.restLength ?? 0)} m`,
+      ['Acortar el largo natural', 'Alargar el largo natural'],
+      () => this.actions.changeSpring(id, 'restLength', -L0_STEP),
+      () => this.actions.changeSpring(id, 'restLength', L0_STEP),
+      () => (sp()?.restLength ?? 0) > L0_MIN + 1e-9,
+      () => (sp()?.restLength ?? 0) < L0_MAX - 1e-9,
+    );
+    this.row(dl, 'L', '', () => `${fmt(L())} m`);
+    this.row(dl, 'ΔL = L − L₀', '', () => `${fmt(L() - (sp()?.restLength ?? 0))} m`);
+    this.row(dl, '|F| = k|ΔL|', 'vec', () => `${fmt((sp()?.k ?? 0) * Math.abs(L() - (sp()?.restLength ?? 0)))} N`);
+    this.row(dl, 'T medido', 'vel', () => {
+      const T = this.actions.period(id);
+      return T === null ? '—' : `${fmt(T)} s`;
+    });
+    const note = h('p', { class: 'note' }, 'ΔL > 0: estirado; ΔL < 0: comprimido. T se mide solo al completar una oscilación.');
+    this.el.replaceChildren(close, h('h2', {}, 'Resorte'), k, L0, dl, note, del);
   }
 
   /** Refresca los valores (cada cuadro). */

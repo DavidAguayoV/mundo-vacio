@@ -1,8 +1,8 @@
 import { dist, type Vec2 } from '../core/vec';
 import { surfaceCoords, surfaceFrame } from '../physics/contact';
-import type { FreeVector, Particle, Surface } from '../world/world';
+import type { FreeVector, Particle, SpringLink, Surface } from '../world/world';
 import { FrameDrag } from './frameDrag';
-import { hitParticle, hitSum, hitSurfaceBody, hitSurfaceEnd, hitVectorBody, hitVectorTip, snapToSurface } from './hit';
+import { hitParticle, hitSpring, hitSpringAnchor, hitSum, hitSurfaceBody, hitSurfaceEnd, hitVectorBody, hitVectorTip, snapToSurface } from './hit';
 import { ICONS } from './icons';
 import type { Tool, ToolContext, WorldPointer } from './tool';
 
@@ -37,6 +37,31 @@ export class ParticleDrag {
     const target = snapToSurface(ctx.world, { x: p.x + this.grab.x, y: p.y + this.grab.y }, ctx.view.m(SNAP_PX));
     this.q.pos.x = target.x;
     this.q.pos.y = target.y;
+  }
+
+  /** Al soltar: si quedó estirando o comprimiendo un resorte, el relato se entera. */
+  finish(ctx: ToolContext): void {
+    if (!this.moved) return;
+    const stretched = ctx.world.springsOf(this.q.id).some((sp) => Math.abs(ctx.world.springLength(sp) - sp.restLength) > 0.3);
+    if (stretched) ctx.emit({ type: 'spring-stretched' });
+  }
+}
+
+/** Arrastre del punto fijo de un resorte. */
+class AnchorDrag {
+  private moved = false;
+
+  constructor(
+    private sp: SpringLink,
+    private end: 'a' | 'b',
+  ) {}
+
+  move(p: Vec2, ctx: ToolContext): void {
+    if (!this.moved) {
+      this.moved = true;
+      if (ctx.sim.hasRun) ctx.sim.reset();
+    }
+    this.sp[this.end] = { anchor: { ...p } };
   }
 }
 
@@ -91,6 +116,7 @@ type Drag =
   | { kind: 'frame'; d: FrameDrag }
   | { kind: 'particle'; d: ParticleDrag }
   | { kind: 'surface'; d: SurfaceDrag }
+  | { kind: 'anchor'; d: AnchorDrag }
   | { kind: 'tip'; v: FreeVector }
   | { kind: 'body'; v: FreeVector; last: Vec2 };
 
@@ -119,6 +145,12 @@ export class MoveTool implements Tool {
       this.drag = { kind: 'tip', v: tip };
       return;
     }
+    const anchor = hitSpringAnchor(world, p, tol);
+    if (anchor) {
+      ctx.select({ kind: 'spring', id: anchor.sp.id });
+      this.drag = { kind: 'anchor', d: new AnchorDrag(anchor.sp, anchor.end) };
+      return;
+    }
     const end = hitSurfaceEnd(world, p, tol);
     if (end) {
       ctx.select({ kind: 'surface', id: end.s.id });
@@ -134,6 +166,11 @@ export class MoveTool implements Tool {
     if (body) {
       ctx.select({ kind: 'vector', id: body.id });
       this.drag = { kind: 'body', v: body, last: p };
+      return;
+    }
+    const spring = hitSpring(world, p, tol);
+    if (spring) {
+      ctx.select({ kind: 'spring', id: spring.id });
       return;
     }
     const s = hitSum(world, p, tol);
@@ -153,7 +190,7 @@ export class MoveTool implements Tool {
   onPointerMove({ p }: WorldPointer, ctx: ToolContext): void {
     const d = this.drag;
     if (!d) return;
-    if (d.kind === 'frame' || d.kind === 'particle' || d.kind === 'surface') d.d.move(p, ctx);
+    if (d.kind === 'frame' || d.kind === 'particle' || d.kind === 'surface' || d.kind === 'anchor') d.d.move(p, ctx);
     else if (d.kind === 'tip') d.v.tip = { ...p };
     else {
       const dx = p.x - d.last.x;
@@ -166,6 +203,7 @@ export class MoveTool implements Tool {
 
   onPointerUp(_e: WorldPointer, ctx: ToolContext): void {
     if (this.drag?.kind === 'frame') this.drag.d.end(ctx);
+    if (this.drag?.kind === 'particle') this.drag.d.finish(ctx);
     this.drag = null;
   }
 }

@@ -90,6 +90,21 @@ export const EXAMPLES: Example[] = [
     },
   },
   {
+    id: 'resorte',
+    name: 'Masa colgada de un resorte',
+    description: 'k = 20 N/m y 1 kg, estirado 0,5 m bajo el equilibrio. Mide T en el panel del resorte y compáralo con 2π√(m/k).',
+    build() {
+      const w = base();
+      const k = 20;
+      const L0 = 1.5;
+      const eq = L0 + G_EARTH / k; // largo de equilibrio con 1 kg
+      const anchor = { x: 0, y: 4 };
+      const p = w.addParticle({ x: 0, y: anchor.y - eq - 0.5 }, 1);
+      w.addSpring({ anchor }, { particle: p.id }, k, L0);
+      return exp(w, this.name, this.description);
+    },
+  },
+  {
     id: 'vectores',
     name: 'Suma en ejes girados',
     description: 'A + B con los ejes girados 30°. Gira los ejes desde el asa: cambian las componentes, no la flecha.',

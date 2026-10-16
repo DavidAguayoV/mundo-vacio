@@ -21,6 +21,9 @@ export type GameEvent =
   | { type: 'slow-set' }
   | { type: 'coasted' }
   | { type: 'peak-found' }
+  | { type: 'spring-made' }
+  | { type: 'spring-stretched' }
+  | { type: 'oscillated' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];

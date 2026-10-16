@@ -46,3 +46,18 @@ describe('ejemplos incluidos', () => {
     expect(sim.contactNormal(world.particles[0].id)).not.toBeNull();
   });
 });
+
+describe('ejemplo de resorte', () => {
+  it('el período medido es 2π√(m/k)', async () => {
+    const { SpringForces } = await import('../src/physics/forces');
+    const { OscillationMeter } = await import('../src/physics/oscillationMeter');
+    const world = worldFromJSON(EXAMPLES.find((e) => e.id === 'resorte')!.build().world);
+    const sim = new Simulation(world);
+    sim.forces.push(new UniformGravity(), new SpringForces(() => world.springs));
+    const meter = new OscillationMeter(sim, () => world.springs.map((s) => ({ id: s.id, length: world.springLength(s) })));
+    sim.start();
+    for (let k = 0; k < 240; k++) sim.advance(1 / 60);
+    const T = meter.period(world.springs[0].id)!;
+    expect(Math.abs(T - 2 * Math.PI * Math.sqrt(1 / 20))).toBeLessThan(1 / 240 + 1e-9);
+  });
+});
