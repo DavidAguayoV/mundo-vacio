@@ -11,6 +11,7 @@ export const ICONS = {
   sum: svg('<path d="M4 18l7-4M11 14l7-9M4 18L18 5"/><path d="M18 5l-1 4M18 5l-4 1"/>'),
   gravity: svg('<path d="M6 4v12M12 4v14M18 4v12M6 16l-2-3M6 16l2-3M12 18l-2-3M12 18l2-3M18 16l-2-3M18 16l2-3"/>'),
   velocity: svg('<circle cx="6" cy="17" r="2.5" fill="currentColor"/><path d="M8 15l11-9M19 6h-5M19 6v5"/>'),
+  surface: svg('<path d="M3 15l18-6"/><path d="M6 16l-2 3M10 14.7l-2 3M14 13.3l-2 3M18 12l-2 3" stroke-width="1.2"/><circle cx="12" cy="9" r="2" fill="currentColor"/>'),
   play: svg('<path d="M7 5l12 7-12 7z" fill="currentColor"/>'),
   pause: svg('<path d="M8 5v14M16 5v14"/>'),
   reset: svg('<path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/>'),

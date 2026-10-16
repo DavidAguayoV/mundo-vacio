@@ -1,7 +1,8 @@
 import { dist, segmentDistance, type Vec2 } from '../core/vec';
 import { HANDLE_DIST, VEL_SCALE, particleRadiusPx } from '../render/scales';
 import type { View } from '../render/view';
-import type { FreeVector, Particle, VectorSum, World } from '../world/world';
+import { surfaceCoords, surfaceFrame } from '../physics/contact';
+import type { FreeVector, Particle, Surface, VectorSum, World } from '../world/world';
 
 // Búsqueda de objetos bajo el puntero. Se recorre de atrás hacia adelante: gana lo dibujado encima.
 
@@ -52,4 +53,35 @@ export function handlePos(world: World): Vec2 | null {
   if (!f) return null;
   const ex = f.ex;
   return { x: f.origin.x + HANDLE_DIST * ex.x, y: f.origin.y + HANDLE_DIST * ex.y };
+}
+
+/** Extremo de superficie bajo el puntero. */
+export function hitSurfaceEnd(world: World, p: Vec2, tol: number): { s: Surface; end: 'a' | 'b' } | undefined {
+  for (let i = world.surfaces.length - 1; i >= 0; i--) {
+    const s = world.surfaces[i];
+    if (dist(s.b, p) <= tol) return { s, end: 'b' };
+    if (dist(s.a, p) <= tol) return { s, end: 'a' };
+  }
+  return undefined;
+}
+
+export function hitSurfaceBody(world: World, p: Vec2, tol: number): Surface | undefined {
+  for (let i = world.surfaces.length - 1; i >= 0; i--) {
+    const s = world.surfaces[i];
+    if (segmentDistance(p, s.a, s.b) <= tol * 0.8) return s;
+  }
+  return undefined;
+}
+
+/**
+ * Si p está a menos de tol de alguna superficie (dentro del segmento), lo lleva exactamente sobre ella:
+ * así una partícula soltada cerca de una superficie queda apoyada al lanzar.
+ */
+export function snapToSurface(world: World, p: Vec2, tol: number): Vec2 {
+  for (const s of world.surfaces) {
+    const f = surfaceFrame(s);
+    const { d, u } = surfaceCoords(s, f, p);
+    if (Math.abs(d) <= tol && u >= 0 && u <= f.length) return { x: s.a.x + u * f.t.x, y: s.a.y + u * f.t.y };
+  }
+  return p;
 }

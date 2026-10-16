@@ -1,4 +1,5 @@
 import { fieldLayer } from './layers/field';
+import { surfacesLayer } from './layers/surfaces';
 import { axesLayer, gridLayer } from './layers/frame';
 import { particlesLayer, trailsLayer } from './layers/particles';
 import { targetLayer } from './layers/target';
@@ -10,6 +11,7 @@ const LAYERS: Layer[] = [
   gridLayer,
   fieldLayer,
   axesLayer,
+  surfacesLayer,
   targetLayer,
   trailsLayer,
   vectorsLayer,

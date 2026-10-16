@@ -1,6 +1,6 @@
 import type { Vec2 } from '../core/vec';
 import type { Constraint } from './constraints';
-import { makeAccel, type Force } from './forces';
+import { forceParts, makeAccel, type Force, type ForcePart } from './forces';
 import { RK4Integrator } from './integrator';
 import { stateFromBodies, type Body, type ForceWorld, type SystemState } from './state';
 
@@ -74,6 +74,8 @@ export class Simulation {
       this.t = 0;
       this.steps = 0;
       this.acc = 0;
+      const s = stateFromBodies(this.world.particles, 0);
+      for (const c of this.constraints) c.begin?.(s, this.world);
     }
     this.running = true;
     this.onStateChange?.();
@@ -110,6 +112,7 @@ export class Simulation {
     const changed = this.running || this.finished || this.snapshot !== null;
     this.snapshot = null;
     this.trails.clear();
+    for (const c of this.constraints) c.reset?.();
     this.t = 0;
     this.steps = 0;
     this.acc = 0;
@@ -136,6 +139,26 @@ export class Simulation {
       this.finished = true;
       this.onStateChange?.();
     }
+  }
+
+  /** Normal de contacto si la partícula está apoyada en una superficie. */
+  contactNormal(id: string): Vec2 | null {
+    for (const c of this.constraints) {
+      const n = c.contactNormal?.(id);
+      if (n) return n;
+    }
+    return null;
+  }
+
+  /** Fuerzas sobre una partícula en el estado actual y la aceleración resultante. */
+  forcesOn(id: string): { parts: ForcePart[]; accel: Vec2 } | null {
+    const s = stateFromBodies(this.world.particles, this.t);
+    const i = s.index.get(id);
+    if (i === undefined) return null;
+    const parts = forceParts(this.forces, i, s, this.world);
+    const m = s.mass[i];
+    const accel = parts.reduce((a, p) => ({ x: a.x + p.F.x / m, y: a.y + p.F.y / m }), { x: 0, y: 0 });
+    return { parts, accel };
   }
 
   private stepOnce(s: SystemState, accel: ReturnType<typeof makeAccel>): void {

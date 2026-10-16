@@ -1,11 +1,13 @@
 import type { Force, ForceJSON } from './force';
 import { Drag } from './drag';
+import { FrictionForce } from './friction';
 import { Gravitation } from './gravitation';
+import { NormalForce } from './normal';
 import { Spring } from './spring';
 import { UniformGravity } from './uniformGravity';
 
 export * from './force';
-export { Drag, Gravitation, Spring, UniformGravity };
+export { Drag, FrictionForce, Gravitation, NormalForce, Spring, UniformGravity };
 
 /** Reconstruye una fuerza desde su JSON (guardar/cargar experimentos). */
 export function forceFromJSON(j: ForceJSON): Force {

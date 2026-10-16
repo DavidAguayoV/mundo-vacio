@@ -27,6 +27,11 @@ function ensureSum(ctx: StoryContext): void {
   if (!world.sums.length) world.addSum(world.vectors[0].id, world.vectors[1].id);
 }
 
+/** Un suelo bajo las partículas sembradas. */
+function ensureSurface({ world }: StoryContext): void {
+  if (!world.surfaces.length) world.addSurface({ x: -5, y: -1 }, { x: 5, y: -1 });
+}
+
 function ensureG({ world }: StoryContext): void {
   if (!world.g) world.g = { x: 0, y: -G_EARTH };
 }
@@ -177,8 +182,51 @@ export const CHAPTERS: Chapter[] = [
         },
       },
       {
-        text: 'Resolviste un problema de proyectiles sin escribir una ecuación. Cada punto salió de integrar a = g paso a paso con Runge-Kutta de orden 4. Lo que sigue: superficies, normal y roce.',
+        text: 'Resolviste un problema de proyectiles sin escribir una ecuación. Cada punto salió de integrar a = g paso a paso con Runge-Kutta de orden 4. Pero nada detiene todavía una caída.',
+        on: 'next',
+      },
+    ],
+  },
+  {
+    id: 'superficies',
+    title: 'Superficies',
+    unlocks: ['surface'],
+    sim: true,
+    seed: (ctx) => {
+      ensureFrame(ctx);
+      ensureParticles(ctx);
+      ensureG(ctx);
+      ctx.world.targets = [];
+    },
+    steps: [
+      {
+        text: 'Elige Superficie y arrastra para dibujar un suelo bajo las partículas.',
+        on: 'surface-drawn',
+      },
+      {
+        text: 'Presiona Lanzar. La partícula cae, toca la superficie y se queda ahí: la superficie la empuja. Esa fuerza es la normal N, perpendicular a la superficie. Las flechas ámbar son las fuerzas sobre la partícula.',
+        on: 'landed',
+        enter: ensureSurface,
+      },
+      {
+        text: 'Con Mover, arrastra un extremo de la superficie para inclinarla un poco y lanza otra vez. La partícula queda quieta en la pendiente: el roce estático f, paralelo a la superficie, la sostiene.',
+        on: 'held',
+        enter: ensureSurface,
+      },
+      {
+        text: 'Inclínala más, hasta que la partícula deslice. El roce estático tiene un máximo, μₛN; si la componente del peso a lo largo de la superficie lo supera, la partícula desliza y el roce pasa a ser cinético: f = μc N, opuesto al deslizamiento.',
+        on: 'slid',
+        enter: ensureSurface,
+      },
+      {
+        text: 'Toca la superficie con Mover para ver μₛ, μc y su inclinación α. Una partícula soltada sobre ella queda apoyada; si tan α > μₛ, desliza. Buscar el ángulo en que empieza a deslizar es una forma de medir μₛ.',
+        on: 'next',
+        enter: ensureSurface,
+      },
+      {
+        text: 'Ya tienes las fuerzas de contacto: la normal impide atravesar la superficie y el roce se opone al deslizamiento. Mira que a, la flecha rosa, es la suma de todas las fuerzas dividida por m. Lo que sigue: resortes, gravitación entre masas y arrastre.',
         on: 'end',
+        enter: ensureSurface,
       },
     ],
   },
@@ -189,4 +237,5 @@ export function seedFree(ctx: StoryContext): void {
   ensureFrame(ctx);
   ensureParticles(ctx);
   ensureG(ctx);
+  ensureSurface(ctx);
 }

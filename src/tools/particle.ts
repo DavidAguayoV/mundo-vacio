@@ -1,4 +1,4 @@
-import { hitParticle } from './hit';
+import { hitParticle, snapToSurface } from './hit';
 import { ICONS } from './icons';
 import { ParticleDrag } from './move';
 import type { Tool, ToolContext, WorldPointer } from './tool';
@@ -20,7 +20,7 @@ export class ParticleTool implements Tool {
     }
     // editar el mundo vuelve al estado de preparación del experimento
     if (sim.hasRun) sim.reset();
-    const n = world.addParticle(p, 1);
+    const n = world.addParticle(snapToSurface(world, p, view.m(12)), 1);
     ctx.select({ kind: 'particle', id: n.id });
     this.drag = new ParticleDrag(n, p, view.m(4));
     ctx.emit({ type: 'particle-placed' });

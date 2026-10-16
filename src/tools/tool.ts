@@ -5,7 +5,7 @@ import type { Painter } from '../render/painter';
 import type { View } from '../render/view';
 import type { EntityRef, World } from '../world/world';
 
-export type ToolId = 'move' | 'origin' | 'particle' | 'vector' | 'sum' | 'gravity' | 'velocity';
+export type ToolId = 'move' | 'origin' | 'particle' | 'vector' | 'sum' | 'gravity' | 'velocity' | 'surface';
 
 /** Un toque o clic ya convertido a metros. */
 export interface WorldPointer {

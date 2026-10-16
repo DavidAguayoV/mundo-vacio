@@ -1,4 +1,5 @@
 import type { Vec2 } from '../core/vec';
+import type { SurfaceLike } from '../physics/contact';
 import type { Body, ForceWorld } from '../physics/state';
 import { ReferenceFrame } from './frame';
 
@@ -29,19 +30,17 @@ export interface Target {
   radius: number; // m
 }
 
-/** Superficie plana (segmento). Fase 2: normal y roce. */
-export interface Surface {
-  id: string;
-  a: Vec2;
-  b: Vec2;
-  muS: number;
-  muK: number;
-}
+/** Superficie plana y rígida (segmento) con roce estático μₛ y cinético μc. */
+export type Surface = SurfaceLike;
+
+export const DEFAULT_MU_S = 0.6;
+export const DEFAULT_MU_K = 0.4;
 
 export type EntityRef =
   | { kind: 'particle'; id: string }
   | { kind: 'vector'; id: string }
-  | { kind: 'sum'; id: string };
+  | { kind: 'sum'; id: string }
+  | { kind: 'surface'; id: string };
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -145,18 +144,36 @@ export class World implements ForceWorld {
     return { A, B, tail: A.tail, bTail: A.tip, tip: { x: A.tip.x + bx, y: A.tip.y + by } };
   }
 
+  // ----- superficies -----
+
+  addSurface(a: Vec2, b: Vec2, muS = DEFAULT_MU_S, muK = DEFAULT_MU_K): Surface {
+    const s: Surface = { id: this.newId('f'), a: { ...a }, b: { ...b }, muS, muK };
+    this.surfaces.push(s);
+    return s;
+  }
+
+  surface(id: string): Surface | undefined {
+    return this.surfaces.find((s) => s.id === id);
+  }
+
+  removeSurface(id: string): void {
+    this.surfaces = this.surfaces.filter((s) => s.id !== id);
+  }
+
   // ----- selección -----
 
   exists(ref: EntityRef | null): boolean {
     if (!ref) return false;
     if (ref.kind === 'particle') return !!this.particle(ref.id);
     if (ref.kind === 'vector') return !!this.vector(ref.id);
+    if (ref.kind === 'surface') return !!this.surface(ref.id);
     return !!this.sum(ref.id);
   }
 
   remove(ref: EntityRef): void {
     if (ref.kind === 'particle') this.removeParticle(ref.id);
     else if (ref.kind === 'vector') this.removeVector(ref.id);
+    else if (ref.kind === 'surface') this.removeSurface(ref.id);
     else this.removeSum(ref.id);
   }
 }

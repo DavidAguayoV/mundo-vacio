@@ -53,10 +53,16 @@ export class StoryEngine {
     return s;
   }
 
-  /** Herramientas que se desbloquean en el capítulo siguiente (para marcar "próxima" en el árbol). */
-  upcomingTools(): ToolId[] {
-    if (this.free) return [];
-    return this.chapters[this.progress.chapter + 1]?.unlocks ?? [];
+  /** Capítulos ya alcanzados (todos en modo libre). */
+  reachedChapters(): Set<string> {
+    const upTo = this.free ? this.chapters.length - 1 : this.progress.chapter;
+    return new Set(this.chapters.slice(0, upTo + 1).map((c) => c.id));
+  }
+
+  /** Capítulo siguiente, para marcar "próxima" en el árbol (null si ya no quedan). */
+  nextChapter(): string | null {
+    if (this.free) return null;
+    return this.chapters[this.progress.chapter + 1]?.id ?? null;
   }
 
   simEnabled(): boolean {

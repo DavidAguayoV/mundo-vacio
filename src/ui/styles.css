@@ -327,6 +327,35 @@ button {
   font-size: 13px;
 }
 
+.inspector {
+  position: relative;
+}
+
+.inspector .close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.inspector .close:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.inspector .close:focus-visible {
+  outline: 2px solid var(--vel);
+  outline-offset: 2px;
+}
+
 .inspector h2 {
   margin: 0;
   font-size: 12px;
@@ -381,6 +410,18 @@ button {
   padding: 3px 11px;
   font-size: 15px;
   line-height: 1.2;
+}
+
+.inspector .note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.mass .btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .inspector .del {
@@ -563,6 +604,10 @@ button {
   .inspector .kv {
     gap: 2px 8px;
     font-size: 12px;
+  }
+
+  .inspector .note {
+    display: none;
   }
 
   .card h1 {

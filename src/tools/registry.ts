@@ -3,12 +3,13 @@ import { MoveTool } from './move';
 import { OriginTool } from './origin';
 import { ParticleTool } from './particle';
 import { SumTool } from './sum';
+import { SurfaceTool } from './surface';
 import type { Tool, ToolId } from './tool';
 import { VectorTool } from './vector';
 import { VelocityTool } from './velocity';
 
 /** Orden en la caja de herramientas. Agregar una herramienta nueva = una línea aquí + su archivo. */
-export const TOOL_ORDER: ToolId[] = ['move', 'origin', 'particle', 'vector', 'sum', 'gravity', 'velocity'];
+export const TOOL_ORDER: ToolId[] = ['move', 'origin', 'particle', 'vector', 'sum', 'gravity', 'velocity', 'surface'];
 
 export function createTools(): Record<ToolId, Tool> {
   return {
@@ -19,5 +20,6 @@ export function createTools(): Record<ToolId, Tool> {
     sum: new SumTool(),
     gravity: new GravityTool(),
     velocity: new VelocityTool(),
+    surface: new SurfaceTool(),
   };
 }

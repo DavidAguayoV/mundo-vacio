@@ -1,6 +1,7 @@
 import { EventBus, type GameEvent } from './core/events';
 import { dist } from './core/vec';
-import { Spring, UniformGravity } from './physics/forces';
+import { SurfaceConstraint } from './physics/constraints';
+import { FrictionForce, NormalForce, Spring, UniformGravity } from './physics/forces';
 import { Simulation } from './physics/simulation';
 import { Painter } from './render/painter';
 import { drawScene } from './render/renderer';
@@ -8,6 +9,7 @@ import { applyTheme, loadTheme, readPalette } from './render/theme';
 import { View } from './render/view';
 import { freshProgress, loadProgress, saveProgress, type Progress } from './state/progress';
 import { CHAPTERS, seedFree } from './story/chapters';
+import { RunMonitor } from './story/runMonitor';
 import { StoryEngine } from './story/storyEngine';
 import { FrameDrag } from './tools/frameDrag';
 import { TOOL_ORDER, createTools } from './tools/registry';
@@ -16,7 +18,7 @@ import { TreeView } from './tree/treeView';
 import { StoryCard } from './ui/card';
 import { $ } from './ui/dom';
 import { Hud } from './ui/hud';
-import { Inspector, clampMass } from './ui/inspector';
+import { Inspector, MU_MAX, clampMass } from './ui/inspector';
 import { Toast } from './ui/toast';
 import { Toolbar } from './ui/toolbar';
 import { G_EARTH, World, type EntityRef } from './world/world';
@@ -57,8 +59,8 @@ export class Game {
   private pointerId: number | null = null;
   private frameDrag: FrameDrag | null = null;
   private hitFlash = 0;
-  private fellRun = -1;
-  private hadFrame = false;
+  private monitor: RunMonitor;
+  private structure = '';
   private last = 0;
   private fps = 60;
   private restartArmed = 0;
@@ -69,7 +71,11 @@ export class Game {
     applyTheme(loadTheme());
     this.painter = new Painter(ctx2d, this.view, readPalette());
 
-    this.sim.forces.push(new UniformGravity());
+    // superficies: la restricción decide quién está apoyado; la normal y el roce leen esos contactos
+    const surfaces = new SurfaceConstraint(() => this.world.surfaces);
+    this.sim.constraints.push(surfaces);
+    this.sim.forces.push(new UniformGravity(), new NormalForce(surfaces.contacts), new FrictionForce(surfaces.contacts));
+    this.monitor = new RunMonitor(this.world, this.sim, (ev) => this.bus.emit(ev));
 
     const stress = opts.stress ?? 0;
     const progress: Progress = stress ? { ...freshProgress(), free: true } : loadProgress(CHAPTERS.length);
@@ -115,10 +121,24 @@ export class Game {
         q.mass = m;
         this.bus.emit({ type: 'mass-changed' });
       },
+      changeMu: (id, which, delta) => {
+        const sf = this.world.surface(id);
+        if (!sf) return;
+        const round = (x: number) => Math.round(x * 100) / 100;
+        if (which === 'muS') {
+          sf.muS = round(Math.min(MU_MAX, Math.max(0, sf.muS + delta)));
+          sf.muK = Math.min(sf.muK, sf.muS);
+        } else {
+          sf.muK = round(Math.min(sf.muS, Math.max(0, sf.muK + delta)));
+        }
+      },
       remove: (ref) => {
         this.world.remove(ref);
+        if (ref.kind === 'surface') this.sim.clearRun();
         this.select(null);
       },
+      forces: (id) => this.sim.forcesOn(id)?.parts ?? null,
+      close: () => this.select(null),
     });
     this.hud = new Hud(!!opts.debug || stress > 0);
     this.tree = new TreeView(() => this.tree.hide());
@@ -191,7 +211,7 @@ export class Game {
     this.restartArmed = 0;
     $('restartBtn').textContent = 'Empezar de nuevo';
     $('restartBtn').classList.remove('warn');
-    this.tree.show(this.unlocked(), this.story.upcomingTools());
+    this.tree.show(this.story.reachedChapters(), this.story.nextChapter());
   }
 
   private setFree(free: boolean): void {
@@ -347,13 +367,14 @@ export class Game {
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
 
     this.sim.advance(dt);
-    this.checkFell();
+    this.monitor.update();
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
     if (this.opts.stress && this.sim.finished) this.sim.start();
 
-    const hasFrame = !!this.world.frame;
-    if (hasFrame !== this.hadFrame) {
-      this.hadFrame = hasFrame;
+    // el inspector agrega filas cuando aparece el origen, la primera superficie o g
+    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${!!this.world.g}`;
+    if (structure !== this.structure) {
+      this.structure = structure;
       this.inspector.rebuild();
     }
     if (this.selection && !this.world.exists(this.selection)) this.select(null);
@@ -372,19 +393,6 @@ export class Game {
       draft: tool.renderDraft ? (p) => tool.renderDraft!(p, this.ctx) : null,
     });
     requestAnimationFrame((t) => this.loop(t));
-  }
-
-  /** "Cayó": alguna partícula se alejó más de 1 m de donde partió en este lanzamiento. */
-  private checkFell(): void {
-    if (!this.sim.hasRun || this.fellRun === this.sim.runId) return;
-    const moved = this.world.particles.some((p) => {
-      const s = this.sim.initialState(p.id);
-      return s && dist(p.pos, s.pos) > 1;
-    });
-    if (moved) {
-      this.fellRun = this.sim.runId;
-      this.bus.emit({ type: 'fell' });
-    }
   }
 
   // ---------- prueba de rendimiento ----------

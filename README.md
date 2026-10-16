@@ -27,10 +27,11 @@ El workflow `.github/workflows/deploy.yml` corre los tests, construye y publica 
 | Carpeta | Qué hay |
 | --- | --- |
 | `src/physics` | RK4 de sistema con paso fijo (1/240 s), fuerzas (`Force`), simulación con acumulador y estroboscopio |
+| `src/physics/constraints` | superficies rígidas: choque plástico, contacto, separación; la normal y el roce (`forces/normal.ts`, `forces/friction.ts`) leen esos contactos |
 | `src/world` | entidades serializables, sistema de referencia del usuario (`toUser` / `toGlobal`) |
 | `src/render` | cámara, paleta desde los tokens CSS, capas del lienzo |
 | `src/tools` | herramientas como plugins (`Tool`), una por archivo |
-| `src/story` | capítulos como datos (`Chapter`, `Step`) y el motor que avanza con los eventos del juego |
+| `src/story` | capítulos como datos (`Chapter`, `Step`), el motor que avanza con los eventos del juego y `RunMonitor`, que traduce cada lanzamiento en eventos (cayó, se apoyó, la sostiene el roce, desliza) |
 | `src/tree` | árbol de habilidades |
 | `src/ui` | tarjeta de relato, caja de herramientas, inspector, HUD |
 

@@ -1,13 +1,18 @@
 import { dist, type Vec2 } from '../core/vec';
-import type { FreeVector, Particle } from '../world/world';
+import { surfaceCoords, surfaceFrame } from '../physics/contact';
+import type { FreeVector, Particle, Surface } from '../world/world';
 import { FrameDrag } from './frameDrag';
-import { hitParticle, hitSum, hitVectorBody, hitVectorTip } from './hit';
+import { hitParticle, hitSum, hitSurfaceBody, hitSurfaceEnd, hitVectorBody, hitVectorTip, snapToSurface } from './hit';
 import { ICONS } from './icons';
 import type { Tool, ToolContext, WorldPointer } from './tool';
+
+/** Distancia en píxeles a la que una partícula soltada se apoya sola en una superficie. */
+const SNAP_PX = 12;
 
 /**
  * Arrastre de una partícula. Tocar sin arrastrar solo la selecciona (se puede mirar su v en pleno vuelo);
  * al moverla de verdad, el lanzamiento se olvida y su posición actual pasa a ser la inicial.
+ * Cerca de una superficie, la partícula queda apoyada exactamente sobre ella.
  */
 export class ParticleDrag {
   private moved = false;
@@ -29,14 +34,63 @@ export class ParticleDrag {
       this.moved = true;
       ctx.sim.clearRun();
     }
-    this.q.pos.x = p.x + this.grab.x;
-    this.q.pos.y = p.y + this.grab.y;
+    const target = snapToSurface(ctx.world, { x: p.x + this.grab.x, y: p.y + this.grab.y }, ctx.view.m(SNAP_PX));
+    this.q.pos.x = target.x;
+    this.q.pos.y = target.y;
+  }
+}
+
+/**
+ * Arrastre de una superficie entera o de uno de sus extremos (para inclinarla).
+ * Las partículas apoyadas en ella se mueven con ella: así se puede ir inclinando de a poco
+ * una superficie con una partícula encima y buscar el ángulo en que empieza a deslizar.
+ */
+class SurfaceDrag {
+  private moved = false;
+  private last: Vec2;
+  /** partículas apoyadas y su posición relativa a lo largo del segmento (0 en a, 1 en b) */
+  private riders: { q: Particle; frac: number }[] = [];
+
+  constructor(
+    private s: Surface,
+    private end: 'a' | 'b' | null,
+    p: Vec2,
+  ) {
+    this.last = { ...p };
+  }
+
+  move(p: Vec2, ctx: ToolContext): void {
+    if (!this.moved) {
+      this.moved = true;
+      // la geometría cambia: se vuelve al comienzo del lanzamiento (las partículas a su posición inicial)
+      if (ctx.sim.hasRun) ctx.sim.reset();
+      const f = surfaceFrame(this.s);
+      for (const q of ctx.world.particles) {
+        const { d, u } = surfaceCoords(this.s, f, q.pos);
+        if (Math.abs(d) < 1e-6 && u >= 0 && u <= f.length) this.riders.push({ q, frac: u / f.length });
+      }
+    }
+    if (this.end) {
+      this.s[this.end] = { ...p };
+    } else {
+      const dx = p.x - this.last.x;
+      const dy = p.y - this.last.y;
+      this.s.a = { x: this.s.a.x + dx, y: this.s.a.y + dy };
+      this.s.b = { x: this.s.b.x + dx, y: this.s.b.y + dy };
+    }
+    this.last = { ...p };
+    const { a, b } = this.s;
+    for (const { q, frac } of this.riders) {
+      q.pos.x = a.x + frac * (b.x - a.x);
+      q.pos.y = a.y + frac * (b.y - a.y);
+    }
   }
 }
 
 type Drag =
   | { kind: 'frame'; d: FrameDrag }
   | { kind: 'particle'; d: ParticleDrag }
+  | { kind: 'surface'; d: SurfaceDrag }
   | { kind: 'tip'; v: FreeVector }
   | { kind: 'body'; v: FreeVector; last: Vec2 };
 
@@ -65,6 +119,12 @@ export class MoveTool implements Tool {
       this.drag = { kind: 'tip', v: tip };
       return;
     }
+    const end = hitSurfaceEnd(world, p, tol);
+    if (end) {
+      ctx.select({ kind: 'surface', id: end.s.id });
+      this.drag = { kind: 'surface', d: new SurfaceDrag(end.s, end.end, p) };
+      return;
+    }
     const fo = FrameDrag.tryStart(p, tol, ctx, true);
     if (fo) {
       this.drag = { kind: 'frame', d: fo };
@@ -77,14 +137,23 @@ export class MoveTool implements Tool {
       return;
     }
     const s = hitSum(world, p, tol);
-    ctx.select(s ? { kind: 'sum', id: s.id } : null);
+    if (s) {
+      ctx.select({ kind: 'sum', id: s.id });
+      return;
+    }
+    const surf = hitSurfaceBody(world, p, tol);
+    if (surf) {
+      ctx.select({ kind: 'surface', id: surf.id });
+      this.drag = { kind: 'surface', d: new SurfaceDrag(surf, null, p) };
+      return;
+    }
+    ctx.select(null);
   }
 
   onPointerMove({ p }: WorldPointer, ctx: ToolContext): void {
     const d = this.drag;
     if (!d) return;
-    if (d.kind === 'frame') d.d.move(p, ctx);
-    else if (d.kind === 'particle') d.d.move(p, ctx);
+    if (d.kind === 'frame' || d.kind === 'particle' || d.kind === 'surface') d.d.move(p, ctx);
     else if (d.kind === 'tip') d.v.tip = { ...p };
     else {
       const dx = p.x - d.last.x;

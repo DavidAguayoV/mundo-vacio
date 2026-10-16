@@ -70,8 +70,7 @@ describe('relato', () => {
 
   it('el árbol marca disponible, próxima y bloqueada', () => {
     const { story } = setup();
-    const states = () =>
-      Object.fromEntries(SKILLS.map((n) => [n.id, skillState(n, story.unlockedTools(TOOL_ORDER), story.upcomingTools())]));
+    const states = () => Object.fromEntries(SKILLS.map((n) => [n.id, skillState(n, story.reachedChapters(), story.nextChapter())]));
     let s = states();
     expect(s.origin).toBe('disponible');
     expect(s.particle).toBe('próxima');
@@ -80,7 +79,12 @@ describe('relato', () => {
     s = states();
     expect(s.velocity).toBe('disponible');
     expect(s.surface).toBe('próxima');
-    expect(s.normal).toBe('bloqueada');
+    expect(s.friction).toBe('próxima');
+    expect(s.spring).toBe('bloqueada');
+    story.progress = { version: 1, chapter: 5, step: 0, free: false };
+    s = states();
+    expect(s.normal).toBe('disponible');
+    expect(s.spring).toBe('próxima');
   });
 
   it('el blanco del capítulo 5 queda dentro de la pantalla', () => {

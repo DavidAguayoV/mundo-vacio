@@ -12,6 +12,10 @@ export type GameEvent =
   | { type: 'fell' }
   | { type: 'v-set' }
   | { type: 'target-hit' }
+  | { type: 'surface-drawn' }
+  | { type: 'landed' }
+  | { type: 'held' }
+  | { type: 'slid' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];
