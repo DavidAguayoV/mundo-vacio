@@ -22,5 +22,6 @@ export const ICONS = {
   step: svg('<path d="M6 5l9 7-9 7z" fill="currentColor"/><path d="M18 5v14"/>'),
   slow: svg('<circle cx="12" cy="13" r="8"/><path d="M12 13V9M10 2h4M12 13l3 2"/>'),
   reset: svg('<path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/>'),
+  more: svg('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
   tree: svg('<circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><path d="M12 7v5M12 12l-6 5M12 12l6 5"/>'),
 } as const;

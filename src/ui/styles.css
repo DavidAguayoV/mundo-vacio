@@ -227,49 +227,69 @@ button {
 .btn:focus-visible,
 .tool:focus-visible,
 .min:focus-visible {
-  outline: 2px solid var(--vel);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
 /* ---------- caja de herramientas ---------- */
 
+/* Sin caja: tres zonas sobre el vacío (herramientas, tiempo, árbol), con una penumbra suave detrás para leerlas. */
 .bar {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  max-width: calc(100% - 32px);
-  display: flex;
-  gap: 4px;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  padding: 5px;
-  overflow-x: auto;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  scrollbar-width: none;
+  gap: 12px;
+  isolation: isolate;
+  pointer-events: none;
 }
 
-.bar::-webkit-scrollbar {
-  display: none;
+.bar::before {
+  content: '';
+  position: absolute;
+  inset: -48px -16px calc(-12px - env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg-edge) 85%, transparent), transparent);
+  z-index: -1;
+}
+
+.zone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.zone.time {
+  gap: 6px;
+}
+
+.zone.meta {
+  justify-content: flex-end;
 }
 
 .tool {
+  position: relative;
   flex: none;
   display: grid;
-  justify-items: center;
-  gap: 2px;
-  width: 62px;
-  padding: 6px 2px 5px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition: color 0.15s;
 }
 
-.tool:hover {
-  color: var(--ink);
+.tool .ico {
+  display: grid;
 }
 
 .tool svg {
@@ -277,14 +297,174 @@ button {
   height: 20px;
 }
 
-.tool span {
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
+.tool:hover,
+.tool:focus-visible {
+  color: var(--ink);
 }
 
+/* herramienta elegida o interruptor encendido: tinta y un punto bajo el ícono */
 .tool[aria-pressed='true'] {
-  background: var(--line);
   color: var(--ink);
+}
+
+.tool[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* nombre del botón: aparece al pasar el mouse o al enfocar con el teclado */
+.tool .tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  display: none;
+}
+
+.zone.tools > .tool .tip {
+  left: 0;
+  transform: none;
+}
+
+.zone.meta .tool .tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.tool:hover .tip,
+.tool:focus-visible .tip {
+  display: block;
+}
+
+/* comienzo del relato: pocas herramientas, con su nombre a la vista */
+.bar.labeled .zone.tools .tool,
+.bar.labeled .zone.meta .tool,
+.bar.labeled .zone.time .tool:not(.play) {
+  width: auto;
+  min-width: 56px;
+  height: 52px;
+  padding: 4px 10px 6px;
+  gap: 3px;
+  grid-template-rows: 22px auto;
+}
+
+.bar.labeled .zone:not(.time) .tool .tip,
+.bar.labeled .zone.time .tool:not(.play) .tip {
+  display: block;
+  position: static;
+  transform: none;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: var(--t-sm);
+}
+
+.bar.labeled .tool[aria-pressed='true']::after {
+  display: none;
+}
+
+.bar.labeled .tool[aria-pressed='true'] .tip {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+/* el tiempo: el control principal */
+.tool.play {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.tool.play:hover,
+.tool.play:focus-visible {
+  color: var(--bg);
+}
+
+.tool.play svg {
+  width: 22px;
+  height: 22px;
+}
+
+.tool.play[aria-pressed='true']::after {
+  display: none;
+}
+
+.tool .badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tool .badge:empty {
+  display: none;
+}
+
+/* menú «Más»: las herramientas que no caben, con su nombre */
+.menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  min-width: 190px;
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--bg-edge) 60%, transparent);
+  z-index: 2;
+}
+
+.menu .tool {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 10px;
+}
+
+.menu .tool .tip,
+.bar.labeled .menu .tool .tip {
+  display: block;
+  position: static;
+  transform: none;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: var(--t-md);
+}
+
+.menu .tool[aria-pressed='true']::after {
+  left: auto;
+  right: 12px;
+  bottom: 50%;
+  margin: 0 0 -2px;
 }
 
 .tool.new {
@@ -295,14 +475,6 @@ button {
   50% {
     box-shadow: 0 0 0 2px var(--vec);
   }
-}
-
-.sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--line);
-  margin: 4px 3px;
-  flex: none;
 }
 
 /* ---------- HUD e inspector ---------- */
@@ -373,7 +545,7 @@ button {
 }
 
 .inspector .close:focus-visible {
-  outline: 2px solid var(--vel);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -541,13 +713,12 @@ button {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
-  background: var(--ink);
-  color: var(--bg);
-  padding: 8px 14px;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 14px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--ink);
+  font-size: var(--t-md);
   white-space: nowrap;
   max-width: calc(100% - 32px);
   overflow: hidden;
@@ -715,53 +886,105 @@ button {
 
 /* ---------- línea de tiempo ---------- */
 
+/* Riel fino y neutro: el cian queda solo para la velocidad. */
 .timeline {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-  width: min(520px, calc(100% - 32px));
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  width: min(560px, calc(100% - 32px));
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font: 500 12px var(--mono);
+  gap: 12px;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
+}
+
+.timeline label {
+  font: italic 400 var(--t-lg) var(--display);
+  color: var(--ink);
+  line-height: 1;
 }
 
 .timeline input {
+  --p: 0%;
   flex: 1;
   min-width: 0;
-  accent-color: var(--vel);
   height: 24px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.timeline input::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to right, color-mix(in srgb, var(--ink) 55%, transparent) var(--p), color-mix(in srgb, var(--muted) 35%, transparent) var(--p));
+}
+
+.timeline input::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to right, color-mix(in srgb, var(--ink) 55%, transparent) var(--p), color-mix(in srgb, var(--muted) 35%, transparent) var(--p));
+}
+
+.timeline input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.timeline input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.timeline input:focus-visible {
+  outline: none;
+}
+
+.timeline input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ink);
+}
+
+.timeline input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ink);
 }
 
 .timeline output {
-  min-width: 52px;
+  min-width: 56px;
   text-align: right;
+  font: 400 var(--t-sm) var(--mono);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
 #app.has-timeline .toast {
-  bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(114px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ---------- celular ---------- */
 
 @media (max-width: 700px) {
   #app.has-timeline .dock {
-    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   }
 
   .dock {
     top: auto;
     left: max(16px, env(safe-area-inset-left, 0px));
     right: max(16px, env(safe-area-inset-right, 0px));
-    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     width: auto;
     justify-items: stretch;
     gap: 8px;
@@ -812,8 +1035,21 @@ button {
     font-size: 14px;
   }
 
-  .tool {
-    width: 56px;
+  .bar {
+    gap: 6px;
+  }
+
+  .zone.time {
+    gap: 2px;
+  }
+
+  .bar:not(.labeled) .tool:not(.play) {
+    width: 36px;
+  }
+
+  .tool.play {
+    width: 46px;
+    height: 46px;
   }
 }
 
@@ -845,7 +1081,7 @@ button {
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--vel);
+  outline: 2px solid var(--ink);
   outline-offset: 1px;
 }
 
@@ -916,5 +1152,5 @@ button {
 .check input {
   width: 16px;
   height: 16px;
-  accent-color: var(--vel);
+  accent-color: var(--ink);
 }
