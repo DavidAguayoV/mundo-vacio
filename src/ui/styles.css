@@ -98,50 +98,61 @@ button {
   display: none !important;
 }
 
-/* ---------- tarjeta de relato ---------- */
+/* ---------- relato ---------- */
 
+/* El relato no es una ventana: es texto escrito sobre el vacío, con una penumbra apenas sugerida detrás. */
 .card {
   position: absolute;
-  top: max(14px, env(safe-area-inset-top, 0px));
-  left: max(16px, env(safe-area-inset-left, 0px));
-  width: min(400px, calc(100% - 32px));
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px 16px;
+  top: max(20px, env(safe-area-inset-top, 0px));
+  left: max(24px, env(safe-area-inset-left, 0px));
+  width: min(460px, calc(100% - 48px));
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  isolation: isolate;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: -40px -64px -40px -48px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--bg) 78%, transparent), transparent);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .eyebrow {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-  padding-right: 28px;
+  font-size: var(--t-sm);
+  color: var(--muted);
+  padding-right: 36px;
 }
 
 .card h1 {
   font-family: var(--display);
-  font-style: italic;
   font-weight: 400;
-  font-size: 30px;
-  line-height: 1.05;
+  font-size: var(--t-2xl);
+  line-height: 1;
+  letter-spacing: -0.005em;
   margin: 0;
   text-wrap: balance;
 }
 
 .card p {
   margin: 0;
-  line-height: 1.5;
-  font-size: 14.5px;
+  font-family: var(--display);
+  font-size: 21px;
+  line-height: 1.4;
+  max-width: 34em;
   text-wrap: pretty;
+  text-shadow: 0 0 18px var(--bg), 0 0 4px var(--bg);
+}
+
+/* Instrument Serif no tiene negrita: las ideas clave van en cursiva, como en un apunte */
+.card p strong {
+  font-weight: 400;
+  font-style: italic;
 }
 
 .dots {
@@ -150,10 +161,10 @@ button {
 }
 
 .dots i {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: var(--line);
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
 }
 
 .dots i.done {
@@ -161,7 +172,8 @@ button {
 }
 
 .dots i.now {
-  background: var(--vec);
+  background: var(--ink);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 18%, transparent);
 }
 
 .row {
@@ -174,26 +186,48 @@ button {
   display: none;
 }
 
+.card .row {
+  margin-top: 4px;
+}
+
 .card.collapsed p,
-.card.collapsed .row {
+.card.collapsed .row,
+.card.collapsed .kind {
   display: none;
+}
+
+.card.collapsed h1 {
+  font-size: var(--t-xl);
 }
 
 .min {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: -6px;
+  right: -8px;
   background: none;
   border: 0;
   color: var(--muted);
-  font: 500 13px var(--mono);
+  font: 400 var(--t-lg) var(--body);
+  line-height: 1;
   cursor: pointer;
-  padding: 6px 9px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
 }
 
 .min:hover {
-  background: var(--line);
+  color: var(--ink);
+}
+
+/* cada paso nuevo entra con un solo fundido */
+.card.enter > :not(.min) {
+  animation: step-in 0.32s ease-out both;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 /* ---------- botones ---------- */
@@ -847,41 +881,75 @@ button {
 /* ---------- relato: predicciones e ingeniería ---------- */
 
 .card .kind {
-  font: 500 11px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--vel);
+  font-size: var(--t-sm);
+  color: var(--muted);
+  margin-bottom: -4px;
 }
 
 .card .kind:empty {
   display: none;
 }
 
-.card.engineering .kind {
-  color: var(--vec);
+/* los botones del relato: «Siguiente» en tinta, el resto como enlace */
+.card .row .btn {
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: var(--t-md);
 }
 
-.card.engineering p {
-  font-style: italic;
+.card .row .btn:not(.primary) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--muted) 50%, transparent);
 }
 
-.card p strong {
-  font-weight: 600;
-}
-
+/* predicciones: respuestas a una pregunta, no botones de formulario */
 .card .row.choices {
   display: grid;
-  gap: 6px;
+  gap: 2px;
+  margin-top: 2px;
 }
 
-.card .row.choices .btn {
+.choice {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px 7px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: 400 19px/1.3 var(--display);
   text-align: left;
-  padding: 9px 12px;
-  font-size: 14px;
+  cursor: pointer;
+  text-shadow: 0 0 14px var(--bg);
 }
 
-.card.collapsed .kind {
-  display: none;
+.choice::before {
+  content: '';
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border: 1.25px solid var(--muted);
+  border-radius: 50%;
+  transform: translateY(1px);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.choice:hover::before,
+.choice:focus-visible::before {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.choice:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
 }
 
 /* ---------- línea de tiempo ---------- */
@@ -1027,12 +1095,25 @@ button {
     display: none;
   }
 
+  .card {
+    left: max(16px, env(safe-area-inset-left, 0px));
+    top: max(14px, env(safe-area-inset-top, 0px));
+    width: calc(100% - 32px);
+    gap: 8px;
+  }
+
   .card h1 {
-    font-size: 26px;
+    font-size: 32px;
   }
 
   .card p {
-    font-size: 14px;
+    font-size: 18px;
+    line-height: 1.38;
+  }
+
+  .choice {
+    font-size: 17.5px;
+    padding: 6px 8px 6px 4px;
   }
 
   .bar {
@@ -1054,7 +1135,8 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tool.new {
+  .tool.new,
+  .card.enter > :not(.min) {
     animation: none;
   }
 
