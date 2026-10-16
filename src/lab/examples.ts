@@ -1,6 +1,7 @@
 import type { Vec2 } from '../core/vec';
 import { ReferenceFrame } from '../world/frame';
 import { worldToJSON } from '../world/serialize';
+import { G_GAME } from '../physics/forces/gravitation';
 import { G_EARTH, World } from '../world/world';
 import { makeExperiment, type Experiment } from './experiment';
 
@@ -101,6 +102,23 @@ export const EXAMPLES: Example[] = [
       const anchor = { x: 0, y: 4 };
       const p = w.addParticle({ x: 0, y: anchor.y - eq - 0.5 }, 1);
       w.addSpring({ anchor }, { particle: p.id }, k, L0);
+      return exp(w, this.name, this.description);
+    },
+  },
+  {
+    id: 'orbita',
+    name: 'Una órbita circular',
+    description: 'Atracción encendida, sin g: 64 kg en el centro y 1 kg a 3 m con la velocidad justa para una órbita circular. Prueba más y menos velocidad.',
+    build() {
+      const w = base(null);
+      w.gravitation = { G: G_GAME };
+      const M = 64;
+      const m = 1;
+      const r = 3;
+      const v = Math.sqrt((G_GAME * (M + m)) / r);
+      // el centro de masa queda quieto: el cuerpo grande se mueve un poco al revés
+      w.addParticle({ x: 0, y: -(m * r) / (M + m) }, M, { x: -(m * v) / (M + m), y: 0 });
+      w.addParticle({ x: 0, y: (M * r) / (M + m) }, m, { x: (M * v) / (M + m), y: 0 });
       return exp(w, this.name, this.description);
     },
   },

@@ -37,7 +37,7 @@ describe('relato', () => {
 
   it('el orden de los actos: velocidad antes que gravedad', () => {
     const ids = CHAPTERS.map((c) => c.id);
-    expect(ids).toEqual(['vacio', 'particula', 'vectores', 'tiempo', 'abajo', 'blanco', 'superficies', 'resortes']);
+    expect(ids).toEqual(['vacio', 'particula', 'vectores', 'tiempo', 'abajo', 'blanco', 'superficies', 'resortes', 'gravitacion']);
     expect(ids.indexOf('tiempo')).toBeLessThan(ids.indexOf('abajo'));
   });
 
@@ -87,6 +87,7 @@ describe('relato', () => {
     story.setFree(true);
     expect(story.unlockedTools(TOOL_ORDER).size).toBe(TOOL_ORDER.length);
     expect(story.timeSkills().size).toBe(5);
+    expect(story.forceSwitches().has('gravitation')).toBe(true);
     story.handle({ type: 'origin-placed' });
     expect(story.progress.step).toBe(0);
   });
@@ -113,6 +114,9 @@ describe('relato', () => {
     s = states(at('resortes', 0));
     expect(s.spring).toBe('disponible');
     expect(s.gravitation).toBe('próxima');
+    s = states(at('gravitacion', 0));
+    expect(s.gravitation).toBe('disponible');
+    expect(s.drag).toBe('próxima');
   });
 
   it('el blanco del capítulo «Al blanco» queda dentro de la pantalla', () => {

@@ -1,3 +1,4 @@
+import { G_GAME } from '../physics/forces/gravitation';
 import { ReferenceFrame } from '../world/frame';
 import { G_EARTH } from '../world/world';
 import type { Chapter, Step, StoryContext } from './types';
@@ -40,6 +41,24 @@ function ensureSpring(ctx: StoryContext): void {
   const p = world.particles[0];
   p.vel = { x: 0, y: 0 };
   world.addSpring({ anchor: { x: p.pos.x, y: p.pos.y + 2 } }, { particle: p.id }, 20, 2);
+}
+
+/** Dos cuerpos en el espacio: uno de 64 kg en el centro y otro de 1 kg a 3 m, en reposo. */
+function twoBodies(ctx: StoryContext): void {
+  const { world } = ctx;
+  stopAll(ctx);
+  ensureParticles(ctx);
+  while (world.particles.length < 2) world.addParticle({ x: 0, y: 0 }, 1);
+  world.particles = world.particles.slice(0, 2);
+  const [big, small] = world.particles;
+  big.pos = { x: 0, y: 0 };
+  big.mass = 64;
+  small.pos = { x: 0, y: 3 };
+  small.mass = 1;
+}
+
+function ensureGravitation({ world }: StoryContext): void {
+  if (!world.gravitation) world.gravitation = { G: G_GAME };
 }
 
 function ensureG({ world }: StoryContext): void {
@@ -558,9 +577,97 @@ export const CHAPTERS: Chapter[] = [
       },
       engineering('La suspensión de un auto es un resorte: su período decide si el viaje se siente firme o blando.'),
       {
-        text: 'Ya tienes una fuerza que depende de la posición, y con ella, el movimiento que se repite. Lo que sigue: gravitación entre masas y arrastre.',
-        on: 'end',
+        text: 'Ya tienes una fuerza que depende de la posición, y con ella, el movimiento que se repite. Ahora, una fuerza que actúa a distancia, sin resorte ni contacto.',
+        on: 'next',
         enter: ensureSpring,
+      },
+    ],
+  },
+  {
+    id: 'gravitacion',
+    act: III,
+    title: 'Gravitación',
+    grants: ['force:gravitation'],
+    seed: (ctx) => {
+      ensureFrame(ctx);
+      // lejos de la Tierra: sin campo uniforme, sin suelo ni resortes
+      ctx.world.g = null;
+      ctx.world.surfaces = [];
+      ctx.world.springs = [];
+      ctx.world.targets = [];
+      ctx.world.gravitation = null;
+      twoBodies(ctx);
+    },
+    steps: [
+      {
+        text: 'Lejos de la Tierra no hay un «abajo»: aquí apagamos g. Quedan dos partículas, una de 64 kg y otra de 1 kg. Newton se preguntó si lo que hace caer una manzana es lo mismo que mantiene a la Luna dando vueltas. Enciende la **Atracción** entre masas en la barra.',
+        on: 'gravitation-on',
+      },
+      {
+        text: 'Las dos están en reposo. Si dejas fluir el tiempo, ¿qué pasa?',
+        on: 'end',
+        ask: 'atraccion',
+        enter: ensureGravitation,
+        choices: [
+          { id: 'nada', label: 'Nada, porque no hay g' },
+          { id: 'cae', label: 'La de 1 kg cae hacia la de 64 kg' },
+          { id: 'juntas', label: 'Las dos se acercan' },
+        ],
+      },
+      {
+        text: 'Deja fluir el tiempo.',
+        on: 'fell',
+        enter: ensureGravitation,
+      },
+      {
+        text: reveal('atraccion', 'Se acercan las dos, aunque la de 64 kg se mueve muy poco. Cada masa atrae a la otra, **F = G m₁ m₂ / r²**, con fuerzas iguales y opuestas (tercera ley): compara |Fg| en el panel de cada una. La de 64 kg acelera 64 veces menos. Aquí G vale 0,5 N·m²/kg²; la real es 6,67·10⁻¹¹, y con masas de kilogramos no notarías nada.', {
+          nada: 'Dijiste que nada. No hay g, pero toda masa atrae a toda masa.',
+          cae: 'Dijiste que caía la de 1 kg. Cae, sí, pero la de 64 kg también se mueve hacia ella, solo que muy poco.',
+          juntas: 'Lo predijiste bien.',
+        }),
+        on: 'next',
+        enter: ensureGravitation,
+      },
+      {
+        text: 'Vuelve a t = 0. Con Velocidad, dale a la de 1 kg una velocidad de lado, perpendicular a la línea que las une. ¿Logras que dé una vuelta completa sin chocar ni escaparse?',
+        on: 'orbited',
+        enter: ensureGravitation,
+      },
+      {
+        text: 'Está **en órbita**: cae todo el tiempo hacia la de 64 kg, pero avanza tan rápido de lado que nunca llega. La manzana y la Luna caen por la misma razón; la diferencia es que la Luna también va de lado.',
+        on: 'next',
+        enter: ensureGravitation,
+      },
+      {
+        text: '¿Qué pasa si le das mucha más velocidad?',
+        on: 'end',
+        ask: 'escape',
+        enter: ensureGravitation,
+        choices: [
+          { id: 'grande', label: 'Da una vuelta más grande' },
+          { id: 'escapa', label: 'Se escapa y no vuelve' },
+          { id: 'rapido', label: 'Gira más rápido en la misma órbita' },
+        ],
+      },
+      {
+        text: 'Pruébalo: vuelve a t = 0 y dale bastante más velocidad.',
+        on: 'escaped',
+        enter: ensureGravitation,
+      },
+      {
+        text: reveal('escape', 'Con suficiente velocidad se escapa: es la **velocidad de escape**, √2 veces la de una órbita circular. Entre la órbita circular y el escape hay órbitas alargadas, **elipses**: prueba velocidades intermedias.', {
+          grande: 'Dijiste una vuelta más grande. Con un poco más de velocidad, sí: una elipse. Con mucha más, se escapa.',
+          escapa: 'Lo predijiste bien.',
+          rapido: 'Dijiste que giraba más rápido en la misma órbita. Para eso haría falta más fuerza hacia el centro; con la misma, la órbita se abre.',
+        }),
+        on: 'next',
+        enter: ensureGravitation,
+      },
+      engineering('Un satélite de GPS está cayendo todo el tiempo; su velocidad hace que «falle» el suelo.'),
+      {
+        text: 'Ya tienes la gravitación: la misma ley para una manzana, la Luna y un satélite. Lo que sigue: el arrastre de un fluido.',
+        on: 'end',
+        enter: ensureGravitation,
       },
     ],
   },

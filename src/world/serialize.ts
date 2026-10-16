@@ -15,6 +15,8 @@ export interface WorldJSON {
   surfaces: Surface[];
   /** desde la fase B; los experimentos anteriores no lo traen */
   springs?: SpringLink[];
+  /** desde la fase C */
+  gravitation?: { G: number } | null;
 }
 
 const v2 = (v: Vec2): Vec2 => ({ x: v.x, y: v.y });
@@ -30,6 +32,7 @@ export function worldToJSON(w: World): WorldJSON {
     targets: w.targets.map((t) => ({ id: t.id, pos: v2(t.pos), radius: t.radius })),
     surfaces: w.surfaces.map((s) => ({ ...s, a: v2(s.a), b: v2(s.b) })),
     springs: w.springs.map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength })),
+    gravitation: w.gravitation ? { G: w.gravitation.G } : null,
   };
 }
 
@@ -57,11 +60,13 @@ export function worldFromJSON(data: unknown, into = new World()): World {
   const springs = arr<SpringLink>(d.springs, (s) => isStr(s?.id) && isEnd(s.a) && isEnd(s.b) && isNum(s.k) && s.k > 0 && isNum(s.restLength) && s.restLength >= 0, 'resortes');
   if (d.frame && !(isVec(d.frame.origin) && isNum(d.frame.angle))) throw new Error('El sistema de referencia es inválido.');
   if (d.g && !isVec(d.g)) throw new Error('El campo g es inválido.');
+  if (d.gravitation && !(isNum(d.gravitation.G) && d.gravitation.G > 0)) throw new Error('La gravitación es inválida.');
 
   const w = into;
   w.clear();
   w.frame = d.frame ? new ReferenceFrame(v2(d.frame.origin), d.frame.angle) : null;
   w.g = d.g ? v2(d.g) : null;
+  w.gravitation = d.gravitation ? { G: d.gravitation.G } : null;
   w.particles = particles.map((p, i) => ({ id: p.id, label: isStr(p.label) ? p.label : String(i + 1), pos: v2(p.pos), vel: v2(p.vel), mass: p.mass }));
   w.vectors = vectors.map((v, i) => ({ id: v.id, label: isStr(v.label) ? v.label : 'ABCDEFGH'[i % 8], tail: v2(v.tail), tip: v2(v.tip) }));
   const vecIds = new Set(w.vectors.map((v) => v.id));

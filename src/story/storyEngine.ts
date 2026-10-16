@@ -1,7 +1,7 @@
 import type { GameEvent, GameEventType } from '../core/events';
 import { freshProgress, type Progress } from '../state/progress';
 import type { ToolId } from '../tools/tool';
-import { TIME_SKILLS, type Chapter, type Grant, type Step, type StoryContext, type TimeSkill } from './types';
+import { FORCE_SWITCHES, TIME_SKILLS, type Chapter, type ForceSwitch, type Grant, type Step, type StoryContext, type TimeSkill } from './types';
 
 export interface StoryChange {
   /** herramientas o habilidades recién ganadas */
@@ -79,6 +79,7 @@ export class StoryEngine {
     if (this.free) {
       const all = this.allGrants();
       TIME_SKILLS.forEach((t) => all.add(`time:${t}`));
+      FORCE_SWITCHES.forEach((f) => all.add(`force:${f}`));
       return all;
     }
     return this.grantsUpTo(this.index, this.progress.step);
@@ -100,6 +101,11 @@ export class StoryEngine {
   timeSkills(): Set<TimeSkill> {
     const g = this.grants();
     return new Set(TIME_SKILLS.filter((t) => g.has(`time:${t}`)));
+  }
+
+  forceSwitches(): Set<ForceSwitch> {
+    const g = this.grants();
+    return new Set(FORCE_SWITCHES.filter((f) => g.has(`force:${f}`)));
   }
 
   /** Capítulos ya alcanzados (todos en modo libre). */

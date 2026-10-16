@@ -64,6 +64,8 @@ export class World implements ForceWorld {
   targets: Target[] = [];
   surfaces: Surface[] = [];
   springs: SpringLink[] = [];
+  /** atracción gravitacional entre todas las masas (null = apagada) */
+  gravitation: { G: number } | null = null;
 
   private nextId = 1;
 
@@ -88,6 +90,7 @@ export class World implements ForceWorld {
     this.targets = [];
     this.surfaces = [];
     this.springs = [];
+    this.gravitation = null;
   }
 
   // ----- partículas -----

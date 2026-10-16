@@ -1,7 +1,7 @@
 import { EventBus, type GameEvent } from './core/events';
 import { dist } from './core/vec';
 import { SurfaceConstraint } from './physics/constraints';
-import { FrictionForce, NormalForce, Spring, SpringForces, UniformGravity } from './physics/forces';
+import { FrictionForce, G_GAME, NormalForce, Spring, SpringForces, UniformGravity, WorldGravitation } from './physics/forces';
 import { OscillationMeter } from './physics/oscillationMeter';
 import { Lab } from './lab/lab';
 import { Simulation } from './physics/simulation';
@@ -13,7 +13,7 @@ import { freshProgress, loadProgress, saveProgress, type Progress } from './stat
 import { CHAPTERS, seedFree } from './story/chapters';
 import { RunMonitor } from './story/runMonitor';
 import { StoryEngine } from './story/storyEngine';
-import type { Grant, TimeSkill } from './story/types';
+import type { ForceSwitch, Grant, TimeSkill } from './story/types';
 import { FrameDrag } from './tools/frameDrag';
 import { TOOL_ORDER, createTools } from './tools/registry';
 import type { Tool, ToolContext, ToolId, WorldPointer } from './tools/tool';
@@ -24,7 +24,7 @@ import { Hud } from './ui/hud';
 import { Inspector, K_MAX, K_MIN, L0_MAX, L0_MIN, MU_MAX, clampMass } from './ui/inspector';
 import { Toast } from './ui/toast';
 import { Timeline } from './ui/timeline';
-import { TIME_NAMES, Toolbar } from './ui/toolbar';
+import { SWITCH_NAMES, TIME_NAMES, Toolbar } from './ui/toolbar';
 import { G_EARTH, World, type EntityRef } from './world/world';
 
 /** Radio de toque en píxeles según el dispositivo. */
@@ -86,9 +86,12 @@ export class Game {
     this.sim.forces.push(
       new UniformGravity(),
       new SpringForces(() => this.world.springs),
+      new WorldGravitation(() => this.world.gravitation),
       new NormalForce(surfaces.contacts),
       new FrictionForce(surfaces.contacts),
     );
+    // las órbitas necesitan más que los 10 s de una caída
+    this.sim.maxTime = 30;
     // cronómetro de oscilaciones de cada resorte
     this.meter = new OscillationMeter(this.sim, () => this.world.springs.map((s) => ({ id: s.id, length: this.world.springLength(s) })));
     this.meter.onFirstPeriod = () => this.bus.emit({ type: 'oscillated' });
@@ -131,6 +134,7 @@ export class Game {
       rewind: () => this.rewind(),
       step: () => this.stepTime(),
       slow: () => this.cycleSlow(),
+      toggleForce: (id) => this.toggleForce(id),
       openTree: () => this.openTree(),
       openLab: () => this.lab.show(),
     });
@@ -250,6 +254,7 @@ export class Game {
       tools: TOOL_ORDER.filter((id) => unlocked.has(id)).map((id) => this.tools[id]),
       active: this.activeTool.id,
       time: this.story.timeSkills(),
+      switches: [...this.story.forceSwitches()].map((id) => ({ id, on: this.forceOn(id) })),
       labEnabled: this.story.free,
       running: this.sim.running,
       timeScale: this.timeScale,
@@ -286,6 +291,23 @@ export class Game {
     } else {
       this.sim.start();
     }
+  }
+
+  // ---------- interruptores de fuerza ----------
+
+  private forceOn(id: ForceSwitch): boolean {
+    return id === 'gravitation' ? !!this.world.gravitation : false;
+  }
+
+  private toggleForce(id: ForceSwitch): void {
+    if (!this.story.forceSwitches().has(id)) return;
+    // cambiar las fuerzas es preparar otro experimento: se vuelve a t = 0
+    if (this.sim.hasRun) this.sim.reset();
+    const on = !this.forceOn(id);
+    if (id === 'gravitation') this.world.gravitation = on ? { G: G_GAME } : null;
+    this.toolbar.setSwitch(id, on);
+    this.toast.show(`${SWITCH_NAMES[id]} entre masas: ${on ? 'encendida' : 'apagada'}`);
+    if (on && id === 'gravitation') this.bus.emit({ type: 'gravitation-on' });
   }
 
   private rewind(): void {
@@ -377,7 +399,8 @@ export class Game {
     this.story.onChange = ({ newGrants }) => {
       const tools = newGrants.filter((g) => g.startsWith('tool:')).map((g) => g.slice(5) as ToolId);
       const skills = newGrants.filter((g) => g.startsWith('time:')).map((g) => g.slice(5) as TimeSkill);
-      const names = [...tools.map((t) => this.tools[t].name), ...skills.map((k) => TIME_NAMES[k])];
+      const switches = newGrants.filter((g) => g.startsWith('force:')).map((g) => g.slice(6) as ForceSwitch);
+      const names = [...tools.map((t) => this.tools[t].name), ...skills.map((k) => TIME_NAMES[k]), ...switches.map((f) => SWITCH_NAMES[f])];
       if (names.length) this.toast.show(`${tools.length ? 'Nueva herramienta' : 'Nueva habilidad'}: ${names.join(', ')}`);
       if (tools.length) this.setTool(tools[0], false);
       this.refreshUI(newGrants);
@@ -513,7 +536,8 @@ export class Game {
     if (this.opts.stress && this.sim.finished) this.sim.start();
 
     // el inspector agrega filas cuando aparece el origen, la primera superficie o g
-    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.g}`;
+    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.gravitation}|${!!this.world.g}`;
+    this.toolbar.setSwitch('gravitation', !!this.world.gravitation);
     if (structure !== this.structure) {
       this.structure = structure;
       this.inspector.rebuild();

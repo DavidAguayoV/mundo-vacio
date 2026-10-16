@@ -184,6 +184,12 @@ export class Inspector {
       return q && len(q.vel) > 1e-9 ? fmtDeg(angleDeg(this.frame.toUser(q.vel))) : '—';
     });
     const part = (kind: string) => this.actions.forces(id)?.find((f) => f.kind === kind);
+    if (this.world.gravitation && this.world.particles.length > 1) {
+      this.row(dl, '|Fg|', 'vec', () => {
+        const F = part('gravitation');
+        return F ? `${fmt(len(F.F))} N` : '—';
+      });
+    }
     if (this.world.springs.length) {
       this.row(dl, '|Fe|', 'vec', () => {
         const F = part('spring');

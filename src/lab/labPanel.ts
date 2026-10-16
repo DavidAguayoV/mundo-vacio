@@ -16,6 +16,7 @@ export interface LabState {
   name: string;
   saved: SavedExperiment[];
   g: Vec2 | null;
+  gravitation: boolean;
   prefs: LabPrefs;
 }
 
@@ -29,6 +30,7 @@ export interface LabActions {
   openFile(file: File): void;
   openExample(id: string): void;
   setG(g: number | null): void;
+  setGravitation(on: boolean): void;
   clearWorld(): void;
   setPrefs(p: LabPrefs): void;
   state(): LabState;
@@ -188,10 +190,14 @@ export class LabPanel {
         return b;
       }),
     );
+    const attract = h('input', { type: 'checkbox' });
+    attract.checked = st.gravitation;
+    attract.addEventListener('change', () => this.actions.setGravitation(attract.checked));
     const world = this.section(
       'Mundo',
       h('small', { class: 'hint' }, '|g| en m/s². La dirección se sigue eligiendo con la herramienta Gravedad.'),
       gRow,
+      h('label', { class: 'check' }, attract, 'Atracción entre masas (G = 0,5 N·m²/kg²)'),
       h('div', { class: 'row' }, this.confirmBtn('clear', 'Vaciar el mundo', () => this.actions.clearWorld())),
     );
 

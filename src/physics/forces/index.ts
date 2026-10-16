@@ -1,14 +1,14 @@
 import type { Force, ForceJSON } from './force';
 import { Drag } from './drag';
 import { FrictionForce } from './friction';
-import { Gravitation } from './gravitation';
+import { G_GAME, Gravitation, SOFTENING, WorldGravitation } from './gravitation';
 import { NormalForce } from './normal';
 import { Spring } from './spring';
 import { SpringForces } from './springs';
 import { UniformGravity } from './uniformGravity';
 
 export * from './force';
-export { Drag, FrictionForce, Gravitation, NormalForce, Spring, SpringForces, UniformGravity };
+export { Drag, FrictionForce, G_GAME, Gravitation, NormalForce, SOFTENING, Spring, SpringForces, UniformGravity, WorldGravitation };
 export type { SpringLike } from './springs';
 export { endpointPos } from './springs';
 

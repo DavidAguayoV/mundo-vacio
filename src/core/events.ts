@@ -24,6 +24,9 @@ export type GameEvent =
   | { type: 'spring-made' }
   | { type: 'spring-stretched' }
   | { type: 'oscillated' }
+  | { type: 'gravitation-on' }
+  | { type: 'orbited' }
+  | { type: 'escaped' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];

@@ -7,11 +7,24 @@ import type { World } from '../world/world';
 const MIN_INCLINE = (5 * Math.PI) / 180;
 const HOLD_TIME = 0.5; // s quieta en la pendiente para "la sostiene el roce"
 const SLIDE_TIME = 0.3; // s acelerando pendiente abajo para "desliza"
+/** Más cerca que esto (m) del cuerpo central cuenta como choque: la vuelta no vale. */
+const CRASH = 0.4;
+
+interface Orbit {
+  /** ángulo anterior de la partícula vista desde el cuerpo más masivo, rad */
+  angle: number;
+  /** ángulo barrido acumulado, rad */
+  swept: number;
+  /** distancia inicial al cuerpo central, m */
+  r0: number;
+}
 
 /**
  * Observa cada lanzamiento y traduce lo que pasa en eventos del relato:
  * fell (se alejó 1 m de donde partió), landed (se apoyó en una superficie),
- * held (quieta en una pendiente) y slid (desliza acelerando por una pendiente).
+ * held (quieta en una pendiente), slid (desliza acelerando por una pendiente),
+ * orbited (dio una vuelta completa alrededor del cuerpo más masivo sin chocar) y
+ * escaped (tiene energía para no volver y ya se alejó al doble de su distancia inicial).
  * Cada evento se emite a lo más una vez por lanzamiento.
  */
 export class RunMonitor {
@@ -20,6 +33,7 @@ export class RunMonitor {
   private lastT = 0;
   private hold = new Map<string, number>();
   private slide = new Map<string, number>();
+  private orbits = new Map<string, Orbit>();
 
   constructor(
     private world: World,
@@ -35,6 +49,7 @@ export class RunMonitor {
       this.emitted.clear();
       this.hold.clear();
       this.slide.clear();
+      this.orbits.clear();
       this.lastT = sim.t;
     }
     const dt = sim.t - this.lastT;
@@ -49,6 +64,7 @@ export class RunMonitor {
     if ((sim.t >= 1 || sim.finished) && world.particles.some((p) => Math.hypot(p.vel.x, p.vel.y) > 0.3)) this.once('coasted');
 
     if (dt <= 0) return;
+    this.watchOrbits();
     const g = world.g;
     const gL = g ? Math.hypot(g.x, g.y) : 0;
     for (const p of world.particles) {
@@ -66,6 +82,41 @@ export class RunMonitor {
       const speedingUp = !!a && speed > 0.3 && a.x * p.vel.x + a.y * p.vel.y > 0;
       this.slide.set(p.id, speedingUp ? (this.slide.get(p.id) ?? 0) + dt : 0);
       if ((this.slide.get(p.id) ?? 0) >= SLIDE_TIME) this.once('slid');
+    }
+  }
+
+  /** Vueltas y escapes alrededor del cuerpo más masivo, cuando hay atracción entre masas. */
+  private watchOrbits(): void {
+    const { world } = this;
+    const grav = world.gravitation;
+    if (!grav || world.particles.length < 2) return;
+    const center = world.particles.reduce((a, b) => (b.mass > a.mass ? b : a));
+    for (const p of world.particles) {
+      if (p === center) continue;
+      const rx = p.pos.x - center.pos.x;
+      const ry = p.pos.y - center.pos.y;
+      const r = Math.hypot(rx, ry);
+      const angle = Math.atan2(ry, rx);
+      let o = this.orbits.get(p.id);
+      if (!o) {
+        this.orbits.set(p.id, (o = { angle, swept: 0, r0: r }));
+        continue;
+      }
+      if (r < CRASH) {
+        o.swept = 0; // chocó: se empieza a contar de nuevo
+      } else {
+        let d = angle - o.angle;
+        if (d > Math.PI) d -= 2 * Math.PI;
+        if (d < -Math.PI) d += 2 * Math.PI;
+        o.swept += d;
+      }
+      o.angle = angle;
+      if (Math.abs(o.swept) >= 2 * Math.PI) this.once('orbited');
+      // energía del movimiento relativo: positiva = no vuelve
+      const vx = p.vel.x - center.vel.x;
+      const vy = p.vel.y - center.vel.y;
+      const energy = 0.5 * (vx * vx + vy * vy) - (grav.G * (p.mass + center.mass)) / r;
+      if (energy > 0 && r > 2 * o.r0 && rx * vx + ry * vy > 0) this.once('escaped');
     }
   }
 

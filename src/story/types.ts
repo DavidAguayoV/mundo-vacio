@@ -7,10 +7,14 @@ import type { World } from '../world/world';
 /** Habilidades para controlar el tiempo. */
 export type TimeSkill = 'flow' | 'rewind' | 'step' | 'slow' | 'timeline';
 
-/** Algo que el relato le entrega al jugador: una herramienta o una habilidad del tiempo. */
-export type Grant = `tool:${ToolId}` | `time:${TimeSkill}`;
+/** Fuerzas que son una propiedad del mundo y se encienden con un interruptor (no con el puntero). */
+export type ForceSwitch = 'gravitation';
+
+/** Algo que el relato le entrega al jugador: una herramienta, una habilidad del tiempo o un interruptor de fuerza. */
+export type Grant = `tool:${ToolId}` | `time:${TimeSkill}` | `force:${ForceSwitch}`;
 
 export const TIME_SKILLS: TimeSkill[] = ['flow', 'rewind', 'step', 'slow', 'timeline'];
+export const FORCE_SWITCHES: ForceSwitch[] = ['gravitation'];
 
 /** Lo que un capítulo puede consultar o preparar. */
 export interface StoryContext {

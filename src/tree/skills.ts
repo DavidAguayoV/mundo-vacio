@@ -35,14 +35,14 @@ export const SKILLS: SkillNode[] = [
   { id: 'normal', tier: 4, chapter: 'superficies', name: 'Normal', desc: 'La fuerza que hace la superficie.' },
   { id: 'friction', tier: 4, chapter: 'superficies', name: 'Roce', desc: 'Estático y cinético.' },
   { id: 'spring', tier: 5, grant: 'tool:spring', name: 'Resorte', desc: 'Ley de Hooke y oscilaciones.' },
-  { id: 'gravitation', tier: 5, name: 'Gravitación', desc: 'Masas que se atraen entre sí: órbitas.', requires: ['velocity'] },
+  { id: 'gravitation', tier: 5, grant: 'force:gravitation', name: 'Gravitación', desc: 'Masas que se atraen entre sí: órbitas y escape.' },
   { id: 'drag', tier: 5, name: 'Arrastre', desc: 'Fuerza que depende de la velocidad.', requires: ['velocity'] },
   { id: 'accel-frame', tier: 6, name: 'Marco acelerado', desc: '¿Qué ve alguien dentro de un ascensor?', requires: ['gravity'] },
   { id: '3d', tier: 6, name: 'Tercera dimensión', desc: 'El mismo juego con un eje z.' },
 ];
 
 /** Primer nodo de la hoja de ruta cuando ya no quedan capítulos. */
-const ROADMAP_NEXT = 'gravitation';
+const ROADMAP_NEXT = 'drag';
 
 export interface TreeProgress {
   /** herramientas y habilidades ya ganadas */
