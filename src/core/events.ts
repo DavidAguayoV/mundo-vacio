@@ -1,0 +1,34 @@
+// Eventos del juego. El relato escucha estos eventos para avanzar; las herramientas y la simulación los emiten.
+
+export type GameEvent =
+  | { type: 'origin-placed' }
+  | { type: 'origin-moved' }
+  | { type: 'frame-rotated' }
+  | { type: 'particle-placed' }
+  | { type: 'mass-changed' }
+  | { type: 'vector-drawn' }
+  | { type: 'sum-done' }
+  | { type: 'g-set' }
+  | { type: 'fell' }
+  | { type: 'v-set' }
+  | { type: 'target-hit' }
+  | { type: 'next' };
+
+export type GameEventType = GameEvent['type'];
+
+type Listener<E> = (ev: E) => void;
+
+export class EventBus<E extends { type: string }> {
+  private listeners: Listener<E>[] = [];
+
+  on(fn: Listener<E>): () => void {
+    this.listeners.push(fn);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== fn);
+    };
+  }
+
+  emit(ev: E): void {
+    for (const l of [...this.listeners]) l(ev);
+  }
+}

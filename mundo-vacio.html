@@ -1,0 +1,490 @@
+<title>Mundo Vacío</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: lienzo a pantalla completa (el universo), tarjeta de relato arriba, caja de herramientas abajo, inspector flotante. */
+:root{
+  --bg:#0d1015; --panel:#151a21; --line:#262d38; --grid:#1d2430;
+  --ink:#e9e7e0; --muted:#8a93a0;
+  --pos:#b9c2cf; --vec:#f0b44c; --vel:#5ccbe3; --acc:#ee7393;
+  --display:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#f3f5f7; --panel:#ffffff; --line:#d5dbe3; --grid:#d9dfe7;
+  --ink:#151a21; --muted:#5b6574;
+  --pos:#3d4755; --vec:#b8740a; --vel:#0b83a0; --acc:#c23a5d; color-scheme:light } }
+:root[data-theme="light"]{
+  --bg:#f3f5f7; --panel:#ffffff; --line:#d5dbe3; --grid:#d9dfe7;
+  --ink:#151a21; --muted:#5b6574;
+  --pos:#3d4755; --vec:#b8740a; --vel:#0b83a0; --acc:#c23a5d; color-scheme:light }
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);overflow:hidden;font-size:15px}
+#app{position:relative;height:100%;width:100%;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+
+.card{position:absolute;top:14px;left:max(16px, env(safe-area-inset-left,0px));width:min(400px, calc(100% - 32px));
+  background:color-mix(in srgb, var(--panel) 88%, transparent);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:10px;padding:14px 16px 14px;display:grid;gap:8px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.card h1{font-family:var(--display);font-style:italic;font-weight:400;font-size:30px;line-height:1.05;margin:0;text-wrap:balance}
+.card p{margin:0;line-height:1.5;color:var(--ink);font-size:14.5px}
+.dots{display:flex;gap:5px}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.dots i.done{background:var(--muted)} .dots i.now{background:var(--vec)}
+.card .row{display:flex;gap:8px;flex-wrap:wrap}
+.card.collapsed p,.card.collapsed .row{display:none}
+.min{position:absolute;top:10px;right:10px;background:none;border:0;color:var(--muted);font:500 12px var(--mono);cursor:pointer;padding:4px 6px;border-radius:6px}
+
+button{font-family:var(--body)}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn:focus-visible,.tool:focus-visible,.min:focus-visible{outline:2px solid var(--vel);outline-offset:2px}
+
+.bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  max-width:calc(100% - 32px);display:flex;gap:4px;align-items:center;padding:5px;overflow-x:auto;
+  background:color-mix(in srgb, var(--panel) 92%, transparent);border:1px solid var(--line);border-radius:12px;scrollbar-width:none}
+.tool{flex:none;display:grid;justify-items:center;gap:2px;width:62px;padding:6px 2px 5px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.tool svg{width:20px;height:20px}
+.tool span{font-size:10.5px;letter-spacing:.02em}
+.tool[aria-pressed="true"]{background:var(--line);color:var(--ink)}
+.tool.new{animation:glow 1.2s ease-in-out 3}
+@keyframes glow{50%{box-shadow:0 0 0 2px var(--vec)}}
+.sep{width:1px;align-self:stretch;background:var(--line);margin:4px 3px;flex:none}
+
+.hud{position:absolute;right:max(16px, env(safe-area-inset-right,0px));top:14px;font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;display:grid;gap:3px;font-variant-numeric:tabular-nums;pointer-events:none}
+.inspector{position:absolute;right:max(16px, env(safe-area-inset-right,0px));top:64px;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px;font-size:13px}
+.inspector h2{margin:0;font-size:12px;font-family:var(--mono);font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right}
+.mass{display:flex;align-items:center;gap:6px;justify-content:space-between}
+.mass .btn{padding:3px 10px}
+
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;font-weight:500;white-space:nowrap;transition:opacity .3s}
+
+.overlay{position:absolute;inset:0;background:color-mix(in srgb, var(--bg) 82%, transparent);backdrop-filter:blur(4px);overflow-y:auto;
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));padding-block:24px 40px}
+.tree{max-width:760px;margin:0 auto;display:grid;gap:22px}
+.tree header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tree header h2{font-family:var(--display);font-style:italic;font-weight:400;font-size:34px;margin:0}
+.tier{display:grid;gap:8px}
+.tier h3{margin:0;font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.nodes{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.node{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:3px;background:var(--panel);min-width:0}
+.node b{font-weight:600;font-size:14px;display:flex;justify-content:space-between;gap:6px}
+.node small{color:var(--muted);line-height:1.4;font-size:12.5px}
+.node .st{font:500 10.5px var(--mono);letter-spacing:.05em;text-transform:uppercase}
+.node.on .st{color:var(--vel)} .node.next{border-color:var(--vec)} .node.next .st{color:var(--vec)}
+.node.off{background:transparent;border-style:dashed} .node.off b{color:var(--muted)} .node.off .st{color:var(--muted)}
+.tree .row{display:flex;gap:8px;flex-wrap:wrap}
+
+@media (max-width:700px){
+  .hud{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .inspector{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));left:max(16px, env(safe-area-inset-left,0px));right:auto;width:min(260px, calc(100% - 32px))}
+  .card h1{font-size:26px}
+}
+@media (prefers-reduced-motion: reduce){ .tool.new{animation:none} .toast{transition:none} }
+</style>
+
+<div id="app">
+  <canvas id="cv" aria-label="Espacio de simulación"></canvas>
+
+  <section class="card" id="card" aria-live="polite">
+    <button class="min" id="minBtn" aria-label="Contraer relato">—</button>
+    <div class="eyebrow"><span id="eyebrow">Capítulo 1 de 5</span><span class="dots" id="dots"></span></div>
+    <h1 id="ctitle">El vacío</h1>
+    <p id="ctext"></p>
+    <div class="row" id="crow"></div>
+  </section>
+
+  <div class="hud" id="hud"></div>
+  <aside class="inspector" id="insp" hidden></aside>
+  <div class="toast" id="toast" style="opacity:0"></div>
+  <nav class="bar" id="bar" aria-label="Caja de herramientas"></nav>
+
+  <div class="overlay" id="treeOv" hidden>
+    <div class="tree">
+      <header><h2>Árbol de herramientas</h2><div class="row"><button class="btn" id="freeBtn">Modo libre</button><button class="btn" id="restartBtn">Empezar de nuevo</button><button class="btn primary" id="closeTree">Volver</button></div></header>
+      <div id="tiers" class="tree"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+/* ---------- utilidades ---------- */
+const $=id=>document.getElementById(id);
+const cv=$('cv'), ctx=cv.getContext('2d');
+const fmt=(n,d=2)=>{if(Math.abs(n)<0.5*10**-d)n=0;return n.toFixed(d).replace('.',',').replace('-','−')};
+const hyp=Math.hypot;
+let W=0,H=0,S=40,DPR=1,C={};
+const VS=0.2;   // m de flecha por cada m/s
+const AS=0.12;  // m de flecha por cada m/s²
+const G=9.8;
+
+function readColors(){const cs=getComputedStyle(document.documentElement);
+  for(const k of ['bg','ink','muted','grid','pos','vec','vel','acc','line'])C[k]=cs.getPropertyValue('--'+k).trim();
+  C.mono=cs.getPropertyValue('--mono').trim();}
+function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;
+  cv.width=W*DPR;cv.height=H*DPR;S=Math.max(26,Math.min(W,H)/13);readColors();}
+const cyOff=()=>H*(W<700?0.58:0.53);
+const P=(x,y)=>[W/2+x*S, cyOff()-y*S];
+const Wd=(px,py)=>({x:(px-W/2)/S, y:(cyOff()-py)/S});
+
+/* ---------- estado ---------- */
+const world={origin:null,th:0,particles:[],vectors:[],sums:[],g:null,target:null};
+let tool='origen', sel=null, running=false, t=0, snap=null, fellEmitted=false, massChanged=false, hitFlash=0, nextId=1;
+let prog={ch:0,st:0,free:false};
+const unlocked=new Set();
+try{const s=JSON.parse(localStorage.getItem('mundoVacio')||'null'); if(s&&typeof s.ch==='number')prog=s;}catch(e){}
+const save=()=>{try{localStorage.setItem('mundoVacio',JSON.stringify(prog))}catch(e){}};
+
+/* ---------- herramientas ---------- */
+const ic=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const TOOLS={
+  mano:{n:'Mover',i:ic('<path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/>')},
+  origen:{n:'Origen',i:ic('<path d="M5 19V5M5 19h14M5 5l-2 3M5 5l2 3M19 19l-3-2M19 19l-3 2"/><circle cx="5" cy="19" r="1.4" fill="currentColor"/>')},
+  particula:{n:'Partícula',i:ic('<circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" stroke-dasharray="2 3"/>')},
+  vector:{n:'Vector',i:ic('<path d="M5 19L19 5M19 5h-7M19 5v7"/>')},
+  suma:{n:'Sumar',i:ic('<path d="M4 18l7-4M11 14l7-9M4 18L18 5" /><path d="M18 5l-1 4M18 5l-4 1" />')},
+  gravedad:{n:'Gravedad',i:ic('<path d="M6 4v12M12 4v14M18 4v12M6 16l-2-3M6 16l2-3M12 18l-2-3M12 18l2-3M18 16l-2-3M18 16l2-3"/>')},
+  velocidad:{n:'Velocidad',i:ic('<circle cx="6" cy="17" r="2.5" fill="currentColor"/><path d="M8 15l11-9M19 6h-5M19 6v5"/>')},
+};
+const ORDER=['mano','origen','particula','vector','suma','gravedad','velocidad'];
+
+/* ---------- relato ---------- */
+function spawnTarget(){
+  const p=world.particles[0]; if(!p)return;
+  const gh=world.g?{x:world.g.x/G,y:world.g.y/G}:{x:0,y:-1};
+  let perp={x:-gh.y,y:gh.x};
+  const half={x:W/2/S-1,y:Math.min(cyOff(),H-cyOff())/S-1};
+  let tx=p.x+4.5*perp.x-1.5*gh.x, ty=p.y+4.5*perp.y-1.5*gh.y;
+  if(Math.abs(tx)>half.x||Math.abs(ty)>half.y){tx=p.x-4.5*perp.x-1.5*gh.x;ty=p.y-4.5*perp.y-1.5*gh.y;}
+  tx=Math.max(-half.x,Math.min(half.x,tx)); ty=Math.max(-half.y+1,Math.min(half.y-1,ty));
+  world.target={x:tx,y:ty};
+}
+const CH=[
+ {title:'El vacío',unlock:['origen'],steps:[
+  {t:'Esto es un espacio vacío. Sin un punto de referencia no existe un «aquí» ni un «allá». Toca en cualquier lugar para fijar un origen.',on:'origin-placed'},
+  {t:'Ya tienes un sistema de referencia: un origen y dos ejes. Arrastra el círculo en la punta del eje x para girarlos. Nadie dijo que x tenga que apuntar a la derecha.',on:'frame-rotated'},
+ ]},
+ {title:'Una partícula',unlock:['particula','mano'],steps:[
+  {t:'Lo más simple que puede existir es una partícula: un punto con masa y nada más. Elige Partícula y coloca una.',on:'particle-placed'},
+  {t:'La flecha punteada que sale del origen es su vector posición r. Coloca una segunda partícula.',on:'particle-placed',test:()=>world.particles.length>=2},
+  {t:'Elige Mover y arrastra el origen a otro lugar. Las partículas siguen donde estaban, pero sus vectores r cambiaron. La posición depende de quién mide.',on:'origin-moved'},
+ ]},
+ {title:'Vectores',unlock:['vector','suma'],steps:[
+  {t:'Un vector es una flecha con magnitud y dirección; puedes trasladarlo sin cambiarlo. Elige Vector y arrastra para dibujar uno.',on:'vector-drawn'},
+  {t:'Toca el vector con Mover para ver sus componentes en tus ejes. Luego dibuja un segundo vector.',on:'vector-drawn',test:()=>world.vectors.length>=2},
+  {t:'Elige Sumar y toca un vector y después otro. El segundo se traslada a la punta del primero: cola con punta.',on:'sum-done'},
+  {t:'Gira ahora los ejes con Origen. La flecha suma no cambia; sus componentes sí. El vector existe antes que las coordenadas que usas para describirlo.',on:'frame-rotated'},
+ ]},
+ {title:'¿Dónde es abajo?',unlock:['gravedad'],sim:true,steps:[
+  {t:'Hasta aquí nada se mueve: falta una interacción. ¿Dónde es abajo? Elige Gravedad y arrastra en la dirección en que crees que caen las cosas.',on:'g-set'},
+  {t:'Abajo es la dirección de g, no el borde de tu pantalla. Presiona ▶ y observa. Los puntos marcan la posición cada 0,1 s.',on:'fell'},
+  {t:'Toca una partícula con Mover, cambia su masa con + o −, reinicia con ⟲ y lanza otra vez. ¿Cae distinto?',on:'fell',test:()=>massChanged},
+  {t:'Caen igual. En un campo gravitacional uniforme todas las partículas tienen la misma aceleración g, sin importar su masa. Galileo lo notó antes que Newton.',on:'next'},
+ ]},
+ {title:'Velocidad',unlock:['velocidad'],sim:true,steps:[
+  {t:'Una partícula también puede partir moviéndose. Reinicia con ⟲, elige Velocidad y arrastra desde una partícula: la flecha cian es su velocidad inicial v₀.',on:'v-set'},
+  {t:'Apareció un blanco. Dale a una partícula la velocidad justa para que pase por él. Mientras vuela, mira que la flecha de v cambia y la de g no.',on:'target-hit',enter:spawnTarget},
+  {t:'Resolviste un problema de proyectiles sin escribir una ecuación. Cada punto salió de integrar a = g paso a paso con Runge-Kutta de orden 4. Lo que sigue: superficies, normal y roce.',on:'end'},
+ ]},
+];
+
+function applyUnlocks(){unlocked.clear();
+  if(prog.free){ORDER.forEach(k=>unlocked.add(k));return;}
+  for(let c=0;c<=Math.min(prog.ch,CH.length-1);c++)CH[c].unlock.forEach(k=>unlocked.add(k));}
+const simOn=()=>prog.free||CH.slice(0,prog.ch+1).some(c=>c.sim);
+
+function emit(ev){
+  if(prog.free)return;
+  const ch=CH[prog.ch]; if(!ch)return; const st=ch.steps[prog.st];
+  if(!st||st.on!==ev||(st.test&&!st.test()))return;
+  advance();
+}
+function advance(){
+  const ch=CH[prog.ch];
+  if(prog.st<ch.steps.length-1){prog.st++;}
+  else if(prog.ch<CH.length-1){prog.ch++;prog.st=0;
+    const newTools=CH[prog.ch].unlock; applyUnlocks(); buildBar(newTools);
+    toast('Nueva herramienta: '+newTools.map(k=>TOOLS[k].n).join(', '));
+    if(newTools[0])setTool(newTools[0]);}
+  const st=CH[prog.ch].steps[prog.st]; if(st.enter)st.enter();
+  save(); renderCard();
+}
+function renderCard(){
+  const card=$('card');
+  if(prog.free){$('eyebrow').textContent='Modo libre';$('dots').innerHTML='';$('ctitle').textContent='Laboratorio abierto';
+    $('ctext').textContent='Todas las herramientas disponibles. Arma tu propio experimento: coloca partículas, dales velocidad, define g y presiona ▶.';
+    $('crow').innerHTML='<button class="btn" data-a="tree">Ver árbol</button>';return;}
+  const ch=CH[prog.ch], st=ch.steps[prog.st];
+  $('eyebrow').textContent=`Capítulo ${prog.ch+1} de ${CH.length}`;
+  $('dots').innerHTML=ch.steps.map((_,i)=>`<i class="${i<prog.st?'done':i===prog.st?'now':''}"></i>`).join('');
+  $('ctitle').textContent=ch.title; $('ctext').textContent=st.t;
+  let row='';
+  if(st.on==='next')row+='<button class="btn primary" data-a="next">Siguiente</button>';
+  if(st.on==='end')row+='<button class="btn primary" data-a="tree">Ver el árbol</button><button class="btn" data-a="free">Seguir en modo libre</button>';
+  $('crow').innerHTML=row;
+}
+$('crow').addEventListener('click',e=>{const a=e.target.dataset.a;
+  if(a==='next')advance(); if(a==='tree')openTree(); if(a==='free')setFree();});
+$('minBtn').addEventListener('click',()=>{const c=$('card');c.classList.toggle('collapsed');$('minBtn').textContent=c.classList.contains('collapsed')?'+':'—';});
+
+let toastT; function toast(m){const el=$('toast');el.textContent=m;el.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>el.style.opacity=0,2600);}
+
+/* ---------- barra ---------- */
+function buildBar(fresh=[]){
+  const bar=$('bar'); let h='';
+  ORDER.filter(k=>unlocked.has(k)).forEach(k=>{h+=`<button class="tool${fresh.includes(k)?' new':''}" data-t="${k}" aria-pressed="${tool===k}">${TOOLS[k].i}<span>${TOOLS[k].n}</span></button>`;});
+  if(simOn()){h+='<span class="sep"></span>';
+    h+=`<button class="tool" id="playBtn" data-c="play">${ic(running?'<path d="M8 5v14M16 5v14"/>':'<path d="M7 5l12 7-12 7z" fill="currentColor"/>')}<span>${running?'Pausa':'Lanzar'}</span></button>`;
+    h+=`<button class="tool" data-c="reset">${ic('<path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/>')}<span>Reiniciar</span></button>`;}
+  h+='<span class="sep"></span>'+`<button class="tool" data-c="tree">${ic('<circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><path d="M12 7v5M12 12l-6 5M12 12l6 5"/>')}<span>Árbol</span></button>`;
+  bar.innerHTML=h;
+}
+$('bar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.t)setTool(b.dataset.t);
+  if(b.dataset.c==='play')toggleRun(); if(b.dataset.c==='reset')resetSim(); if(b.dataset.c==='tree')openTree();});
+function setTool(k){tool=k;sumPick=null;document.querySelectorAll('.tool[data-t]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===k));}
+
+/* ---------- árbol ---------- */
+const TREE=[
+ {h:'I · Espacio',n:[['origen','Origen','Fija un punto y orienta los ejes.'],['particula','Partícula','Un punto con masa y posición.']]},
+ {h:'II · Vectores',n:[['vector','Vector','Magnitud, dirección y componentes.'],['suma','Sumar','Cola con punta.'],[null,'Escalar y producto punto','Estirar, invertir y proyectar vectores.']]},
+ {h:'III · Movimiento',n:[['gravedad','Gravedad','Campo uniforme g. Tú decides dónde es abajo.'],['velocidad','Velocidad','Condición inicial v₀.']]},
+ {h:'IV · Contacto',n:[[null,'Superficie','Un plano que las partículas no pueden atravesar.'],[null,'Normal','La fuerza que hace la superficie.'],[null,'Roce','Estático y cinético.']]},
+ {h:'V · Más fuerzas',n:[[null,'Resorte','Ley de Hooke entre dos partículas.'],[null,'Gravitación','Masas que se atraen entre sí: órbitas.'],[null,'Arrastre','Fuerza que depende de la velocidad.']]},
+ {h:'VI · Marcos',n:[[null,'Marco acelerado','¿Qué ve alguien dentro de un ascensor?'],[null,'Tercera dimensión','El mismo juego con un eje z.']]},
+];
+function openTree(){
+  let first=true;
+  $('tiers').innerHTML=TREE.map(t=>`<div class="tier"><h3>${t.h}</h3><div class="nodes">${t.n.map(([k,name,d])=>{
+    let cls='off',st='Bloqueada';
+    if(k&&unlocked.has(k)){cls='on';st='Disponible';}
+    else if(k&&first){cls='next';st='Próxima';first=false;}
+    else if(!k&&first){cls='next';st='Próxima';first=false;}
+    return `<div class="node ${cls}"><b>${name}<span class="st">${st}</span></b><small>${d}</small></div>`;}).join('')}</div></div>`).join('');
+  $('treeOv').hidden=false;}
+$('closeTree').onclick=()=>$('treeOv').hidden=true;
+function setFree(){prog.free=true;save();applyUnlocks();buildBar();renderCard();seed(true);$('treeOv').hidden=true;toast('Todas las herramientas desbloqueadas');}
+$('freeBtn').onclick=setFree;
+$('restartBtn').onclick=()=>{prog={ch:0,st:0,free:false};save();
+  Object.assign(world,{origin:null,th:0,particles:[],vectors:[],sums:[],g:null,target:null});
+  running=false;snap=null;t=0;sel=null;applyUnlocks();setTool('origen');buildBar();renderCard();$('treeOv').hidden=true;};
+
+/* ---------- objetos ---------- */
+function addParticle(x,y,m=1){const p={id:nextId++,n:world.particles.length+1,x,y,vx:0,vy:0,m,trail:[]};world.particles.push(p);return p;}
+const LETTERS='ABCDEFGHIJKLMN';
+function addVector(x1,y1,x2,y2){const v={id:nextId++,label:LETTERS[world.vectors.length%LETTERS.length],x1,y1,x2,y2};world.vectors.push(v);return v;}
+function seed(free){
+  if(!world.origin&&(prog.ch>=1||free))world.origin={x:0,y:0};
+  if(!world.particles.length&&(prog.ch>=2||free)){addParticle(-3,1.5,1);addParticle(-1.5,3,4);}
+  if(!world.g&&(prog.ch>=4||(prog.ch===3&&prog.st>0)||free))world.g={x:0,y:-G};
+  const st=CH[prog.ch]&&CH[prog.ch].steps[prog.st]; if(!prog.free&&st&&st.enter)st.enter();
+}
+
+/* ---------- marco de referencia ---------- */
+const fc=(dx,dy)=>{const c=Math.cos(world.th),s=Math.sin(world.th);return [dx*c+dy*s,-dx*s+dy*c];};
+const handle=()=>world.origin?{x:world.origin.x+3*Math.cos(world.th),y:world.origin.y+3*Math.sin(world.th)}:null;
+const ang=(x,y)=>{let a=Math.atan2(y,x)*180/Math.PI;return a;};
+
+/* ---------- física: RK4 ---------- */
+function accel(p,s){ // s=[x,y,vx,vy]; aquí se suman las fuerzas futuras (resortes, roce, gravitación…)
+  let ax=0,ay=0; if(world.g){ax+=world.g.x;ay+=world.g.y;} return [ax,ay];}
+function deriv(p,s){const a=accel(p,s);return [s[2],s[3],a[0],a[1]];}
+function rk4(p,dt){
+  const s=[p.x,p.y,p.vx,p.vy];
+  const k1=deriv(p,s);
+  const k2=deriv(p,s.map((v,i)=>v+dt/2*k1[i]));
+  const k3=deriv(p,s.map((v,i)=>v+dt/2*k2[i]));
+  const k4=deriv(p,s.map((v,i)=>v+dt*k3[i]));
+  const n=s.map((v,i)=>v+dt/6*(k1[i]+2*k2[i]+2*k3[i]+k4[i]));
+  [p.x,p.y,p.vx,p.vy]=n;
+}
+function takeSnap(){snap=world.particles.map(p=>({id:p.id,x:p.x,y:p.y,vx:p.vx,vy:p.vy}));}
+function toggleRun(){
+  if(!running){ if(!snap){takeSnap();t=0;nextMark=0.1;acc=0;world.particles.forEach(p=>p.trail=[{x:p.x,y:p.y}]);fellEmitted=false;} running=true; }
+  else running=false;
+  buildBar();
+}
+function resetSim(){
+  if(snap){snap.forEach(s=>{const p=world.particles.find(q=>q.id===s.id);if(p)Object.assign(p,{x:s.x,y:s.y,vx:s.vx,vy:s.vy});});}
+  world.particles.forEach(p=>p.trail=[]); snap=null;running=false;t=0;nextMark=0.1;buildBar();
+}
+const DT=1/240; let acc=0, nextMark=0.1;
+function stepSim(real){
+  acc+=Math.min(real,0.05);
+  while(acc>=DT){acc-=DT;t+=DT;
+    world.particles.forEach(p=>{rk4(p,DT);
+      if(world.target&&hyp(p.x-world.target.x,p.y-world.target.y)<0.45&&hitFlash<=0){hitFlash=1.2;toast('¡Le diste al blanco!');emit('target-hit');}});
+    if(t>=nextMark-1e-9){world.particles.forEach(p=>p.trail.push({x:p.x,y:p.y}));nextMark+=0.1;}
+  }
+  if(!fellEmitted&&snap&&world.particles.some(p=>{const s=snap.find(q=>q.id===p.id);return s&&hyp(p.x-s.x,p.y-s.y)>1;})){fellEmitted=true;emit('fell');}
+  const lim=Math.max(W,H)/S*1.5;
+  if(t>10||world.particles.every(p=>Math.abs(p.x)>lim||Math.abs(p.y)>lim)){running=false;buildBar();}
+}
+
+/* ---------- interacción ---------- */
+let drag=null, sumPick=null;
+const near=(a,b,px=16)=>hyp(a.x-b.x,a.y-b.y)*S<px;
+function segDist(p,v){const ax=v.x1,ay=v.y1,bx=v.x2-ax,by=v.y2-ay;const L=bx*bx+by*by||1;
+  let u=((p.x-ax)*bx+(p.y-ay)*by)/L;u=Math.max(0,Math.min(1,u));return hyp(ax+u*bx-p.x,ay+u*by-p.y)*S;}
+const hitParticle=p=>[...world.particles].reverse().find(q=>near(q,p,18));
+const hitVector=p=>[...world.vectors].reverse().find(v=>segDist(p,v)<12);
+
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId);
+  const p=Wd(e.offsetX,e.offsetY);
+  if(running&&tool!=='mano'){running=false;buildBar();}
+  const h=handle();
+  if((tool==='origen'||tool==='mano')&&h&&near(h,p,20)){drag={k:'rot',th0:world.th};return;}
+  if((tool==='origen'||tool==='mano')&&world.origin&&near(world.origin,p,18)){drag={k:'org',sx:world.origin.x,sy:world.origin.y};return;}
+  if(tool==='origen'){const first=!world.origin;world.origin={x:p.x,y:p.y};drag={k:'org',sx:p.x,sy:p.y};if(first)emit('origin-placed');return;}
+  if(tool==='mano'){
+    const q=hitParticle(p); if(q){sel={t:'p',o:q};drag={k:'p',o:q,dx:q.x-p.x,dy:q.y-p.y};renderInsp();return;}
+    const v=world.vectors.slice().reverse().find(v=>near({x:v.x2,y:v.y2},p,16));
+    if(v){sel={t:'v',o:v};drag={k:'vtip',o:v};renderInsp();return;}
+    const v2=hitVector(p); if(v2){sel={t:'v',o:v2};drag={k:'vmove',o:v2,px:p.x,py:p.y};renderInsp();return;}
+    sel=null;renderInsp();return;}
+  if(tool==='particula'){const q=hitParticle(p);
+    if(q){sel={t:'p',o:q};drag={k:'p',o:q,dx:q.x-p.x,dy:q.y-p.y};}
+    else{const n=addParticle(p.x,p.y);sel={t:'p',o:n};snap=null;emit('particle-placed');}
+    renderInsp();return;}
+  if(tool==='vector'){const v=addVector(p.x,p.y,p.x,p.y);drag={k:'vnew',o:v};return;}
+  if(tool==='suma'){const v=hitVector(p);if(!v)return;
+    if(!sumPick){sumPick=v;toast(`Elegiste ${v.label}. Ahora toca otro vector.`);}
+    else if(sumPick!==v){world.sums.push({a:sumPick.id,b:v.id});toast(`${sumPick.label} + ${v.label}`);sumPick=null;emit('sum-done');}
+    return;}
+  if(tool==='gravedad'){drag={k:'g',x1:p.x,y1:p.y,x2:p.x,y2:p.y};return;}
+  if(tool==='velocidad'){const q=hitParticle(p)||world.particles.find(q=>q.vx||q.vy?near({x:q.x+q.vx*VS,y:q.y+q.vy*VS},p,18):false);
+    if(q){if(snap)resetSim();sel={t:'p',o:q};drag={k:'v',o:q};renderInsp();}return;}
+});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const p=Wd(e.offsetX,e.offsetY);
+  if(drag.k==='rot'){world.th=Math.atan2(p.y-world.origin.y,p.x-world.origin.x);}
+  if(drag.k==='org'){world.origin.x=p.x;world.origin.y=p.y;}
+  if(drag.k==='p'){drag.o.x=p.x+drag.dx;drag.o.y=p.y+drag.dy;drag.o.trail=[];snap=null;}
+  if(drag.k==='vtip'||drag.k==='vnew'){drag.o.x2=p.x;drag.o.y2=p.y;}
+  if(drag.k==='vmove'){const dx=p.x-drag.px,dy=p.y-drag.py;const o=drag.o;o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;drag.px=p.x;drag.py=p.y;}
+  if(drag.k==='g'){drag.x2=p.x;drag.y2=p.y;}
+  if(drag.k==='v'){let vx=(p.x-drag.o.x)/VS,vy=(p.y-drag.o.y)/VS;const m=hyp(vx,vy);if(m>25){vx*=25/m;vy*=25/m;}drag.o.vx=vx;drag.o.vy=vy;}
+  renderInsp();
+});
+cv.addEventListener('pointerup',()=>{if(!drag)return;const d=drag;drag=null;
+  if(d.k==='rot'){let dth=Math.abs(world.th-d.th0)%(2*Math.PI);if(dth>Math.PI)dth=2*Math.PI-dth;if(dth>0.17)emit('frame-rotated');}
+  if(d.k==='org'&&hyp(world.origin.x-d.sx,world.origin.y-d.sy)>0.5&&world.particles.length)emit('origin-moved');
+  if(d.k==='vnew'){const v=d.o;if(hyp(v.x2-v.x1,v.y2-v.y1)<0.3)world.vectors.pop();else{sel={t:'v',o:v};renderInsp();emit('vector-drawn');}}
+  if(d.k==='g'){const L=hyp(d.x2-d.x1,d.y2-d.y1);if(L>0.3){world.g={x:(d.x2-d.x1)/L*G,y:(d.y2-d.y1)/L*G};emit('g-set');}}
+  if(d.k==='v'&&hyp(d.o.vx,d.o.vy)>0.3)emit('v-set');
+});
+
+/* ---------- inspector ---------- */
+function renderInsp(){
+  const el=$('insp');
+  if(!sel||(sel.t==='p'&&!world.particles.includes(sel.o))||(sel.t==='v'&&!world.vectors.includes(sel.o))){el.hidden=true;return;}
+  el.hidden=false; const O=world.origin;
+  if(sel.t==='p'){const p=sel.o;let r='';
+    if(O){const [rx,ry]=fc(p.x-O.x,p.y-O.y);r=`<dt>r</dt><dd>(${fmt(rx)} ; ${fmt(ry)}) m</dd><dt>|r|</dt><dd>${fmt(hyp(rx,ry))} m</dd>`;}
+    const [vx,vy]=fc(p.vx,p.vy);
+    el.innerHTML=`<h2>Partícula ${p.n}</h2><div class="mass"><span style="font-family:var(--mono)">m = ${fmt(p.m,1)} kg</span><span><button class="btn" data-m="0.5" aria-label="Reducir masa">−</button> <button class="btn" data-m="2" aria-label="Aumentar masa">+</button></span></div>
+      <dl class="kv">${r}<dt>v</dt><dd>(${fmt(vx)} ; ${fmt(vy)}) m/s</dd></dl><button class="btn" data-del="1">Eliminar</button>`;}
+  else{const v=sel.o;const [cx,cy]=fc(v.x2-v.x1,v.y2-v.y1);
+    el.innerHTML=`<h2>Vector ${v.label}</h2><dl class="kv"><dt>${v.label}ₓ</dt><dd>${fmt(cx)}</dd><dt>${v.label}ᵧ</dt><dd>${fmt(cy)}</dd><dt>|${v.label}|</dt><dd>${fmt(hyp(cx,cy))}</dd><dt>θ</dt><dd>${fmt(ang(cx,cy),1)}°</dd></dl><button class="btn" data-del="1">Eliminar</button>`;}
+}
+$('insp').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!sel)return;
+  if(b.dataset.m){const p=sel.o;p.m=Math.max(0.25,Math.min(64,p.m*+b.dataset.m));massChanged=true;renderInsp();}
+  if(b.dataset.del){if(sel.t==='p'){world.particles=world.particles.filter(q=>q!==sel.o);snap=null;}
+    else{const id=sel.o.id;world.vectors=world.vectors.filter(q=>q!==sel.o);world.sums=world.sums.filter(s=>s.a!==id&&s.b!==id);}
+    sel=null;renderInsp();}
+});
+
+/* ---------- dibujo ---------- */
+function line(x1,y1,x2,y2,col,w=1,dash){const [a,b]=P(x1,y1),[c,d]=P(x2,y2);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash||[]);ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke();ctx.setLineDash([]);}
+function arrow(x1,y1,x2,y2,col,w=2,dash){
+  const [a,b]=P(x1,y1),[c,d]=P(x2,y2);const L=hyp(c-a,d-b);if(L<2)return;
+  const ux=(c-a)/L,uy=(d-b)/L,hl=Math.min(11,L*0.4)+w;
+  ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash||[]);
+  ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c-ux*hl*0.8,d-uy*hl*0.8);ctx.stroke();ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(c,d);ctx.lineTo(c-ux*hl-uy*hl*0.45,d-uy*hl+ux*hl*0.45);ctx.lineTo(c-ux*hl+uy*hl*0.45,d-uy*hl-ux*hl*0.45);ctx.closePath();ctx.fill();}
+function label(txt,x,y,col,size=12,align='left'){const [a,b]=P(x,y);ctx.fillStyle=col;ctx.font=`500 ${size}px ${C.mono}`;ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillText(txt,a,b);}
+function midLabel(txt,x1,y1,x2,y2,col){const mx=(x1+x2)/2,my=(y1+y2)/2,L=hyp(x2-x1,y2-y1)||1;const nx=-(y2-y1)/L*0.35,ny=(x2-x1)/L*0.35;label(txt,mx+nx,my+ny,col,13,'center');}
+function alpha(col,a){ctx.globalAlpha=a;return col;}
+
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,W,H);ctx.globalAlpha=1;
+  const O=world.origin, R=hyp(W,H)/S;
+  // malla del marco de referencia
+  if(O){const c=Math.cos(world.th),s=Math.sin(world.th);ctx.fillStyle=C.grid;
+    const n=Math.ceil(R)+2, ox=Math.round(O.x),oy=0;
+    for(let i=-n;i<=n;i++)for(let j=-n;j<=n;j++){const x=O.x+i*c-j*s,y=O.y+i*s+j*c;const [a,b]=P(x,y);if(a<-5||a>W+5||b<-5||b>H+5)continue;ctx.fillRect(a-1,b-1,2,2);}
+    // ejes
+    line(O.x-R*c,O.y-R*s,O.x+R*c,O.y+R*s,alpha(C.muted,.45),1);
+    line(O.x+R*s,O.y-R*c,O.x-R*s,O.y+R*c,alpha(C.muted,.45),1);ctx.globalAlpha=1;
+    for(let k=-Math.ceil(R);k<=Math.ceil(R);k++){if(!k)continue;const tx=O.x+k*c,ty=O.y+k*s;const [a,b]=P(tx,ty);const [p2,q2]=P(tx-0.12*s,ty+0.12*c);ctx.strokeStyle=C.muted;ctx.globalAlpha=.5;ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(p2,q2);ctx.stroke();
+      const ux=O.x-k*s,uy=O.y+k*c;const [e,f]=P(ux,uy);const [g2,h2]=P(ux+0.12*c,uy+0.12*s);ctx.beginPath();ctx.moveTo(e,f);ctx.lineTo(g2,h2);ctx.stroke();ctx.globalAlpha=1;}
+    arrow(O.x,O.y,O.x+3*c,O.y+3*s,C.ink,1.6);arrow(O.x,O.y,O.x-2.2*s,O.y+2.2*c,C.ink,1.6);
+    label('x',O.x+3.35*c-0.25*s,O.y+3.35*s+0.25*c,C.ink,14,'center');label('y',O.x-2.55*s-0.25*c,O.y+2.55*c-0.25*s,C.ink,14,'center');
+    const h=handle();const [hx,hy]=P(h.x,h.y);ctx.strokeStyle=C.vec;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(hx,hy,9,0,7);ctx.stroke();
+    const [ox2,oy2]=P(O.x,O.y);ctx.fillStyle=C.ink;ctx.beginPath();ctx.arc(ox2,oy2,3.5,0,7);ctx.fill();label('O',O.x-0.3*c+0.3*s-0.15,O.y-0.3*s-0.3*c,C.muted,12,'center');
+  }
+  // campo g
+  const gv=drag&&drag.k==='g'?drag:null;
+  if(world.g){const gx=world.g.x/G,gy=world.g.y/G;ctx.globalAlpha=.22;
+    for(let i=-Math.ceil(W/2/S/2.5)-1;i<=Math.ceil(W/2/S/2.5)+1;i++)for(let j=-Math.ceil(H/S/2.5)-1;j<=Math.ceil(H/S/2.5)+1;j++){const x=i*2.5,y=j*2.5+((cyOff()-H/2)/S);arrow(x-gx*0.35,y-gy*0.35,x+gx*0.35,y+gy*0.35,C.acc,1.2);}
+    ctx.globalAlpha=1;}
+  if(gv&&hyp(gv.x2-gv.x1,gv.y2-gv.y1)>0.1){arrow(gv.x1,gv.y1,gv.x2,gv.y2,C.acc,3);midLabel('g',gv.x1,gv.y1,gv.x2,gv.y2,C.acc);}
+  // blanco
+  if(world.target){const T=world.target;const [a,b]=P(T.x,T.y);ctx.strokeStyle=C.vec;ctx.lineWidth=1.5;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(a,b,0.45*S,0,7);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(a-6,b);ctx.lineTo(a+6,b);ctx.moveTo(a,b-6);ctx.lineTo(a,b+6);ctx.stroke();
+    if(hitFlash>0){ctx.globalAlpha=Math.min(1,hitFlash)*.35;ctx.fillStyle=C.vec;ctx.beginPath();ctx.arc(a,b,0.45*S*(1.6-hitFlash*0.5),0,7);ctx.fill();ctx.globalAlpha=1;}}
+  // vectores libres
+  world.vectors.forEach(v=>{const isSel=sel&&sel.o===v, picked=sumPick===v;
+    arrow(v.x1,v.y1,v.x2,v.y2,C.vec,isSel||picked?3.2:2.2);midLabel(v.label,v.x1,v.y1,v.x2,v.y2,C.vec);
+    if(isSel&&O){const [cx,cy]=fc(v.x2-v.x1,v.y2-v.y1);const c=Math.cos(world.th),s=Math.sin(world.th);
+      const mx=v.x1+cx*c,my=v.y1+cx*s;line(v.x1,v.y1,mx,my,alpha(C.vec,.6),1.2,[3,3]);line(mx,my,v.x2,v.y2,C.vec,1.2,[3,3]);ctx.globalAlpha=1;}});
+  // sumas
+  world.sums.forEach(sm=>{const A=world.vectors.find(v=>v.id===sm.a),B=world.vectors.find(v=>v.id===sm.b);if(!A||!B)return;
+    const bx=B.x2-B.x1,by=B.y2-B.y1;arrow(A.x2,A.y2,A.x2+bx,A.y2+by,alpha(C.vec,.55),1.6,[5,4]);ctx.globalAlpha=1;
+    arrow(A.x1,A.y1,A.x2+bx,A.y2+by,C.ink,2.8);midLabel(A.label+'+'+B.label,A.x1,A.y1,A.x2+bx,A.y2+by,C.ink);});
+  // partículas
+  world.particles.forEach(p=>{
+    ctx.fillStyle=C.ink;ctx.globalAlpha=.55;p.trail.forEach(q=>{const [a,b]=P(q.x,q.y);ctx.beginPath();ctx.arc(a,b,1.8,0,7);ctx.fill();});ctx.globalAlpha=1;
+    if(O){line(O.x,O.y,p.x,p.y,alpha(C.pos,.7),1.2,[4,4]);ctx.globalAlpha=1;const L=hyp(p.x-O.x,p.y-O.y);if(L>0.8)midLabel('r'+sub(p.n),O.x,O.y,p.x,p.y,C.pos);}
+    if(p.vx||p.vy){arrow(p.x,p.y,p.x+p.vx*VS,p.y+p.vy*VS,C.vel,2.2);label('v',p.x+p.vx*VS+0.25,p.y+p.vy*VS+0.25,C.vel,13);}
+    if((running||snap)&&world.g){arrow(p.x,p.y,p.x+world.g.x*AS,p.y+world.g.y*AS,C.acc,1.8);}
+    const [a,b]=P(p.x,p.y),r=4+3*Math.cbrt(p.m);ctx.fillStyle=C.ink;ctx.beginPath();ctx.arc(a,b,r,0,7);ctx.fill();
+    if(sel&&sel.o===p){ctx.strokeStyle=C.vel;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(a,b,r+5,0,7);ctx.stroke();}
+    label(fmt(p.m,1)+' kg',p.x+0.3,p.y-0.35,C.muted,11);
+  });
+  // HUD
+  let hud='';
+  if(simOn())hud+=`<div>t = ${fmt(t,2)} s</div>`;
+  if(world.g){const [gx,gy]=O?fc(world.g.x,world.g.y):[world.g.x,world.g.y];hud+=`<div style="color:var(--acc)">g = (${fmt(gx)} ; ${fmt(gy)}) m/s²</div>`;}
+  if(O)hud+=`<div>1 cuadro = 1 m</div>`;
+  if($('hud').innerHTML!==hud)$('hud').innerHTML=hud;
+}
+const SUB='₀₁₂₃₄₅₆₇₈₉';const sub=n=>String(n).split('').map(d=>SUB[+d]).join('');
+
+/* ---------- bucle ---------- */
+let last=performance.now(), frame=0;
+function loop(now){const dt=(now-last)/1000;last=now;
+  if(running)stepSim(dt); if(hitFlash>0)hitFlash-=dt;
+  if(++frame%30===0){readColors(); if(running&&sel)renderInsp();}
+  draw();requestAnimationFrame(loop);}
+
+/* ---------- inicio ---------- */
+window.addEventListener('resize',resize);
+new MutationObserver(readColors).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+if(document.fonts)document.fonts.ready.then(readColors);
+resize();
+if(prog.ch>=CH.length){prog={ch:0,st:0,free:false};}
+applyUnlocks();
+const last0=ORDER.filter(k=>unlocked.has(k));setTool(prog.free?'mano':(CH[prog.ch].unlock[0]||last0[0]));
+buildBar();renderCard();seed(prog.free);
+requestAnimationFrame(loop);
+})();
+</script>
