@@ -51,90 +51,187 @@ export const LENS_NAMES: Record<LensId, string> = {
 
 const scaleLabel = (k: number) => (k === 0.5 ? '×½' : k === 0.25 ? '×¼' : '×1');
 
-/** Caja de herramientas: herramientas ganadas, controles del tiempo ganados y acceso al árbol. */
+/** Con pocas herramientas (el comienzo del relato) los botones llevan su nombre a la vista. */
+const LABELED_MAX = 3;
+
+/**
+ * Caja de herramientas en tres zonas: herramientas a la izquierda, el tiempo al centro y el árbol
+ * (y el laboratorio) a la derecha. Los íconos muestran su nombre al pasar el mouse o al enfocarlos;
+ * si no caben, las herramientas que sobran pasan a un menú «Más».
+ */
 export class Toolbar {
   private bar = $('bar');
+  private toolsZone = h('div', { class: 'zone tools' });
+  private timeZone = h('div', { class: 'zone time', role: 'group', 'aria-label': 'Tiempo' });
+  private metaZone = h('div', { class: 'zone meta' });
+  private more: HTMLButtonElement;
+  private menu = h('div', { class: 'menu', id: 'toolMenu', role: 'group', 'aria-label': 'Más herramientas', hidden: '' });
+  private toolItems: HTMLButtonElement[] = [];
+  private metaItems: HTMLButtonElement[] = [];
   private flowBtn: HTMLButtonElement | null = null;
   private slowBtn: HTMLButtonElement | null = null;
 
-  constructor(private actions: ToolbarActions) {}
+  constructor(private actions: ToolbarActions) {
+    this.more = this.button(ICONS.more, 'Más herramientas', () => this.setMenu(this.menu.hidden), {
+      'aria-expanded': 'false',
+      'aria-controls': 'toolMenu',
+      'data-cmd': 'more',
+    });
+    this.toolsZone.append(this.menu);
+    this.bar.replaceChildren(this.toolsZone, this.timeZone, this.metaZone);
+    // elegir algo en el menú lo cierra
+    this.menu.addEventListener('click', (e) => {
+      if ((e.target as Element).closest('button')) this.setMenu(false);
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.menu.hidden && !this.menu.contains(e.target as Node) && !this.more.contains(e.target as Node)) this.setMenu(false);
+    });
+    this.bar.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !this.menu.hidden) {
+        e.stopPropagation();
+        this.setMenu(false);
+        this.more.focus();
+      }
+    });
+    new ResizeObserver(() => this.layout()).observe(this.bar);
+  }
 
   private button(icon: string, label: string, fn: () => void, extra: Record<string, string> = {}): HTMLButtonElement {
-    const b = h('button', { class: 'tool', type: 'button', ...extra });
-    b.innerHTML = icon;
-    b.append(h('span', {}, label));
+    const b = h('button', { class: 'tool', type: 'button', 'aria-label': label, ...extra });
+    b.append(h('span', { class: 'ico' }), h('span', { class: 'tip', 'aria-hidden': 'true' }, label));
+    b.querySelector('.ico')!.innerHTML = icon;
     b.addEventListener('click', fn);
     return b;
   }
 
+  private setLabel(b: HTMLButtonElement, label: string): void {
+    if (b.getAttribute('aria-label') !== label) b.setAttribute('aria-label', label);
+    const tip = b.querySelector('.tip');
+    if (tip && tip.textContent !== label) tip.textContent = label;
+  }
+
+  private setIcon(b: HTMLButtonElement, icon: string): void {
+    const ico = b.querySelector('.ico');
+    if (ico && ico.innerHTML !== icon) ico.innerHTML = icon;
+  }
+
+  private setMenu(open: boolean): void {
+    this.menu.hidden = !open;
+    this.more.setAttribute('aria-expanded', String(open));
+  }
+
   render(s: ToolbarState): void {
     const fresh = new Set(s.fresh ?? []);
-    const items: Node[] = [];
+    this.toolItems = [];
     for (const t of s.tools) {
       const b = this.button(t.icon, t.name, () => this.actions.selectTool(t.id), {
         'data-tool': t.id,
         'aria-pressed': String(t.id === s.active),
       });
       if (fresh.has(`tool:${t.id}`)) b.classList.add('new');
-      items.push(b);
+      this.toolItems.push(b);
     }
-    if (s.switches?.length) {
-      items.push(h('span', { class: 'sep' }));
-      for (const sw of s.switches) {
-        const b = this.button(ICONS[sw.id], sw.label ?? SWITCH_NAMES[sw.id], () => this.actions.toggleForce(sw.id), {
-          'data-switch': sw.id,
-          'aria-pressed': String(sw.on),
-        });
-        b.title = sw.label ?? `${SWITCH_NAMES[sw.id]}: ${sw.on ? 'encendida' : 'apagada'}`;
-        if (fresh.has(`force:${sw.id}`)) b.classList.add('new');
-        items.push(b);
-      }
+    for (const sw of s.switches ?? []) {
+      const b = this.button(ICONS[sw.id], sw.label ?? SWITCH_NAMES[sw.id], () => this.actions.toggleForce(sw.id), {
+        'data-switch': sw.id,
+        'aria-pressed': String(sw.on),
+      });
+      b.classList.add('switch');
+      if (fresh.has(`force:${sw.id}`)) b.classList.add('new');
+      this.toolItems.push(b);
     }
-    if (s.lenses?.length) {
-      if (!s.switches?.length) items.push(h('span', { class: 'sep' }));
-      for (const l of s.lenses) {
-        const b = this.button(ICONS[l.id], LENS_NAMES[l.id], () => this.actions.toggleLens(l.id), {
-          'data-lens': l.id,
-          'aria-pressed': String(l.on),
-        });
-        b.title = `Lente ${LENS_NAMES[l.id]}: ${l.on ? 'activo' : 'apagado'}`;
-        if (fresh.has(`lens:${l.id}`)) b.classList.add('new');
-        items.push(b);
-      }
+    for (const l of s.lenses ?? []) {
+      const b = this.button(ICONS[l.id], `Lente ${LENS_NAMES[l.id]}`, () => this.actions.toggleLens(l.id), {
+        'data-lens': l.id,
+        'aria-pressed': String(l.on),
+      });
+      b.classList.add('switch');
+      if (fresh.has(`lens:${l.id}`)) b.classList.add('new');
+      this.toolItems.push(b);
     }
+
     this.flowBtn = null;
     this.slowBtn = null;
-    if (s.time.size) {
-      items.push(h('span', { class: 'sep' }));
-      const add = (skill: TimeSkill, b: HTMLButtonElement) => {
-        if (fresh.has(`time:${skill}`)) b.classList.add('new');
-        b.title = TIME_NAMES[skill];
-        items.push(b);
-      };
-      if (s.time.has('flow')) add('flow', (this.flowBtn = this.button('', '', this.actions.flow, { 'data-cmd': 'flow' })));
-      if (s.time.has('rewind')) add('rewind', this.button(ICONS.reset, 't = 0', this.actions.rewind, { 'data-cmd': 'rewind' }));
-      if (s.time.has('step')) add('step', this.button(ICONS.step, '+0,1 s', this.actions.step, { 'data-cmd': 'step' }));
-      if (s.time.has('slow')) add('slow', (this.slowBtn = this.button('', '', this.actions.slow, { 'data-cmd': 'slow' })));
-      this.setRunning(s.running);
-      this.setScale(s.timeScale);
+    const time: HTMLButtonElement[] = [];
+    const add = (skill: TimeSkill, b: HTMLButtonElement) => {
+      if (fresh.has(`time:${skill}`)) b.classList.add('new');
+      time.push(b);
+    };
+    if (s.time.has('rewind')) add('rewind', this.button(ICONS.reset, 't = 0', this.actions.rewind, { 'data-cmd': 'rewind' }));
+    if (s.time.has('flow')) {
+      this.flowBtn = this.button(ICONS.play, 'Dejar fluir el tiempo', this.actions.flow, { 'data-cmd': 'flow' });
+      this.flowBtn.classList.add('play');
+      add('flow', this.flowBtn);
     }
-    items.push(h('span', { class: 'sep' }));
-    if (s.labEnabled) items.push(this.button(ICONS.lab, 'Lab', this.actions.openLab, { 'data-cmd': 'lab' }));
-    items.push(this.button(ICONS.tree, 'Árbol', this.actions.openTree, { 'data-cmd': 'tree' }));
-    this.bar.replaceChildren(...items);
+    if (s.time.has('step')) add('step', this.button(ICONS.step, '+0,1 s', this.actions.step, { 'data-cmd': 'step' }));
+    if (s.time.has('slow')) {
+      this.slowBtn = this.button(ICONS.slow, 'Cámara lenta', this.actions.slow, { 'data-cmd': 'slow' });
+      this.slowBtn.append(h('span', { class: 'badge', 'aria-hidden': 'true' }));
+      add('slow', this.slowBtn);
+    }
+    this.timeZone.replaceChildren(...time);
+    this.setRunning(s.running);
+    this.setScale(s.timeScale);
+
+    this.metaItems = [];
+    if (s.labEnabled) this.metaItems.push(this.button(ICONS.lab, 'Lab', this.actions.openLab, { 'data-cmd': 'lab' }));
+    this.metaItems.push(this.button(ICONS.tree, 'Árbol', this.actions.openTree, { 'data-cmd': 'tree' }));
+
+    const labeled = s.tools.length <= LABELED_MAX && !s.switches?.length && !s.lenses?.length;
+    this.bar.classList.toggle('labeled', labeled);
+    this.setMenu(false);
+    this.layout();
+  }
+
+  /** Reparte los botones: lo que no cabe en la zona de herramientas pasa al menú «Más». */
+  private layout(): void {
+    const tools = this.toolsZone;
+    tools.replaceChildren(...this.toolItems, this.menu);
+    this.metaZone.replaceChildren(...this.metaItems);
+    const overflow: HTMLButtonElement[] = [];
+    const fits = (z: HTMLElement) => {
+      const items = [...z.children].filter((c): c is HTMLElement => c instanceof HTMLButtonElement);
+      if (!items.length) return true;
+      const first = items[0];
+      const last = items[items.length - 1];
+      return first.offsetLeft >= -0.5 && last.offsetLeft + last.offsetWidth <= z.clientWidth + 0.5;
+    };
+    // a la derecha, el laboratorio es lo primero que cede su lugar (el árbol siempre se ve)
+    if (!fits(this.metaZone) && this.metaItems.length > 1) overflow.push(this.metaItems[0]);
+    if (!fits(tools) || overflow.length) {
+      tools.insertBefore(this.more, this.menu);
+      while (!fits(tools)) {
+        const movable = [...tools.children].filter(
+          (c): c is HTMLButtonElement => c instanceof HTMLButtonElement && c !== this.more && c.getAttribute('aria-pressed') !== 'true',
+        );
+        const victim = movable.at(-1);
+        if (!victim) break;
+        overflow.unshift(victim);
+        victim.remove();
+      }
+    }
+    const order = [...this.toolItems, ...this.metaItems];
+    overflow.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    this.menu.replaceChildren(...overflow);
+    if (!overflow.length) {
+      this.more.remove();
+      this.setMenu(false);
+    }
   }
 
   setActive(id: ToolId): void {
     this.bar.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach((b) => {
       b.setAttribute('aria-pressed', String(b.dataset.tool === id));
     });
+    // la herramienta activa siempre queda a la vista
+    if (this.menu.querySelector(`[data-tool="${id}"]`)) this.layout();
   }
 
   setRunning(running: boolean): void {
     const b = this.flowBtn;
     if (!b) return;
-    b.innerHTML = running ? ICONS.pause : ICONS.play;
-    b.append(h('span', {}, running ? 'Detener' : 'Tiempo'));
+    this.setIcon(b, running ? ICONS.pause : ICONS.play);
+    this.setLabel(b, running ? 'Detener el tiempo' : 'Dejar fluir el tiempo');
     b.setAttribute('aria-pressed', String(running));
   }
 
@@ -142,24 +239,21 @@ export class Toolbar {
     const b = this.bar.querySelector<HTMLButtonElement>(`[data-switch="${id}"]`);
     if (!b) return;
     if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on));
-    const span = b.querySelector('span');
-    const text = label ?? SWITCH_NAMES[id];
-    if (span && span.textContent !== text) span.textContent = text;
-    b.title = label ?? `${SWITCH_NAMES[id]}: ${on ? 'encendida' : 'apagada'}`;
+    this.setLabel(b, label ?? SWITCH_NAMES[id]);
   }
 
   setLens(id: LensId, on: boolean): void {
     const b = this.bar.querySelector<HTMLButtonElement>(`[data-lens="${id}"]`);
     if (!b) return;
     b.setAttribute('aria-pressed', String(on));
-    b.title = `Lente ${LENS_NAMES[id]}: ${on ? 'activo' : 'apagado'}`;
   }
 
   setScale(k: number): void {
     const b = this.slowBtn;
     if (!b) return;
-    b.innerHTML = ICONS.slow;
-    b.append(h('span', {}, `Lenta ${scaleLabel(k)}`));
+    this.setLabel(b, `Cámara lenta ${scaleLabel(k)}`);
+    const badge = b.querySelector('.badge');
+    if (badge) badge.textContent = k < 1 ? scaleLabel(k) : '';
     b.setAttribute('aria-pressed', String(k < 1));
   }
 }

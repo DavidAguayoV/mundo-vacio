@@ -1,6 +1,6 @@
 import type { Simulation } from '../physics/simulation';
 import type { EntityRef, World } from '../world/world';
-import type { Painter } from './painter';
+import type { Painter, Rect } from './painter';
 import type { View } from './view';
 
 /** Todo lo que una capa necesita para dibujar un cuadro. */
@@ -18,6 +18,8 @@ export interface Scene {
   draft: ((p: Painter) => void) | null;
   /** qué dibujar (el laboratorio permite ocultar r y las trayectorias cuando hay muchas partículas) */
   display: { positions: boolean; trails: boolean };
+  /** zonas del lienzo tapadas por la interfaz (tarjeta del relato, paneles, barra), en px CSS: los rótulos las evitan */
+  avoid: readonly Rect[];
 }
 
 export type Layer = (scene: Scene) => void;

@@ -24,6 +24,8 @@ export class StoryCard {
   private row = $('crow');
   private minBtn = $('minBtn');
   private kind = h('div', { class: 'kind' });
+  /** paso que se está mostrando: al cambiar, el texto entra con un fundido */
+  private shown = '';
 
   constructor(private actions: CardActions) {
     this.minBtn.addEventListener('click', () => this.setCollapsed(!this.card.classList.contains('collapsed')));
@@ -32,7 +34,7 @@ export class StoryCard {
 
   setCollapsed(c: boolean): void {
     this.card.classList.toggle('collapsed', c);
-    this.minBtn.textContent = c ? '+' : '—';
+    this.minBtn.textContent = c ? '+' : '−';
     this.minBtn.setAttribute('aria-label', c ? 'Mostrar relato' : 'Contraer relato');
     this.minBtn.setAttribute('aria-expanded', String(!c));
   }
@@ -41,6 +43,17 @@ export class StoryCard {
     const b = h('button', { class: primary ? 'btn primary' : 'btn', type: 'button' }, label);
     b.addEventListener('click', fn);
     return b;
+  }
+
+  /** Un solo fundido por paso nuevo (no en cada refresco de la interfaz). */
+  private enter(key: string): void {
+    if (key === this.shown) return;
+    const first = this.shown === '';
+    this.shown = key;
+    if (first) return;
+    this.card.classList.remove('enter');
+    void this.card.offsetWidth; // reinicia la animación
+    this.card.classList.add('enter');
   }
 
   render(story: StoryEngine): void {
@@ -55,10 +68,13 @@ export class StoryCard {
       this.text.textContent =
         'Todas las herramientas y todo el control del tiempo. Arma tu propio experimento; en Lab puedes guardarlo, compartirlo o abrir uno de los ejemplos.';
       this.row.append(this.button('Abrir Lab', true, this.actions.openLab), this.button('Ver árbol', false, this.actions.openTree));
+      this.enter('libre');
       return;
     }
     const { chapter, step } = story;
-    this.eyebrow.textContent = `${chapter.act} · ${story.index + 1}/${story.chapters.length}`;
+    // «I · Dónde» → «Dónde, capítulo 1 de 11»
+    const actName = chapter.act.split('·').pop()?.trim() ?? chapter.act;
+    this.eyebrow.textContent = `${actName}, capítulo ${story.index + 1} de ${story.chapters.length}`;
     this.eyebrow.title = `Acto ${chapter.act}, capítulo ${story.index + 1} de ${story.chapters.length}`;
     this.dots.replaceChildren(
       ...chapter.steps.map((_, i) =>
@@ -70,12 +86,14 @@ export class StoryCard {
     if (step.kind === 'engineering') {
       this.card.classList.add('engineering');
       this.kind.textContent = 'Mirada de ingeniería';
-    } else if (step.choices) {
-      this.kind.textContent = 'Predice';
     }
     if (step.choices) {
       this.row.classList.add('choices');
-      for (const c of step.choices) this.row.append(this.button(c.label, false, () => this.actions.choose(c.id)));
+      for (const c of step.choices) {
+        const b = h('button', { class: 'choice', type: 'button' }, c.label);
+        b.addEventListener('click', () => this.actions.choose(c.id));
+        this.row.append(b);
+      }
     }
     if (step.on === 'next') this.row.append(this.button(step.button ?? 'Siguiente', true, this.actions.next));
     if (step.on === 'end' && !step.choices) {
@@ -86,5 +104,6 @@ export class StoryCard {
     }
     // un paso nuevo siempre se muestra completo
     this.setCollapsed(false);
+    this.enter(`${chapter.id}:${story.progress.step}`);
   }
 }

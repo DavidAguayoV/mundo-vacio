@@ -2,34 +2,54 @@
    inspector y HUD en un costado (abajo en celular). Oscuro por defecto, claro a elección. */
 
 :root {
-  --bg: #0d1015;
-  --panel: #151a21;
-  --line: #262d38;
-  --grid: #1d2430;
-  --ink: #e9e7e0;
-  --muted: #8a93a0;
-  /* código de colores físico */
-  --pos: #b9c2cf; /* posición: neutro */
-  --vec: #f0b44c; /* vectores y fuerzas: ámbar */
-  --vel: #5ccbe3; /* velocidad: cian */
-  --acc: #ee7393; /* aceleración y g: rosa */
+  /* el vacío: negro azulado con viñeteado (centro algo más claro, bordes casi negros) */
+  --bg: #070a12;
+  --bg-center: #0c1222;
+  --bg-edge: #020308;
+  /* luz tenue que enciende el origen, y halo de las partículas */
+  --glow: #7d93c9;
+  --glow-a: 0.11;
+  --halo: #dfe6ff;
+  --panel: #0e1320;
+  --line: #222a3b;
+  --grid: #5d6a88;
+  --ink: #ece8df;
+  --muted: #7f8898;
+  /* código de colores físico (tonos revisados para deuteranopia: ΔE2000 ≥ 27 entre ámbar, cian y rosa) */
+  --pos: #aab3c2; /* posición: neutro */
+  --vec: #f5bd4a; /* vectores y fuerzas: ámbar */
+  --vel: #6adcf2; /* velocidad: cian */
+  --acc: #eb4789; /* aceleración y g: rosa */
   --display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
-  --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  /* escala tipográfica */
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-lg: 19px;
+  --t-xl: 26px;
+  --t-2xl: 40px;
   color-scheme: dark;
 }
 
 :root[data-theme='light'] {
-  --bg: #f3f5f7;
-  --panel: #ffffff;
-  --line: #d5dbe3;
-  --grid: #d3dae3;
-  --ink: #151a21;
-  --muted: #5b6574;
-  --pos: #3d4755;
-  --vec: #b8740a;
-  --vel: #0b83a0;
-  --acc: #c23a5d;
+  --bg: #eef1f6;
+  --bg-center: #f8f9fc;
+  --bg-edge: #d9dfe9;
+  --glow: #ffffff;
+  --glow-a: 0.8;
+  --halo: #26304a;
+  --panel: #fbfcfd;
+  --line: #d3d9e2;
+  --grid: #8792a6;
+  --ink: #121722;
+  --muted: #5d6676;
+  /* ΔE2000 ≥ 25 entre ámbar, cian y rosa con deuteranopia */
+  --pos: #4a5464;
+  --vec: #b07400;
+  --vel: #00809f;
+  --acc: #9b1d55;
   color-scheme: light;
 }
 
@@ -45,6 +65,7 @@ body {
 
 body {
   background: var(--bg);
+  background-image: radial-gradient(ellipse 75% 70% at 50% 55%, var(--bg-center) 0%, var(--bg) 55%, var(--bg-edge) 100%);
   color: var(--ink);
   font-family: var(--body);
   font-size: 15px;
@@ -77,50 +98,61 @@ button {
   display: none !important;
 }
 
-/* ---------- tarjeta de relato ---------- */
+/* ---------- relato ---------- */
 
+/* El relato no es una ventana: es texto escrito sobre el vacío, con una penumbra apenas sugerida detrás. */
 .card {
   position: absolute;
-  top: max(14px, env(safe-area-inset-top, 0px));
-  left: max(16px, env(safe-area-inset-left, 0px));
-  width: min(400px, calc(100% - 32px));
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px 16px;
+  top: max(20px, env(safe-area-inset-top, 0px));
+  left: max(24px, env(safe-area-inset-left, 0px));
+  width: min(460px, calc(100% - 48px));
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  isolation: isolate;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: -40px -64px -40px -48px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--bg) 78%, transparent), transparent);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .eyebrow {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-  padding-right: 28px;
+  font-size: var(--t-sm);
+  color: var(--muted);
+  padding-right: 36px;
 }
 
 .card h1 {
   font-family: var(--display);
-  font-style: italic;
   font-weight: 400;
-  font-size: 30px;
-  line-height: 1.05;
+  font-size: var(--t-2xl);
+  line-height: 1;
+  letter-spacing: -0.005em;
   margin: 0;
   text-wrap: balance;
 }
 
 .card p {
   margin: 0;
-  line-height: 1.5;
-  font-size: 14.5px;
+  font-family: var(--display);
+  font-size: 21px;
+  line-height: 1.4;
+  max-width: 34em;
   text-wrap: pretty;
+  text-shadow: 0 0 18px var(--bg), 0 0 4px var(--bg);
+}
+
+/* Instrument Serif no tiene negrita: las ideas clave van en cursiva, como en un apunte */
+.card p strong {
+  font-weight: 400;
+  font-style: italic;
 }
 
 .dots {
@@ -129,10 +161,10 @@ button {
 }
 
 .dots i {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: var(--line);
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
 }
 
 .dots i.done {
@@ -140,7 +172,8 @@ button {
 }
 
 .dots i.now {
-  background: var(--vec);
+  background: var(--ink);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 18%, transparent);
 }
 
 .row {
@@ -153,26 +186,48 @@ button {
   display: none;
 }
 
+.card .row {
+  margin-top: 4px;
+}
+
 .card.collapsed p,
-.card.collapsed .row {
+.card.collapsed .row,
+.card.collapsed .kind {
   display: none;
+}
+
+.card.collapsed h1 {
+  font-size: var(--t-xl);
 }
 
 .min {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: -6px;
+  right: -8px;
   background: none;
   border: 0;
   color: var(--muted);
-  font: 500 13px var(--mono);
+  font: 400 var(--t-lg) var(--body);
+  line-height: 1;
   cursor: pointer;
-  padding: 6px 9px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
 }
 
 .min:hover {
-  background: var(--line);
+  color: var(--ink);
+}
+
+/* cada paso nuevo entra con un solo fundido */
+.card.enter > :not(.min) {
+  animation: step-in 0.32s ease-out both;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 /* ---------- botones ---------- */
@@ -206,49 +261,69 @@ button {
 .btn:focus-visible,
 .tool:focus-visible,
 .min:focus-visible {
-  outline: 2px solid var(--vel);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
 /* ---------- caja de herramientas ---------- */
 
+/* Sin caja: tres zonas sobre el vacío (herramientas, tiempo, árbol), con una penumbra suave detrás para leerlas. */
 .bar {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  max-width: calc(100% - 32px);
-  display: flex;
-  gap: 4px;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  padding: 5px;
-  overflow-x: auto;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  scrollbar-width: none;
+  gap: 12px;
+  isolation: isolate;
+  pointer-events: none;
 }
 
-.bar::-webkit-scrollbar {
-  display: none;
+.bar::before {
+  content: '';
+  position: absolute;
+  inset: -48px -16px calc(-12px - env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg-edge) 85%, transparent), transparent);
+  z-index: -1;
+}
+
+.zone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.zone.time {
+  gap: 6px;
+}
+
+.zone.meta {
+  justify-content: flex-end;
 }
 
 .tool {
+  position: relative;
   flex: none;
   display: grid;
-  justify-items: center;
-  gap: 2px;
-  width: 62px;
-  padding: 6px 2px 5px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition: color 0.15s;
 }
 
-.tool:hover {
-  color: var(--ink);
+.tool .ico {
+  display: grid;
 }
 
 .tool svg {
@@ -256,14 +331,174 @@ button {
   height: 20px;
 }
 
-.tool span {
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
+.tool:hover,
+.tool:focus-visible {
+  color: var(--ink);
 }
 
+/* herramienta elegida o interruptor encendido: tinta y un punto bajo el ícono */
 .tool[aria-pressed='true'] {
-  background: var(--line);
   color: var(--ink);
+}
+
+.tool[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* nombre del botón: aparece al pasar el mouse o al enfocar con el teclado */
+.tool .tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  display: none;
+}
+
+.zone.tools > .tool .tip {
+  left: 0;
+  transform: none;
+}
+
+.zone.meta .tool .tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.tool:hover .tip,
+.tool:focus-visible .tip {
+  display: block;
+}
+
+/* comienzo del relato: pocas herramientas, con su nombre a la vista */
+.bar.labeled .zone.tools .tool,
+.bar.labeled .zone.meta .tool,
+.bar.labeled .zone.time .tool:not(.play) {
+  width: auto;
+  min-width: 56px;
+  height: 52px;
+  padding: 4px 10px 6px;
+  gap: 3px;
+  grid-template-rows: 22px auto;
+}
+
+.bar.labeled .zone:not(.time) .tool .tip,
+.bar.labeled .zone.time .tool:not(.play) .tip {
+  display: block;
+  position: static;
+  transform: none;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: var(--t-sm);
+}
+
+.bar.labeled .tool[aria-pressed='true']::after {
+  display: none;
+}
+
+.bar.labeled .tool[aria-pressed='true'] .tip {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+/* el tiempo: el control principal */
+.tool.play {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.tool.play:hover,
+.tool.play:focus-visible {
+  color: var(--bg);
+}
+
+.tool.play svg {
+  width: 22px;
+  height: 22px;
+}
+
+.tool.play[aria-pressed='true']::after {
+  display: none;
+}
+
+.tool .badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tool .badge:empty {
+  display: none;
+}
+
+/* menú «Más»: las herramientas que no caben, con su nombre */
+.menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  min-width: 190px;
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--bg-edge) 60%, transparent);
+  z-index: 2;
+}
+
+.menu .tool {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 10px;
+}
+
+.menu .tool .tip,
+.bar.labeled .menu .tool .tip {
+  display: block;
+  position: static;
+  transform: none;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: var(--t-md);
+}
+
+.menu .tool[aria-pressed='true']::after {
+  left: auto;
+  right: 12px;
+  bottom: 50%;
+  margin: 0 0 -2px;
 }
 
 .tool.new {
@@ -276,23 +511,15 @@ button {
   }
 }
 
-.sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--line);
-  margin: 4px 3px;
-  flex: none;
-}
-
 /* ---------- HUD e inspector ---------- */
 
 .dock {
   position: absolute;
   right: max(16px, env(safe-area-inset-right, 0px));
-  top: max(14px, env(safe-area-inset-top, 0px));
-  width: 236px;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  width: 252px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   justify-items: end;
   pointer-events: none;
 }
@@ -301,34 +528,49 @@ button {
   pointer-events: auto;
 }
 
+/* HUD: solo lo esencial, pequeño y callado */
 .hud {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--t-xs);
+  line-height: 1.5;
   color: var(--muted);
   text-align: right;
   display: grid;
-  gap: 3px;
+  gap: 1px;
   font-variant-numeric: tabular-nums;
   pointer-events: none !important;
+  order: -1;
 }
 
 .hud .g {
   color: var(--acc);
 }
 
-.inspector {
+.hud .quiet {
+  opacity: 0.6;
+}
+
+/* con la línea de tiempo a la vista, t ya está abajo */
+#app.has-timeline .hud .t {
+  display: none;
+}
+
+/* paneles: las únicas cajas del juego, porque son herramientas */
+.inspector,
+.energy {
+  position: relative;
   width: 100%;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-  font-size: 13px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--bg-edge) 45%, transparent);
 }
 
 .inspector {
-  position: relative;
+  padding: 12px 14px 12px;
+  display: grid;
+  gap: 10px;
+  font-size: var(--t-md);
 }
 
 .inspector .close {
@@ -338,7 +580,7 @@ button {
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: none;
   color: var(--muted);
   font-size: 18px;
@@ -347,43 +589,62 @@ button {
 }
 
 .inspector .close:hover {
-  background: var(--line);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--ink);
 }
 
 .inspector .close:focus-visible {
-  outline: 2px solid var(--vel);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
-.inspector h2 {
+.inspector h2,
+.energy h2 {
   margin: 0;
-  font-size: 12px;
-  font-family: var(--mono);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .kv {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 4px 10px;
+  align-items: baseline;
+  gap: 3px 12px;
   margin: 0;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--t-sm);
   font-variant-numeric: tabular-nums;
 }
 
+/* los nombres de las magnitudes, en la serif de pizarra */
 .kv dt {
+  font-family: var(--display);
+  font-size: 17px;
+  line-height: 1.2;
   color: var(--muted);
+  white-space: nowrap;
+}
+
+.kv dt i,
+.sym i {
+  font-style: italic;
+}
+
+.kv dt sub,
+.sym sub {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: -0.2em;
+  font-style: normal;
 }
 
 .kv dd {
   margin: 0;
   text-align: right;
   white-space: nowrap;
+  color: var(--ink);
 }
 
 .kv .pos {
@@ -404,18 +665,24 @@ button {
   gap: 6px;
   justify-content: space-between;
   font-family: var(--mono);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .mass .btn {
-  padding: 3px 11px;
-  font-size: 15px;
-  line-height: 1.2;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  background: transparent;
 }
 
 .inspector .note {
   margin: 0;
-  font-size: 11.5px;
-  line-height: 1.4;
+  font-size: var(--t-xs);
+  line-height: 1.45;
   color: var(--muted);
 }
 
@@ -426,29 +693,26 @@ button {
 
 .inspector .del {
   justify-self: start;
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--t-sm);
   color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+  text-underline-offset: 3px;
+}
+
+.inspector .del:hover {
+  color: var(--ink);
 }
 
 /* ---------- medidor de energía ---------- */
 
 .energy {
-  width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px 12px 6px;
+  padding: 12px 14px 8px;
   display: grid;
-  gap: 4px;
-}
-
-.energy h2 {
-  margin: 0;
-  font: 500 12px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  gap: 6px;
 }
 
 .energy svg {
@@ -494,10 +758,17 @@ button {
 }
 
 .energy .lab {
-  font-size: 10.5px;
-  font-weight: 500;
+  font-family: var(--display);
+  font-size: 14px;
+  font-style: italic;
   text-anchor: middle;
   fill: var(--muted);
+}
+
+.energy .lab.tot {
+  font-family: var(--body);
+  font-style: normal;
+  font-size: 11px;
 }
 
 .energy .lab.k {
@@ -520,13 +791,12 @@ button {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
-  background: var(--ink);
-  color: var(--bg);
-  padding: 8px 14px;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 14px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--ink);
+  font-size: var(--t-md);
   white-space: nowrap;
   max-width: calc(100% - 32px);
   overflow: hidden;
@@ -540,39 +810,49 @@ button {
   opacity: 1;
 }
 
-/* ---------- árbol ---------- */
+/* ---------- árbol y laboratorio: capas sobre el vacío ---------- */
 
 .overlay {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--bg) 84%, transparent);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   overflow-y: auto;
-  padding: max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px));
+  padding: max(28px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
 }
 
 .tree {
   max-width: 760px;
   margin: 0 auto;
   display: grid;
-  gap: 22px;
+  gap: 28px;
 }
 
 .tree header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
+  gap: 12px 16px;
   flex-wrap: wrap;
 }
 
 .tree header h2 {
   font-family: var(--display);
-  font-style: italic;
   font-weight: 400;
-  font-size: 34px;
+  font-size: var(--t-2xl);
+  line-height: 1;
   margin: 0;
+}
+
+.tree header .btn {
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: transparent;
+}
+
+.tree header .btn.primary {
+  background: var(--ink);
 }
 
 .tiers {
@@ -587,12 +867,12 @@ button {
 
 .tier h3 {
   margin: 0;
-  font: 500 11px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--t-md);
+  font-weight: 600;
   color: var(--muted);
 }
 
+/* tarjetas del laboratorio (el panel Lab es una herramienta: aquí sí hay cajas) */
 .nodes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -601,7 +881,7 @@ button {
 
 .node {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px 12px;
   display: grid;
   gap: 3px;
@@ -611,7 +891,7 @@ button {
 
 .node b {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--t-md);
   display: flex;
   justify-content: space-between;
   gap: 6px;
@@ -620,127 +900,364 @@ button {
 .node small {
   color: var(--muted);
   line-height: 1.4;
-  font-size: 12.5px;
+  font-size: var(--t-sm);
 }
 
 .node .st {
-  font: 500 10.5px var(--mono);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: var(--t-xs);
+  font-weight: 400;
+  color: var(--muted);
   flex: none;
 }
 
-.node.on .st {
-  color: var(--vel);
+/* solo para lectores de pantalla */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.node.next {
-  border-color: var(--vec);
+/* ---------- árbol de crecimiento ---------- */
+
+/* un tronco a la izquierda; cada nivel es una rama que sale de él */
+.skilltree {
+  position: relative;
+  gap: 0;
 }
 
-.node.next .st {
-  color: var(--vec);
+.skilltree .links {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
 }
 
-.node.off {
-  background: transparent;
-  border-style: dashed;
+.skilltree .link {
+  fill: none;
+  stroke: var(--muted);
+  stroke-opacity: 0.35;
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
 }
 
-.node.off b,
-.node.off .st {
+.skilltree .link.lit {
+  stroke: var(--ink);
+  stroke-opacity: 0.5;
+  stroke-dasharray: none;
+}
+
+.skilltree .tier {
+  position: relative;
+  padding: 0 0 26px 36px;
+  gap: 12px;
+}
+
+/* tronco: encendido hasta el último nivel con algo ganado */
+.skilltree .tier::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
+}
+
+.skilltree .tier.lit::before {
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.skilltree .tier:first-of-type::before {
+  top: 12px;
+}
+
+.skilltree .tier:last-of-type::before {
+  bottom: auto;
+  height: 12px;
+}
+
+/* nudo de la rama sobre el tronco */
+.skilltree .tier::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--muted) 50%, transparent);
+  background: var(--bg);
+}
+
+.skilltree .tier.lit::after {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.skilltree .tier h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: var(--t-xl);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.skilltree .tier:not(.lit) h3 {
   color: var(--muted);
+}
+
+.skilltree .tier h3 .num {
+  font-family: var(--body);
+  font-size: var(--t-sm);
+  color: var(--muted);
+  min-width: 1.6em;
+}
+
+.skilltree .nodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px 20px;
+}
+
+.skilltree .node {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0 0 0 24px;
+  gap: 2px;
+  align-content: start;
+}
+
+.skilltree .node .dot {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.skilltree .node .name {
+  font-size: var(--t-md);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.skilltree .node small {
+  font-size: var(--t-sm);
+}
+
+/* ganada: encendida, con un brillo suave */
+.skilltree .node.on .dot {
+  background: var(--ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 10%, transparent), 0 0 14px color-mix(in srgb, var(--glow) 70%, transparent);
+}
+
+/* la próxima: un anillo marcado, todavía vacío */
+.skilltree .node.next .dot {
+  border: 2px solid var(--ink);
+  background: var(--bg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* bloqueada: apenas insinuada */
+.skilltree .node.off {
+  opacity: 0.38;
+}
+
+.skilltree .node.off .dot {
+  border: 1px dashed var(--muted);
+}
+
+.skilltree .node.off .name {
+  font-weight: 500;
 }
 
 /* ---------- relato: predicciones e ingeniería ---------- */
 
 .card .kind {
-  font: 500 11px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--vel);
+  font-size: var(--t-sm);
+  color: var(--muted);
+  margin-bottom: -4px;
 }
 
 .card .kind:empty {
   display: none;
 }
 
-.card.engineering .kind {
-  color: var(--vec);
+/* los botones del relato: «Siguiente» en tinta, el resto como enlace */
+.card .row .btn {
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: var(--t-md);
 }
 
-.card.engineering p {
-  font-style: italic;
+.card .row .btn:not(.primary) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--muted) 50%, transparent);
 }
 
-.card p strong {
-  font-weight: 600;
-}
-
+/* predicciones: respuestas a una pregunta, no botones de formulario */
 .card .row.choices {
   display: grid;
-  gap: 6px;
+  gap: 2px;
+  margin-top: 2px;
 }
 
-.card .row.choices .btn {
+.choice {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px 7px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: 400 19px/1.3 var(--display);
   text-align: left;
-  padding: 9px 12px;
-  font-size: 14px;
+  cursor: pointer;
+  text-shadow: 0 0 14px var(--bg);
 }
 
-.card.collapsed .kind {
-  display: none;
+.choice::before {
+  content: '';
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border: 1.25px solid var(--muted);
+  border-radius: 50%;
+  transform: translateY(1px);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.choice:hover::before,
+.choice:focus-visible::before {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.choice:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
 }
 
 /* ---------- línea de tiempo ---------- */
 
+/* Riel fino y neutro: el cian queda solo para la velocidad. */
 .timeline {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-  width: min(520px, calc(100% - 32px));
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  width: min(560px, calc(100% - 32px));
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font: 500 12px var(--mono);
+  gap: 12px;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
+}
+
+.timeline label {
+  font: italic 400 var(--t-lg) var(--display);
+  color: var(--ink);
+  line-height: 1;
 }
 
 .timeline input {
+  --p: 0%;
   flex: 1;
   min-width: 0;
-  accent-color: var(--vel);
   height: 24px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.timeline input::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to right, color-mix(in srgb, var(--ink) 55%, transparent) var(--p), color-mix(in srgb, var(--muted) 35%, transparent) var(--p));
+}
+
+.timeline input::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to right, color-mix(in srgb, var(--ink) 55%, transparent) var(--p), color-mix(in srgb, var(--muted) 35%, transparent) var(--p));
+}
+
+.timeline input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.timeline input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.timeline input:focus-visible {
+  outline: none;
+}
+
+.timeline input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ink);
+}
+
+.timeline input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ink);
 }
 
 .timeline output {
-  min-width: 52px;
+  min-width: 56px;
   text-align: right;
+  font: 400 var(--t-sm) var(--mono);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
 #app.has-timeline .toast {
-  bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(114px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ---------- celular ---------- */
 
 @media (max-width: 700px) {
   #app.has-timeline .dock {
-    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   }
 
   .dock {
     top: auto;
     left: max(16px, env(safe-area-inset-left, 0px));
     right: max(16px, env(safe-area-inset-right, 0px));
-    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     width: auto;
     justify-items: stretch;
     gap: 8px;
@@ -751,8 +1268,15 @@ button {
     text-align: left;
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 14px;
-    font-size: 11.5px;
+    gap: 0 14px;
+  }
+
+  .toast {
+    bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #app.has-timeline .toast {
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
   }
 
   .hud > div {
@@ -762,6 +1286,10 @@ button {
   .energy {
     order: 0;
     padding: 6px 10px 2px;
+  }
+
+  .energy svg {
+    height: 116px;
   }
 
   .energy h2 {
@@ -783,21 +1311,48 @@ button {
     display: none;
   }
 
+  .card {
+    left: max(16px, env(safe-area-inset-left, 0px));
+    top: max(14px, env(safe-area-inset-top, 0px));
+    width: calc(100% - 32px);
+    gap: 8px;
+  }
+
   .card h1 {
-    font-size: 26px;
+    font-size: 32px;
   }
 
   .card p {
-    font-size: 14px;
+    font-size: 18px;
+    line-height: 1.38;
   }
 
-  .tool {
-    width: 56px;
+  .choice {
+    font-size: 17.5px;
+    padding: 6px 8px 6px 4px;
+  }
+
+  .bar {
+    gap: 6px;
+  }
+
+  .zone.time {
+    gap: 2px;
+  }
+
+  .bar:not(.labeled) .tool:not(.play) {
+    width: 36px;
+  }
+
+  .tool.play {
+    width: 46px;
+    height: 46px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tool.new {
+  .tool.new,
+  .card.enter > :not(.min) {
     animation: none;
   }
 
@@ -824,7 +1379,7 @@ button {
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--vel);
+  outline: 2px solid var(--ink);
   outline-offset: 1px;
 }
 
@@ -867,6 +1422,10 @@ button {
   overflow-wrap: anywhere;
 }
 
+.lab .nodes .node {
+  grid-template-rows: auto 1fr auto;
+}
+
 .lab .nodes .node .row {
   margin-top: 6px;
 }
@@ -895,5 +1454,5 @@ button {
 .check input {
   width: 16px;
   height: 16px;
-  accent-color: var(--vel);
+  accent-color: var(--ink);
 }

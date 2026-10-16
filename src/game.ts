@@ -5,7 +5,7 @@ import { FrictionForce, G_GAME, NormalForce, Spring, SpringForces, UniformGravit
 import { OscillationMeter } from './physics/oscillationMeter';
 import { Lab } from './lab/lab';
 import { Simulation } from './physics/simulation';
-import { Painter } from './render/painter';
+import { Painter, type Rect } from './render/painter';
 import { drawScene } from './render/renderer';
 import { applyTheme, loadTheme, readPalette } from './render/theme';
 import { View } from './render/view';
@@ -595,8 +595,21 @@ export class Game {
       hitFlash: this.hitFlash,
       draft: tool.renderDraft ? (p) => tool.renderDraft!(p, this.ctx) : null,
       display: this.lab.display(),
+      avoid: this.uiRects(),
     });
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /** Zonas del lienzo tapadas por la interfaz: los rótulos de masa y de vectores no se dibujan debajo. */
+  private uiRects(): Rect[] {
+    const out: Rect[] = [];
+    const els = [$('card'), $('hud'), $('insp'), $('bar'), $('timeline'), ...document.querySelectorAll<HTMLElement>('#dock > .energy')];
+    for (const el of els) {
+      if (el.hidden) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width && r.height) out.push({ x: r.left - 4, y: r.top - 4, w: r.width + 8, h: r.height + 8 });
+    }
+    return out;
   }
 
   // ---------- prueba de rendimiento ----------

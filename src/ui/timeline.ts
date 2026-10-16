@@ -16,6 +16,7 @@ export class Timeline {
 
   constructor(onSeek: (t: number) => void) {
     this.input.addEventListener('input', () => {
+      this.paint();
       const first = this.pending === null;
       this.pending = Number(this.input.value);
       if (first) {
@@ -43,6 +44,14 @@ export class Timeline {
     const max = Math.max(duration, 0.005);
     if (this.input.max !== String(max)) this.input.max = String(max);
     if (!this.dragging && this.pending === null) this.input.value = String(t);
+    this.paint();
     setText(this.out, `${fmt(t)} s`);
+  }
+
+  /** Riel recorrido hasta la perilla (el deslizador nativo no lo dibuja igual en todos los navegadores). */
+  private paint(): void {
+    const max = Number(this.input.max) || 1;
+    const p = `${((100 * Number(this.input.value)) / max).toFixed(2)}%`;
+    if (this.input.style.getPropertyValue('--p') !== p) this.input.style.setProperty('--p', p);
   }
 }
