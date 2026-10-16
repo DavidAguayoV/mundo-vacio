@@ -124,7 +124,17 @@ export class EnergyMeter {
       label.setAttribute('x', String(cx));
       label.setAttribute('y', String(H + 2 * PAD + 10));
       label.setAttribute('class', `lab ${b.cls}`);
-      label.textContent = b.label;
+      // Ug → U con subíndice g (la serif no trae subíndices)
+      if (b.label.length === 2 && b.label[0] === 'U') {
+        const sub = document.createElementNS(NS, 'tspan');
+        sub.setAttribute('font-size', '10');
+        sub.setAttribute('dy', '3');
+        sub.setAttribute('font-style', 'normal');
+        sub.textContent = b.label[1];
+        label.append('U', sub);
+      } else {
+        label.textContent = b.label;
+      }
       this.svg.append(rect, value, label);
       this.bars.set(b.key, { rect, value });
     });

@@ -516,10 +516,10 @@ button {
 .dock {
   position: absolute;
   right: max(16px, env(safe-area-inset-right, 0px));
-  top: max(14px, env(safe-area-inset-top, 0px));
-  width: 236px;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  width: 252px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   justify-items: end;
   pointer-events: none;
 }
@@ -528,34 +528,49 @@ button {
   pointer-events: auto;
 }
 
+/* HUD: solo lo esencial, pequeño y callado */
 .hud {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--t-xs);
+  line-height: 1.5;
   color: var(--muted);
   text-align: right;
   display: grid;
-  gap: 3px;
+  gap: 1px;
   font-variant-numeric: tabular-nums;
   pointer-events: none !important;
+  order: -1;
 }
 
 .hud .g {
   color: var(--acc);
 }
 
-.inspector {
+.hud .quiet {
+  opacity: 0.6;
+}
+
+/* con la línea de tiempo a la vista, t ya está abajo */
+#app.has-timeline .hud .t {
+  display: none;
+}
+
+/* paneles: las únicas cajas del juego, porque son herramientas */
+.inspector,
+.energy {
+  position: relative;
   width: 100%;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-  font-size: 13px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--bg-edge) 45%, transparent);
 }
 
 .inspector {
-  position: relative;
+  padding: 12px 14px 12px;
+  display: grid;
+  gap: 10px;
+  font-size: var(--t-md);
 }
 
 .inspector .close {
@@ -565,7 +580,7 @@ button {
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: none;
   color: var(--muted);
   font-size: 18px;
@@ -574,7 +589,7 @@ button {
 }
 
 .inspector .close:hover {
-  background: var(--line);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--ink);
 }
 
@@ -583,34 +598,53 @@ button {
   outline-offset: 2px;
 }
 
-.inspector h2 {
+.inspector h2,
+.energy h2 {
   margin: 0;
-  font-size: 12px;
-  font-family: var(--mono);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .kv {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 4px 10px;
+  align-items: baseline;
+  gap: 3px 12px;
   margin: 0;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--t-sm);
   font-variant-numeric: tabular-nums;
 }
 
+/* los nombres de las magnitudes, en la serif de pizarra */
 .kv dt {
+  font-family: var(--display);
+  font-size: 17px;
+  line-height: 1.2;
   color: var(--muted);
+  white-space: nowrap;
+}
+
+.kv dt i,
+.sym i {
+  font-style: italic;
+}
+
+.kv dt sub,
+.sym sub {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: -0.2em;
+  font-style: normal;
 }
 
 .kv dd {
   margin: 0;
   text-align: right;
   white-space: nowrap;
+  color: var(--ink);
 }
 
 .kv .pos {
@@ -631,18 +665,24 @@ button {
   gap: 6px;
   justify-content: space-between;
   font-family: var(--mono);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .mass .btn {
-  padding: 3px 11px;
-  font-size: 15px;
-  line-height: 1.2;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  background: transparent;
 }
 
 .inspector .note {
   margin: 0;
-  font-size: 11.5px;
-  line-height: 1.4;
+  font-size: var(--t-xs);
+  line-height: 1.45;
   color: var(--muted);
 }
 
@@ -653,29 +693,26 @@ button {
 
 .inspector .del {
   justify-self: start;
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--t-sm);
   color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+  text-underline-offset: 3px;
+}
+
+.inspector .del:hover {
+  color: var(--ink);
 }
 
 /* ---------- medidor de energía ---------- */
 
 .energy {
-  width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px 12px 6px;
+  padding: 12px 14px 8px;
   display: grid;
-  gap: 4px;
-}
-
-.energy h2 {
-  margin: 0;
-  font: 500 12px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  gap: 6px;
 }
 
 .energy svg {
@@ -721,10 +758,17 @@ button {
 }
 
 .energy .lab {
-  font-size: 10.5px;
-  font-weight: 500;
+  font-family: var(--display);
+  font-size: 14px;
+  font-style: italic;
   text-anchor: middle;
   fill: var(--muted);
+}
+
+.energy .lab.tot {
+  font-family: var(--body);
+  font-style: normal;
+  font-size: 11px;
 }
 
 .energy .lab.k {
@@ -1063,8 +1107,15 @@ button {
     text-align: left;
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 14px;
-    font-size: 11.5px;
+    gap: 0 14px;
+  }
+
+  .toast {
+    bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #app.has-timeline .toast {
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
   }
 
   .hud > div {
@@ -1074,6 +1125,10 @@ button {
   .energy {
     order: 0;
     padding: 6px 10px 2px;
+  }
+
+  .energy svg {
+    height: 116px;
   }
 
   .energy h2 {

@@ -3,7 +3,7 @@ import { angleDeg, len, type Vec2 } from '../core/vec';
 import type { ForcePart } from '../physics/forces';
 import { IDENTITY_FRAME } from '../world/frame';
 import type { EntityRef, World } from '../world/world';
-import { $, h, setText } from './dom';
+import { $, h, setText, symbol } from './dom';
 
 export interface InspectorActions {
   changeMass(id: string, factor: number): void;
@@ -73,7 +73,7 @@ export class Inspector {
 
   private row(dl: HTMLElement, label: string, cls: string, value: () => string): void {
     const dd = h('dd', { class: cls });
-    dl.append(h('dt', {}, label), dd);
+    dl.append(h('dt', {}, ...symbol(label)), dd);
     this.rows.push({ dd, value });
   }
 

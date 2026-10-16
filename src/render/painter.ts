@@ -175,7 +175,7 @@ export class Painter {
       const h = r.size * 0.95;
       let chosen: Rect | null = null;
       for (const c of r.candidates) {
-        const rect = { x: c.x - w / 2 - 2, y: c.y - h / 2, w: w + 4, h };
+        const rect = { x: c.x - w / 2 - 4, y: c.y - h / 2 - 1, w: w + 8, h: h + 2 };
         const inside = rect.x >= 0 && rect.y >= 0 && rect.x + rect.w <= view.W && rect.y + rect.h <= view.H;
         if (inside && !this.obstacles.some((o) => overlaps(o, rect))) {
           chosen = rect;
@@ -185,10 +185,10 @@ export class Painter {
       // sin lugar libre: el primer candidato, salvo que quede tapado por la interfaz
       if (!chosen) {
         const c = r.candidates[0];
-        chosen = { x: c.x - w / 2 - 2, y: c.y - h / 2, w: w + 4, h };
+        chosen = { x: c.x - w / 2 - 4, y: c.y - h / 2 - 1, w: w + 8, h: h + 2 };
       }
       this.obstacles.push(chosen);
-      this.drawLabel(r, chosen.x + 2, chosen.y + h / 2, w);
+      this.drawLabel(r, chosen.x + 4, chosen.y + 1 + h / 2, w);
     }
     ctx.textAlign = 'left';
   }
