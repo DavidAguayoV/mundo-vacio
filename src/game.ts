@@ -13,7 +13,7 @@ import { freshProgress, loadProgress, saveProgress, type Progress } from './stat
 import { CHAPTERS, seedFree } from './story/chapters';
 import { RunMonitor } from './story/runMonitor';
 import { StoryEngine } from './story/storyEngine';
-import type { ForceSwitch, Grant, TimeSkill } from './story/types';
+import type { ForceSwitch, Grant, LensId, TimeSkill } from './story/types';
 import { FrameDrag } from './tools/frameDrag';
 import { TOOL_ORDER, createTools } from './tools/registry';
 import type { Tool, ToolContext, ToolId, WorldPointer } from './tools/tool';
@@ -24,7 +24,8 @@ import { Hud } from './ui/hud';
 import { Inspector, K_MAX, K_MIN, L0_MAX, L0_MIN, MU_MAX, clampMass } from './ui/inspector';
 import { Toast } from './ui/toast';
 import { Timeline } from './ui/timeline';
-import { SWITCH_NAMES, TIME_NAMES, Toolbar } from './ui/toolbar';
+import { EnergyMeter } from './ui/energyMeter';
+import { LENS_NAMES, SWITCH_NAMES, TIME_NAMES, Toolbar } from './ui/toolbar';
 import { G_EARTH, World, type EntityRef } from './world/world';
 
 /** Radio de toque en píxeles según el dispositivo. */
@@ -61,6 +62,9 @@ export class Game {
   private tree: TreeView;
   private lab: Lab;
   private timeline: Timeline;
+  private energyMeter = new EnergyMeter();
+  /** lentes activos (se recuerdan entre visitas) */
+  private lensOn = loadLenses();
   /** cámara lenta en el relato (en el laboratorio vale la preferencia guardada) */
   private storyTimeScale = 1;
 
@@ -136,6 +140,7 @@ export class Game {
       step: () => this.stepTime(),
       slow: () => this.cycleSlow(),
       toggleForce: (id) => this.toggleForce(id),
+      toggleLens: (id) => this.toggleLens(id),
       openTree: () => this.openTree(),
       openLab: () => this.lab.show(),
     });
@@ -256,6 +261,7 @@ export class Game {
       active: this.activeTool.id,
       time: this.story.timeSkills(),
       switches: [...this.story.forceSwitches()].map((id) => ({ id, on: this.forceOn(id), label: this.switchLabel(id) })),
+      lenses: [...this.story.lenses()].map((id) => ({ id, on: this.lensOn.has(id) })),
       labEnabled: this.story.free,
       running: this.sim.running,
       timeScale: this.timeScale,
@@ -322,6 +328,19 @@ export class Game {
       if (next) this.bus.emit({ type: 'medium-set' });
     }
     this.toolbar.setSwitch(id, this.forceOn(id), this.switchLabel(id));
+  }
+
+  // ---------- lentes ----------
+
+  private toggleLens(id: LensId): void {
+    if (!this.story.lenses().has(id)) return;
+    const on = !this.lensOn.has(id);
+    if (on) this.lensOn.add(id);
+    else this.lensOn.delete(id);
+    saveLenses(this.lensOn);
+    this.toolbar.setLens(id, on);
+    this.toast.show(`Lente ${LENS_NAMES[id]}: ${on ? 'activo' : 'apagado'}`);
+    if (on) this.bus.emit({ type: 'lens-on' });
   }
 
   private rewind(): void {
@@ -422,6 +441,8 @@ export class Game {
 
     this.sim.onStateChange = () => this.toolbar.setRunning(this.sim.running);
     this.sim.shouldStop = () => {
+      // sin área visible (página oculta o aún sin diseño) no hay «fuera de la vista»
+      if (!this.view.W || !this.view.H) return false;
       const b = this.view.bounds(Math.max(this.view.W, this.view.H) * 0.5);
       return this.world.particles.every((p) => p.pos.x < b.minX || p.pos.x > b.maxX || p.pos.y < b.minY || p.pos.y > b.maxY);
     };
@@ -560,6 +581,7 @@ export class Game {
     if (this.selection && !this.world.exists(this.selection)) this.select(null);
     this.inspector.update();
     this.hud.update(this.world, this.sim, this.has('flow'), this.fps);
+    this.energyMeter.update(this.lensOn.has('energy') && this.story.lenses().has('energy'), this.world, this.sim);
     this.timeline.update(this.has('timeline') && this.sim.hasRun && this.sim.duration > 0, this.sim.t, this.sim.duration);
 
     const tool = this.activeTool;
@@ -596,5 +618,24 @@ export class Game {
     w.g = { x: 0, y: -G_EARTH };
     this.sim.maxTime = Infinity;
     this.sim.start();
+  }
+}
+
+const LENS_KEY = 'mundoVacio.lenses';
+
+function loadLenses(): Set<LensId> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LENS_KEY) ?? '[]') as unknown;
+    return new Set(Array.isArray(raw) ? (raw.filter((x) => x === 'energy') as LensId[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveLenses(on: ReadonlySet<LensId>): void {
+  try {
+    localStorage.setItem(LENS_KEY, JSON.stringify([...on]));
+  } catch {
+    /* sin almacenamiento */
   }
 }

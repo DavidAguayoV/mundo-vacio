@@ -431,6 +431,89 @@ button {
   color: var(--muted);
 }
 
+/* ---------- medidor de energía ---------- */
+
+.energy {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.energy h2 {
+  margin: 0;
+  font: 500 12px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.energy svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: var(--mono);
+}
+
+.energy .zero {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.energy .bar.k {
+  fill: var(--vel);
+}
+
+.energy .bar.ug {
+  fill: var(--acc);
+}
+
+.energy .bar.ue {
+  fill: var(--pos);
+}
+
+.energy .bar.uG {
+  fill: var(--pos);
+  opacity: 0.6;
+}
+
+.energy .bar.tot {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+
+.energy .val {
+  font-size: 9.5px;
+  fill: var(--ink);
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.energy .lab {
+  font-size: 10.5px;
+  font-weight: 500;
+  text-anchor: middle;
+  fill: var(--muted);
+}
+
+.energy .lab.k {
+  fill: var(--vel);
+}
+
+.energy .lab.ug {
+  fill: var(--acc);
+}
+
+.energy .unit {
+  font-size: 9.5px;
+  text-anchor: end;
+  fill: var(--muted);
+}
+
 /* ---------- aviso ---------- */
 
 .toast {
@@ -674,6 +757,15 @@ button {
 
   .hud > div {
     white-space: nowrap;
+  }
+
+  .energy {
+    order: 0;
+    padding: 6px 10px 2px;
+  }
+
+  .energy h2 {
+    display: none;
   }
 
   .inspector {

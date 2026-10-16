@@ -1,4 +1,4 @@
-import type { ForceSwitch, TimeSkill } from '../story/types';
+import type { ForceSwitch, LensId, TimeSkill } from '../story/types';
 import { ICONS } from '../tools/icons';
 import type { Tool, ToolId } from '../tools/tool';
 import { $, h } from './dom';
@@ -8,6 +8,8 @@ export interface ToolbarState {
   active: ToolId;
   /** interruptores de fuerza ganados y si están encendidos */
   switches?: { id: ForceSwitch; on: boolean; label?: string }[];
+  /** lentes ganados y si están activos */
+  lenses?: { id: LensId; on: boolean }[];
   /** habilidades del tiempo ganadas: cada una agrega su control */
   time: ReadonlySet<TimeSkill>;
   /** botón Laboratorio (solo en modo libre) */
@@ -25,6 +27,7 @@ export interface ToolbarActions {
   step(): void;
   slow(): void;
   toggleForce(id: ForceSwitch): void;
+  toggleLens(id: LensId): void;
   openTree(): void;
   openLab(): void;
 }
@@ -40,6 +43,10 @@ export const TIME_NAMES: Record<TimeSkill, string> = {
 export const SWITCH_NAMES: Record<ForceSwitch, string> = {
   gravitation: 'Atracción',
   drag: 'Medio',
+};
+
+export const LENS_NAMES: Record<LensId, string> = {
+  energy: 'Energía',
 };
 
 const scaleLabel = (k: number) => (k === 0.5 ? '×½' : k === 0.25 ? '×¼' : '×1');
@@ -80,6 +87,18 @@ export class Toolbar {
         });
         b.title = sw.label ?? `${SWITCH_NAMES[sw.id]}: ${sw.on ? 'encendida' : 'apagada'}`;
         if (fresh.has(`force:${sw.id}`)) b.classList.add('new');
+        items.push(b);
+      }
+    }
+    if (s.lenses?.length) {
+      if (!s.switches?.length) items.push(h('span', { class: 'sep' }));
+      for (const l of s.lenses) {
+        const b = this.button(ICONS[l.id], LENS_NAMES[l.id], () => this.actions.toggleLens(l.id), {
+          'data-lens': l.id,
+          'aria-pressed': String(l.on),
+        });
+        b.title = `Lente ${LENS_NAMES[l.id]}: ${l.on ? 'activo' : 'apagado'}`;
+        if (fresh.has(`lens:${l.id}`)) b.classList.add('new');
         items.push(b);
       }
     }
@@ -127,6 +146,13 @@ export class Toolbar {
     const text = label ?? SWITCH_NAMES[id];
     if (span && span.textContent !== text) span.textContent = text;
     b.title = label ?? `${SWITCH_NAMES[id]}: ${on ? 'encendida' : 'apagada'}`;
+  }
+
+  setLens(id: LensId, on: boolean): void {
+    const b = this.bar.querySelector<HTMLButtonElement>(`[data-lens="${id}"]`);
+    if (!b) return;
+    b.setAttribute('aria-pressed', String(on));
+    b.title = `Lente ${LENS_NAMES[id]}: ${on ? 'activo' : 'apagado'}`;
   }
 
   setScale(k: number): void {

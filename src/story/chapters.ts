@@ -61,6 +61,17 @@ function ensureGravitation({ world }: StoryContext): void {
   if (!world.gravitation) world.gravitation = { G: G_GAME };
 }
 
+/** Una sola partícula de 1 kg en reposo, a 4 m de altura sobre el centro. */
+function oneParticle(ctx: StoryContext): void {
+  const { world } = ctx;
+  stopAll(ctx);
+  ensureParticles(ctx);
+  world.particles = world.particles.slice(0, 1);
+  const p = world.particles[0];
+  p.pos = { x: -2, y: 4 };
+  p.mass = 1;
+}
+
 function ensureAir(ctx: StoryContext): void {
   ensureG(ctx);
   if (!ctx.world.medium) ctx.world.medium = 'aire';
@@ -124,6 +135,7 @@ const engineering = (text: string): Step => ({ text, on: 'next', kind: 'engineer
 const I = 'I · Dónde';
 const II = 'II · Cuándo';
 const III = 'III · Por qué';
+const IV = 'IV · Qué se conserva';
 
 // ---------- capítulos ----------
 
@@ -759,7 +771,96 @@ export const CHAPTERS: Chapter[] = [
       },
       engineering('Un paracaídas no reduce la gravedad: aumenta el arrastre hasta que la velocidad terminal sea segura.'),
       {
-        text: 'Ya tienes las fuerzas que mueven casi todo lo que ves: peso, contacto, resortes, gravitación y arrastre. En el modo libre puedes combinarlas todas.',
+        text: 'Ya tienes las fuerzas que mueven casi todo lo que ves: peso, contacto, resortes, gravitación y arrastre. Ahora, una pregunta distinta sobre todo lo que viste.',
+        on: 'next',
+      },
+    ],
+  },
+
+  // ===== Acto IV · Qué se conserva =====
+  {
+    id: 'energia',
+    act: IV,
+    title: 'Energía',
+    grants: ['lens:energy'],
+    seed: (ctx) => {
+      ensureFrame(ctx);
+      // de vuelta a lo simple: g de la Tierra, sin aire, sin suelo, sin resortes
+      ctx.world.g = null;
+      ensureG(ctx);
+      ctx.world.gravitation = null;
+      ctx.world.medium = null;
+      ctx.world.surfaces = [];
+      ctx.world.springs = [];
+      ctx.world.targets = [];
+      oneParticle(ctx);
+    },
+    steps: [
+      {
+        text: 'Ya sabes cómo se mueve todo. Ahora una pregunta distinta: mientras r, v y a cambian, ¿hay algo que **no** cambie? Activa el lente **Energía** en la barra.',
+        on: 'lens-on',
+      },
+      {
+        text: 'La barra K es la **energía cinética**, ½ m v²: crece con la rapidez. La barra Ug es la **energía potencial gravitatoria**, m g h: crece con la altura h sobre tu origen. Antes de soltar la partícula: ¿qué hace la suma?',
+        on: 'end',
+        ask: 'suma',
+        choices: [
+          { id: 'crece', label: 'Crece' },
+          { id: 'mantiene', label: 'Se mantiene' },
+          { id: 'baja', label: 'Baja' },
+        ],
+      },
+      {
+        text: 'Deja fluir el tiempo y mira las barras.',
+        on: 'fell',
+      },
+      {
+        text: reveal('suma', 'K sube lo mismo que baja Ug: la suma se mantiene. Es la **conservación de la energía mecánica**.', {
+          crece: 'Dijiste que crecía. K crece, sí, pero Ug baja exactamente lo mismo.',
+          mantiene: 'Lo predijiste bien.',
+          baja: 'Dijiste que bajaba. Ug baja, pero K sube lo mismo: sin roce ni aire, nada se pierde.',
+        }),
+        on: 'next',
+      },
+      {
+        text: 'Usa la línea de tiempo: en cualquier instante, el total es el mismo. Ahora vuelve a t = 0, lánzala hacia arriba con Velocidad y deja fluir el tiempo.',
+        on: 'fell',
+        when: (ctx) => ctx.seen('v-set'),
+      },
+      {
+        text: 'Subiendo, K se convierte en Ug; bajando, Ug vuelve a ser K. Si mueves el origen más abajo, ¿qué pasa con Ug?',
+        on: 'end',
+        ask: 'cero',
+        choices: [
+          { id: 'todo', label: 'Cambia en todo el vuelo' },
+          { id: 'nada', label: 'No cambia' },
+          { id: 'final', label: 'Cambia solo al final' },
+        ],
+      },
+      {
+        text: 'Vuelve a t = 0, mueve el origen con Mover y deja fluir el tiempo otra vez.',
+        on: 'fell',
+        when: (ctx) => ctx.seen('origin-moved'),
+      },
+      {
+        text: reveal('cero', 'Ug cambió en todo el vuelo, y el total también; pero lo que gana K sigue siendo exactamente lo que pierde Ug. El cero de la energía potencial es una elección, como el origen del capítulo 1: lo que tiene sentido físico son las diferencias.', {
+          todo: 'Lo predijiste bien.',
+          nada: 'Dijiste que no cambiaba. Ug = m g h, y h se mide desde tu origen: al moverlo, cambia h en todo el vuelo.',
+          final: 'Dijiste que solo al final. h cambia lo mismo en todos los instantes, así que Ug cambia en todo el vuelo, en la misma cantidad.',
+        }),
+        on: 'next',
+      },
+      {
+        text: 'Ahora elige Resorte, cuelga la partícula de un punto fijo y deja fluir el tiempo. Mira K, Ug y Ue.',
+        on: 'oscillated',
+      },
+      {
+        text: 'Se pasan la energía de una a otra: K es máxima al cruzar el equilibrio y Ue en el punto más bajo. La suma de las tres, otra vez, no cambia. La energía no se crea ni se pierde: cambia de forma.',
+        on: 'next',
+      },
+      engineering('Una central hidroeléctrica convierte la energía potencial del agua de un embalse en electricidad: por eso importa tanto la altura de caída.'),
+      {
+        text: 'Hasta aquí no había roce ni aire. ¿Qué pasa con la energía cuando algo frena? Eso viene en el próximo capítulo.',
         on: 'end',
       },
     ],

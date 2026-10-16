@@ -29,6 +29,7 @@ export type GameEvent =
   | { type: 'escaped' }
   | { type: 'medium-set' }
   | { type: 'terminal' }
+  | { type: 'lens-on' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];
