@@ -810,39 +810,49 @@ button {
   opacity: 1;
 }
 
-/* ---------- árbol ---------- */
+/* ---------- árbol y laboratorio: capas sobre el vacío ---------- */
 
 .overlay {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--bg) 84%, transparent);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   overflow-y: auto;
-  padding: max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px));
+  padding: max(28px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
 }
 
 .tree {
   max-width: 760px;
   margin: 0 auto;
   display: grid;
-  gap: 22px;
+  gap: 28px;
 }
 
 .tree header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
+  gap: 12px 16px;
   flex-wrap: wrap;
 }
 
 .tree header h2 {
   font-family: var(--display);
-  font-style: italic;
   font-weight: 400;
-  font-size: 34px;
+  font-size: var(--t-2xl);
+  line-height: 1;
   margin: 0;
+}
+
+.tree header .btn {
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: transparent;
+}
+
+.tree header .btn.primary {
+  background: var(--ink);
 }
 
 .tiers {
@@ -857,12 +867,12 @@ button {
 
 .tier h3 {
   margin: 0;
-  font: 500 11px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--t-md);
+  font-weight: 600;
   color: var(--muted);
 }
 
+/* tarjetas del laboratorio (el panel Lab es una herramienta: aquí sí hay cajas) */
 .nodes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -871,7 +881,7 @@ button {
 
 .node {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px 12px;
   display: grid;
   gap: 3px;
@@ -881,7 +891,7 @@ button {
 
 .node b {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--t-md);
   display: flex;
   justify-content: space-between;
   gap: 6px;
@@ -890,36 +900,187 @@ button {
 .node small {
   color: var(--muted);
   line-height: 1.4;
-  font-size: 12.5px;
+  font-size: var(--t-sm);
 }
 
 .node .st {
-  font: 500 10.5px var(--mono);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: var(--t-xs);
+  font-weight: 400;
+  color: var(--muted);
   flex: none;
 }
 
-.node.on .st {
-  color: var(--vel);
+/* solo para lectores de pantalla */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.node.next {
-  border-color: var(--vec);
+/* ---------- árbol de crecimiento ---------- */
+
+/* un tronco a la izquierda; cada nivel es una rama que sale de él */
+.skilltree {
+  position: relative;
+  gap: 0;
 }
 
-.node.next .st {
-  color: var(--vec);
+.skilltree .links {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
 }
 
-.node.off {
-  background: transparent;
-  border-style: dashed;
+.skilltree .link {
+  fill: none;
+  stroke: var(--muted);
+  stroke-opacity: 0.35;
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
 }
 
-.node.off b,
-.node.off .st {
+.skilltree .link.lit {
+  stroke: var(--ink);
+  stroke-opacity: 0.5;
+  stroke-dasharray: none;
+}
+
+.skilltree .tier {
+  position: relative;
+  padding: 0 0 26px 36px;
+  gap: 12px;
+}
+
+/* tronco: encendido hasta el último nivel con algo ganado */
+.skilltree .tier::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
+}
+
+.skilltree .tier.lit::before {
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.skilltree .tier:first-of-type::before {
+  top: 12px;
+}
+
+.skilltree .tier:last-of-type::before {
+  bottom: auto;
+  height: 12px;
+}
+
+/* nudo de la rama sobre el tronco */
+.skilltree .tier::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--muted) 50%, transparent);
+  background: var(--bg);
+}
+
+.skilltree .tier.lit::after {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.skilltree .tier h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: var(--t-xl);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.skilltree .tier:not(.lit) h3 {
   color: var(--muted);
+}
+
+.skilltree .tier h3 .num {
+  font-family: var(--body);
+  font-size: var(--t-sm);
+  color: var(--muted);
+  min-width: 1.6em;
+}
+
+.skilltree .nodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px 20px;
+}
+
+.skilltree .node {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0 0 0 24px;
+  gap: 2px;
+  align-content: start;
+}
+
+.skilltree .node .dot {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.skilltree .node .name {
+  font-size: var(--t-md);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.skilltree .node small {
+  font-size: var(--t-sm);
+}
+
+/* ganada: encendida, con un brillo suave */
+.skilltree .node.on .dot {
+  background: var(--ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 10%, transparent), 0 0 14px color-mix(in srgb, var(--glow) 70%, transparent);
+}
+
+/* la próxima: un anillo marcado, todavía vacío */
+.skilltree .node.next .dot {
+  border: 2px solid var(--ink);
+  background: var(--bg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* bloqueada: apenas insinuada */
+.skilltree .node.off {
+  opacity: 0.38;
+}
+
+.skilltree .node.off .dot {
+  border: 1px dashed var(--muted);
+}
+
+.skilltree .node.off .name {
+  font-weight: 500;
 }
 
 /* ---------- relato: predicciones e ingeniería ---------- */
@@ -1259,6 +1420,10 @@ button {
   flex: 1 1 200px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.lab .nodes .node {
+  grid-template-rows: auto 1fr auto;
 }
 
 .lab .nodes .node .row {
