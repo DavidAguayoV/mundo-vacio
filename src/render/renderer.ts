@@ -27,5 +27,8 @@ export function drawScene(scene: Scene): void {
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   ctx.clearRect(0, 0, view.W, view.H);
   ctx.globalAlpha = 1;
+  scene.painter.beginFrame(scene.avoid);
   for (const layer of LAYERS) layer(scene);
+  // los rótulos al final, encima de todo y ubicados para no pisarse
+  scene.painter.flushLabels();
 }

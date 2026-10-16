@@ -12,8 +12,8 @@ export function springsLayer(scene: Scene): void {
     const b = world.endPos(sp.b);
     if (!a || !b) continue;
     const isSel = sel?.kind === 'spring' && sel.id === sp.id;
-    const color = isSel ? pal.vel : pal.ink;
-    p.alpha(isSel ? 1 : 0.75, () => drawCoil(p, a, b, color, isSel ? 2 : 1.6));
+    const color = pal.ink;
+    p.alpha(isSel ? 1 : 0.6, () => drawCoil(p, a, b, color, isSel ? 2.2 : 1.6));
     if ('anchor' in sp.a) drawAnchor(p, sp.a.anchor, color);
     if ('anchor' in sp.b) drawAnchor(p, sp.b.anchor, color);
   }

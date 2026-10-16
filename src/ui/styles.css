@@ -2,34 +2,54 @@
    inspector y HUD en un costado (abajo en celular). Oscuro por defecto, claro a elección. */
 
 :root {
-  --bg: #0d1015;
-  --panel: #151a21;
-  --line: #262d38;
-  --grid: #1d2430;
-  --ink: #e9e7e0;
-  --muted: #8a93a0;
-  /* código de colores físico */
-  --pos: #b9c2cf; /* posición: neutro */
-  --vec: #f0b44c; /* vectores y fuerzas: ámbar */
-  --vel: #5ccbe3; /* velocidad: cian */
-  --acc: #ee7393; /* aceleración y g: rosa */
+  /* el vacío: negro azulado con viñeteado (centro algo más claro, bordes casi negros) */
+  --bg: #070a12;
+  --bg-center: #0c1222;
+  --bg-edge: #020308;
+  /* luz tenue que enciende el origen, y halo de las partículas */
+  --glow: #7d93c9;
+  --glow-a: 0.11;
+  --halo: #dfe6ff;
+  --panel: #0e1320;
+  --line: #222a3b;
+  --grid: #5d6a88;
+  --ink: #ece8df;
+  --muted: #7f8898;
+  /* código de colores físico (tonos revisados para deuteranopia: ΔE2000 ≥ 27 entre ámbar, cian y rosa) */
+  --pos: #aab3c2; /* posición: neutro */
+  --vec: #f5bd4a; /* vectores y fuerzas: ámbar */
+  --vel: #6adcf2; /* velocidad: cian */
+  --acc: #eb4789; /* aceleración y g: rosa */
   --display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
-  --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  /* escala tipográfica */
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-lg: 19px;
+  --t-xl: 26px;
+  --t-2xl: 40px;
   color-scheme: dark;
 }
 
 :root[data-theme='light'] {
-  --bg: #f3f5f7;
-  --panel: #ffffff;
-  --line: #d5dbe3;
-  --grid: #d3dae3;
-  --ink: #151a21;
-  --muted: #5b6574;
-  --pos: #3d4755;
-  --vec: #b8740a;
-  --vel: #0b83a0;
-  --acc: #c23a5d;
+  --bg: #eef1f6;
+  --bg-center: #f8f9fc;
+  --bg-edge: #d9dfe9;
+  --glow: #ffffff;
+  --glow-a: 0.8;
+  --halo: #26304a;
+  --panel: #fbfcfd;
+  --line: #d3d9e2;
+  --grid: #8792a6;
+  --ink: #121722;
+  --muted: #5d6676;
+  /* ΔE2000 ≥ 25 entre ámbar, cian y rosa con deuteranopia */
+  --pos: #4a5464;
+  --vec: #b07400;
+  --vel: #00809f;
+  --acc: #9b1d55;
   color-scheme: light;
 }
 
@@ -45,6 +65,7 @@ body {
 
 body {
   background: var(--bg);
+  background-image: radial-gradient(ellipse 75% 70% at 50% 55%, var(--bg-center) 0%, var(--bg) 55%, var(--bg-edge) 100%);
   color: var(--ink);
   font-family: var(--body);
   font-size: 15px;

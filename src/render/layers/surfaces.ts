@@ -8,11 +8,11 @@ export function surfacesLayer(scene: Scene): void {
   for (const s of scene.world.surfaces) {
     const isSel = sel?.kind === 'surface' && sel.id === s.id;
     ctx.lineCap = 'round';
-    p.alpha(isSel ? 1 : 0.8, () => p.line(s.a, s.b, pal.ink, isSel ? 4 : 3));
+    p.alpha(isSel ? 1 : 0.7, () => p.line(s.a, s.b, pal.ink, isSel ? 3.5 : 2.5));
     ctx.lineCap = 'butt';
     if (isSel) {
-      p.ring(s.a, 7, pal.vel, 1.5);
-      p.ring(s.b, 7, pal.vel, 1.5);
+      p.ring(s.a, 7, pal.ink, 1.25);
+      p.ring(s.b, 7, pal.ink, 1.25);
     }
   }
 }
