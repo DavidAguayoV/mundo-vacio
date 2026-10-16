@@ -1,6 +1,7 @@
 import type { Vec2 } from '../core/vec';
 import type { SurfaceLike } from '../physics/contact';
 import type { Endpoint } from '../physics/forces/force';
+import type { MediumId } from '../physics/forces/drag';
 import type { SpringLike } from '../physics/forces/springs';
 import type { Body, ForceWorld } from '../physics/state';
 import { ReferenceFrame } from './frame';
@@ -66,6 +67,8 @@ export class World implements ForceWorld {
   springs: SpringLink[] = [];
   /** atracción gravitacional entre todas las masas (null = apagada) */
   gravitation: { G: number } | null = null;
+  /** fluido que llena el espacio (null = vacío): produce arrastre */
+  medium: MediumId | null = null;
 
   private nextId = 1;
 
@@ -91,6 +94,7 @@ export class World implements ForceWorld {
     this.surfaces = [];
     this.springs = [];
     this.gravitation = null;
+    this.medium = null;
   }
 
   // ----- partículas -----

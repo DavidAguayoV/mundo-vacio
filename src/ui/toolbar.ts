@@ -7,7 +7,7 @@ export interface ToolbarState {
   tools: Tool[];
   active: ToolId;
   /** interruptores de fuerza ganados y si están encendidos */
-  switches?: { id: ForceSwitch; on: boolean }[];
+  switches?: { id: ForceSwitch; on: boolean; label?: string }[];
   /** habilidades del tiempo ganadas: cada una agrega su control */
   time: ReadonlySet<TimeSkill>;
   /** botón Laboratorio (solo en modo libre) */
@@ -39,6 +39,7 @@ export const TIME_NAMES: Record<TimeSkill, string> = {
 
 export const SWITCH_NAMES: Record<ForceSwitch, string> = {
   gravitation: 'Atracción',
+  drag: 'Medio',
 };
 
 const scaleLabel = (k: number) => (k === 0.5 ? '×½' : k === 0.25 ? '×¼' : '×1');
@@ -73,11 +74,11 @@ export class Toolbar {
     if (s.switches?.length) {
       items.push(h('span', { class: 'sep' }));
       for (const sw of s.switches) {
-        const b = this.button(ICONS[sw.id], SWITCH_NAMES[sw.id], () => this.actions.toggleForce(sw.id), {
+        const b = this.button(ICONS[sw.id], sw.label ?? SWITCH_NAMES[sw.id], () => this.actions.toggleForce(sw.id), {
           'data-switch': sw.id,
           'aria-pressed': String(sw.on),
         });
-        b.title = `${SWITCH_NAMES[sw.id]}: ${sw.on ? 'encendida' : 'apagada'}`;
+        b.title = sw.label ?? `${SWITCH_NAMES[sw.id]}: ${sw.on ? 'encendida' : 'apagada'}`;
         if (fresh.has(`force:${sw.id}`)) b.classList.add('new');
         items.push(b);
       }
@@ -118,11 +119,14 @@ export class Toolbar {
     b.setAttribute('aria-pressed', String(running));
   }
 
-  setSwitch(id: ForceSwitch, on: boolean): void {
+  setSwitch(id: ForceSwitch, on: boolean, label?: string): void {
     const b = this.bar.querySelector<HTMLButtonElement>(`[data-switch="${id}"]`);
     if (!b) return;
-    b.setAttribute('aria-pressed', String(on));
-    b.title = `${SWITCH_NAMES[id]}: ${on ? 'encendida' : 'apagada'}`;
+    if (b.getAttribute('aria-pressed') !== String(on)) b.setAttribute('aria-pressed', String(on));
+    const span = b.querySelector('span');
+    const text = label ?? SWITCH_NAMES[id];
+    if (span && span.textContent !== text) span.textContent = text;
+    b.title = label ?? `${SWITCH_NAMES[id]}: ${on ? 'encendida' : 'apagada'}`;
   }
 
   setScale(k: number): void {

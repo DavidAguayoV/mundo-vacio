@@ -40,7 +40,7 @@ export class Lab {
     private persist = true,
   ) {
     this.panel = new LabPanel({
-      state: () => ({ name: this.name, saved: this.library.list(), g: host.world.g, gravitation: !!host.world.gravitation, prefs: this.prefs }),
+      state: () => ({ name: this.name, saved: this.library.list(), g: host.world.g, gravitation: !!host.world.gravitation, medium: host.world.medium, prefs: this.prefs }),
       save: (name) => this.save(name),
       download: (name) => this.download(name),
       share: (name) => this.share(name),
@@ -58,6 +58,12 @@ export class Lab {
         if (e) this.load(e.build());
       },
       setG: (g) => this.setG(g),
+      setMedium: (m) => {
+        if (this.host.sim.hasRun) this.host.sim.reset();
+        this.host.world.medium = m;
+        this.host.toast(m ? `Medio: ${m}` : 'Medio: vacío, sin arrastre');
+        this.panel.refresh();
+      },
       setGravitation: (on) => {
         if (this.host.sim.hasRun) this.host.sim.reset();
         this.host.world.gravitation = on ? { G: G_GAME } : null;

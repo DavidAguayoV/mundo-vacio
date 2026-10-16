@@ -15,7 +15,7 @@ export interface SkillNode {
 
 export type SkillState = 'disponible' | 'próxima' | 'bloqueada';
 
-export const TIERS = ['I · Espacio', 'II · Vectores', 'III · Tiempo', 'IV · Movimiento', 'V · Contacto', 'VI · Más fuerzas', 'VII · Marcos'];
+export const TIERS = ['I · Espacio', 'II · Vectores', 'III · Tiempo', 'IV · Movimiento', 'V · Contacto', 'VI · Más fuerzas', 'VII · Más allá'];
 
 export const SKILLS: SkillNode[] = [
   { id: 'origin', tier: 0, grant: 'tool:origin', name: 'Origen', desc: 'Fija un punto y orienta los ejes.' },
@@ -36,13 +36,14 @@ export const SKILLS: SkillNode[] = [
   { id: 'friction', tier: 4, chapter: 'superficies', name: 'Roce', desc: 'Estático y cinético.' },
   { id: 'spring', tier: 5, grant: 'tool:spring', name: 'Resorte', desc: 'Ley de Hooke y oscilaciones.' },
   { id: 'gravitation', tier: 5, grant: 'force:gravitation', name: 'Gravitación', desc: 'Masas que se atraen entre sí: órbitas y escape.' },
-  { id: 'drag', tier: 5, name: 'Arrastre', desc: 'Fuerza que depende de la velocidad.', requires: ['velocity'] },
+  { id: 'drag', tier: 5, grant: 'force:drag', name: 'Arrastre', desc: 'Aire y agua: la velocidad terminal.' },
+  { id: 'energy', tier: 6, name: 'Energía', desc: 'Lo que se conserva cuando todo cambia.', requires: ['velocity'] },
   { id: 'accel-frame', tier: 6, name: 'Marco acelerado', desc: '¿Qué ve alguien dentro de un ascensor?', requires: ['gravity'] },
   { id: '3d', tier: 6, name: 'Tercera dimensión', desc: 'El mismo juego con un eje z.' },
 ];
 
 /** Primer nodo de la hoja de ruta cuando ya no quedan capítulos. */
-const ROADMAP_NEXT = 'drag';
+const ROADMAP_NEXT = 'energy';
 
 export interface TreeProgress {
   /** herramientas y habilidades ya ganadas */

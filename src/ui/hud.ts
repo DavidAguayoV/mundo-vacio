@@ -10,20 +10,23 @@ export class Hud {
   private t = h('div');
   private g = h('div', { class: 'g' });
   private scale = h('div', {}, '1 cuadro = 1 m');
+  private medium = h('div');
   private fps = h('div');
   private lastKey = '';
 
   constructor(private showFps = false) {}
 
   update(world: World, sim: Simulation, simEnabled: boolean, fps: number): void {
-    const key = `${simEnabled}|${!!world.g}|${!!world.frame}`;
+    const key = `${simEnabled}|${!!world.g}|${!!world.frame}|${!!world.medium}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       const items: HTMLElement[] = [];
       if (simEnabled) items.push(this.t);
       if (world.g) items.push(this.g);
+      if (world.medium) items.push(this.medium);
       if (world.frame) items.push(this.scale);
-      if (this.showFps) items.push(this.fps);
+      if (world.medium) setText(this.medium, `medio: ${world.medium}`);
+    if (this.showFps) items.push(this.fps);
       this.el.replaceChildren(...items);
     }
     const slow = sim.timeScale === 0.5 ? ' · cámara lenta ×½' : sim.timeScale === 0.25 ? ' · cámara lenta ×¼' : '';

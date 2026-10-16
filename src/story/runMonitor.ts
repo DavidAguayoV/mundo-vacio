@@ -9,6 +9,8 @@ const HOLD_TIME = 0.5; // s quieta en la pendiente para "la sostiene el roce"
 const SLIDE_TIME = 0.3; // s acelerando pendiente abajo para "desliza"
 /** Más cerca que esto (m) del cuerpo central cuenta como choque: la vuelta no vale. */
 const CRASH = 0.4;
+/** s con aceleración casi nula mientras cae en un medio para «llegó a la velocidad terminal» */
+const TERMINAL_TIME = 0.3;
 
 interface Orbit {
   /** ángulo anterior de la partícula vista desde el cuerpo más masivo, rad */
@@ -34,6 +36,7 @@ export class RunMonitor {
   private hold = new Map<string, number>();
   private slide = new Map<string, number>();
   private orbits = new Map<string, Orbit>();
+  private steady = new Map<string, number>();
 
   constructor(
     private world: World,
@@ -50,6 +53,7 @@ export class RunMonitor {
       this.hold.clear();
       this.slide.clear();
       this.orbits.clear();
+      this.steady.clear();
       this.lastT = sim.t;
     }
     const dt = sim.t - this.lastT;
@@ -65,6 +69,7 @@ export class RunMonitor {
 
     if (dt <= 0) return;
     this.watchOrbits();
+    this.watchTerminal(dt);
     const g = world.g;
     const gL = g ? Math.hypot(g.x, g.y) : 0;
     for (const p of world.particles) {
@@ -117,6 +122,21 @@ export class RunMonitor {
       const vy = p.vel.y - center.vel.y;
       const energy = 0.5 * (vx * vx + vy * vy) - (grav.G * (p.mass + center.mass)) / r;
       if (energy > 0 && r > 2 * o.r0 && rx * vx + ry * vy > 0) this.once('escaped');
+    }
+  }
+
+  /** En un medio, una partícula que se mueve sin acelerar (el arrastre equilibra el resto) llegó a su velocidad terminal. */
+  private watchTerminal(dt: number): void {
+    const { world, sim } = this;
+    if (!world.medium) return;
+    const g = world.g ? Math.hypot(world.g.x, world.g.y) : 9.8;
+    for (const p of world.particles) {
+      if (sim.contactNormal(p.id)) continue;
+      const speed = Math.hypot(p.vel.x, p.vel.y);
+      const a = sim.forcesOn(p.id)?.accel;
+      const still = !!a && speed > 0.5 && Math.hypot(a.x, a.y) < 0.03 * g;
+      this.steady.set(p.id, still ? (this.steady.get(p.id) ?? 0) + dt : 0);
+      if ((this.steady.get(p.id) ?? 0) >= TERMINAL_TIME) this.once('terminal');
     }
   }
 

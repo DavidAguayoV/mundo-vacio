@@ -190,6 +190,12 @@ export class Inspector {
         return F ? `${fmt(len(F.F))} N` : '—';
       });
     }
+    if (this.world.medium) {
+      this.row(dl, '|Fa|', 'vec', () => {
+        const F = part('drag');
+        return F ? `${fmt(len(F.F))} N` : '0,00 N';
+      });
+    }
     if (this.world.springs.length) {
       this.row(dl, '|Fe|', 'vec', () => {
         const F = part('spring');

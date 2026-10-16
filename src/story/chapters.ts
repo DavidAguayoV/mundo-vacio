@@ -61,6 +61,11 @@ function ensureGravitation({ world }: StoryContext): void {
   if (!world.gravitation) world.gravitation = { G: G_GAME };
 }
 
+function ensureAir(ctx: StoryContext): void {
+  ensureG(ctx);
+  if (!ctx.world.medium) ctx.world.medium = 'aire';
+}
+
 function ensureG({ world }: StoryContext): void {
   if (!world.g) world.g = { x: 0, y: -G_EARTH };
 }
@@ -72,14 +77,14 @@ function stopAll({ world, sim }: StoryContext): void {
 }
 
 /** Dos partículas a la misma altura, de 1 kg y 4 kg, en reposo. */
-function twoMasses(ctx: StoryContext): void {
+function twoMasses(ctx: StoryContext, height = 3): void {
   const { world } = ctx;
   stopAll(ctx);
   while (world.particles.length < 2) world.addParticle({ x: 0, y: 0 }, 1);
   const [a, b] = world.particles;
-  a.pos = { x: -2, y: 3 };
+  a.pos = { x: -2, y: height };
   a.mass = 1;
-  b.pos = { x: 2, y: 3 };
+  b.pos = { x: 2, y: height };
   b.mass = 4;
 }
 
@@ -665,9 +670,97 @@ export const CHAPTERS: Chapter[] = [
       },
       engineering('Un satélite de GPS está cayendo todo el tiempo; su velocidad hace que «falle» el suelo.'),
       {
-        text: 'Ya tienes la gravitación: la misma ley para una manzana, la Luna y un satélite. Lo que sigue: el arrastre de un fluido.',
-        on: 'end',
+        text: 'Ya tienes la gravitación: la misma ley para una manzana, la Luna y un satélite. Ahora, de vuelta en la Tierra, falta algo que siempre estuvo ahí: el aire.',
+        on: 'next',
         enter: ensureGravitation,
+      },
+    ],
+  },
+  {
+    id: 'arrastre',
+    act: III,
+    title: 'Arrastre',
+    grants: ['force:drag'],
+    seed: (ctx) => {
+      ensureFrame(ctx);
+      // de vuelta en la Tierra, sin suelo para ver la caída completa
+      ctx.world.g = null;
+      ensureG(ctx);
+      ctx.world.gravitation = null;
+      ctx.world.surfaces = [];
+      ctx.world.springs = [];
+      ctx.world.targets = [];
+      ctx.world.medium = null;
+      twoMasses(ctx, 5);
+    },
+    steps: [
+      {
+        text: 'En el capítulo 5 todo caía igual, sin importar su masa. Pero una pluma y una piedra no caen igual. ¿Qué falta? El aire. Cambia el **Medio** en la barra a aire.',
+        on: 'medium-set',
+      },
+      {
+        text: 'Las mismas dos partículas, de 1 kg y 4 kg, ahora en aire. Si dejas fluir el tiempo, ¿cuál llega primero abajo?',
+        on: 'end',
+        ask: 'masa_aire',
+        enter: ensureAir,
+        choices: [
+          { id: 'juntas', label: 'Caen juntas, como antes' },
+          { id: 'pesada', label: 'La de 4 kg' },
+          { id: 'liviana', label: 'La de 1 kg' },
+        ],
+      },
+      {
+        text: 'Deja fluir el tiempo.',
+        on: 'fell',
+        enter: ensureAir,
+      },
+      {
+        text: reveal('masa_aire', 'Ahora gana la de 4 kg. El aire empuja contra el movimiento con una fuerza que crece con la rapidez, la **fuerza de arrastre** Fa. A la misma rapidez frena igual a las dos, pero a la de 4 kg le cuesta 4 veces más cambiar su velocidad. Aquí la masa sí importa.', {
+          juntas: 'Dijiste que caían juntas: eso vale en el vacío, como en el capítulo 5. Con aire, no.',
+          pesada: 'Lo predijiste bien.',
+          liviana: 'Dijiste la de 1 kg. Es al revés: las dos sienten el mismo arrastre, pero la liviana tiene menos peso que lo compense.',
+        }),
+        on: 'next',
+        enter: ensureAir,
+      },
+      {
+        text: 'Vuelve a t = 0 y mira la flecha v de la de 1 kg mientras cae; usa la cámara lenta si quieres. ¿Sigue creciendo?',
+        on: 'terminal',
+        enter: ensureAir,
+      },
+      {
+        text: 'Deja de crecer: llega a su **velocidad terminal**, cuando el arrastre iguala al peso. La fuerza total es cero (la flecha a desaparece) y sigue cayendo a velocidad constante: otra vez la inercia.',
+        on: 'next',
+        enter: ensureAir,
+      },
+      {
+        text: 'Si cambias el medio a agua, ¿cómo será la velocidad terminal?',
+        on: 'end',
+        ask: 'agua',
+        enter: ensureAir,
+        choices: [
+          { id: 'mayor', label: 'Mayor' },
+          { id: 'menor', label: 'Menor' },
+          { id: 'igual', label: 'Igual' },
+        ],
+      },
+      {
+        text: 'Cambia el Medio a agua, vuelve a t = 0 y deja fluir el tiempo.',
+        on: 'terminal',
+        when: (ctx) => ctx.world.medium === 'agua',
+      },
+      {
+        text: reveal('agua', 'Menor: el agua arrastra mucho más, así que el arrastre iguala al peso a una rapidez menor. Ignoramos el empuje del agua, que en partículas muy densas es pequeño.', {
+          mayor: 'Dijiste mayor. El agua frena más, no menos: el equilibrio llega antes, a menor rapidez.',
+          menor: 'Lo predijiste bien.',
+          igual: 'Dijiste igual. La velocidad terminal depende del medio: cuanto más arrastra, menor es.',
+        }),
+        on: 'next',
+      },
+      engineering('Un paracaídas no reduce la gravedad: aumenta el arrastre hasta que la velocidad terminal sea segura.'),
+      {
+        text: 'Ya tienes las fuerzas que mueven casi todo lo que ves: peso, contacto, resortes, gravitación y arrastre. En el modo libre puedes combinarlas todas.',
+        on: 'end',
       },
     ],
   },

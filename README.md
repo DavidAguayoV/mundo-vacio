@@ -25,8 +25,8 @@ Desde el árbol → «Modo libre», o al terminar el relato. El botón **Lab** d
 - **Guardar aquí**: guarda el experimento en este navegador (se reemplaza si ya existe uno con el mismo nombre).
 - **Descargar .json** y **Abrir archivo .json** (o arrastrar el archivo al lienzo): para llevarlo a otro equipo.
 - **Copiar enlace**: el experimento va comprimido dentro del enlace (`#exp=…`); quien lo abre lo ve en su modo libre sin perder su avance en el relato.
-- **Ejemplos**: caída de dos masas, tiro parabólico al blanco, el mismo tiro en la Luna, planos con roce, medir μₛ y suma en ejes girados.
-- **Mundo**: |g| de la Tierra, la Luna o Marte, o sin gravedad; vaciar el mundo.
+- **Ejemplos**: caída de dos masas, tiro parabólico al blanco, el mismo tiro en la Luna, planos con roce, medir μₛ, masa colgada de un resorte, órbita circular, caída con aire y suma en ejes girados.
+- **Mundo**: |g| de la Tierra, la Luna o Marte, o sin gravedad; atracción entre masas; medio (vacío, aire o agua); vaciar el mundo.
 - **Vista**: cámara lenta (×½, ×¼) y ocultar los vectores r o la trayectoria cuando hay muchas partículas.
 
 Siempre se guarda el mundo como estaba al lanzar, no a mitad de vuelo. El relato y el laboratorio tienen cada uno su mundo, que se autoguarda en el navegador.

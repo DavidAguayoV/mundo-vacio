@@ -27,6 +27,8 @@ export type GameEvent =
   | { type: 'gravitation-on' }
   | { type: 'orbited' }
   | { type: 'escaped' }
+  | { type: 'medium-set' }
+  | { type: 'terminal' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];

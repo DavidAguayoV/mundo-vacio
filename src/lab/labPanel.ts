@@ -17,6 +17,7 @@ export interface LabState {
   saved: SavedExperiment[];
   g: Vec2 | null;
   gravitation: boolean;
+  medium: 'aire' | 'agua' | null;
   prefs: LabPrefs;
 }
 
@@ -31,6 +32,7 @@ export interface LabActions {
   openExample(id: string): void;
   setG(g: number | null): void;
   setGravitation(on: boolean): void;
+  setMedium(m: 'aire' | 'agua' | null): void;
   clearWorld(): void;
   setPrefs(p: LabPrefs): void;
   state(): LabState;
@@ -198,6 +200,19 @@ export class LabPanel {
       h('small', { class: 'hint' }, '|g| en m/s². La dirección se sigue eligiendo con la herramienta Gravedad.'),
       gRow,
       h('label', { class: 'check' }, attract, 'Atracción entre masas (G = 0,5 N·m²/kg²)'),
+      h(
+        'div',
+        { class: 'seg', role: 'group', 'aria-label': 'Medio' },
+        ...([
+          [null, 'Vacío'],
+          ['aire', 'Aire'],
+          ['agua', 'Agua'],
+        ] as const).map(([m, label]) => {
+          const b = this.btn(label, () => this.actions.setMedium(m));
+          b.setAttribute('aria-pressed', String(st.medium === m));
+          return b;
+        }),
+      ),
       h('div', { class: 'row' }, this.confirmBtn('clear', 'Vaciar el mundo', () => this.actions.clearWorld())),
     );
 

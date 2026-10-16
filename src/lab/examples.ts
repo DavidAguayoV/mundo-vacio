@@ -123,6 +123,18 @@ export const EXAMPLES: Example[] = [
     },
   },
   {
+    id: 'aire',
+    name: 'Caída con aire',
+    description: 'Las mismas masas del primer ejemplo, ahora con aire: la de 8 kg llega antes. Mira cuándo deja de crecer v.',
+    build() {
+      const w = base();
+      w.medium = 'aire';
+      w.addParticle({ x: -2, y: 4 }, 0.5);
+      w.addParticle({ x: 2, y: 4 }, 8);
+      return exp(w, this.name, this.description);
+    },
+  },
+  {
     id: 'vectores',
     name: 'Suma en ejes girados',
     description: 'A + B con los ejes girados 30°. Gira los ejes desde el asa: cambian las componentes, no la flecha.',

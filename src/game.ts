@@ -1,7 +1,7 @@
 import { EventBus, type GameEvent } from './core/events';
 import { dist } from './core/vec';
 import { SurfaceConstraint } from './physics/constraints';
-import { FrictionForce, G_GAME, NormalForce, Spring, SpringForces, UniformGravity, WorldGravitation } from './physics/forces';
+import { FrictionForce, G_GAME, NormalForce, Spring, SpringForces, UniformGravity, WorldDrag, WorldGravitation, type MediumId } from './physics/forces';
 import { OscillationMeter } from './physics/oscillationMeter';
 import { Lab } from './lab/lab';
 import { Simulation } from './physics/simulation';
@@ -87,6 +87,7 @@ export class Game {
       new UniformGravity(),
       new SpringForces(() => this.world.springs),
       new WorldGravitation(() => this.world.gravitation),
+      new WorldDrag(() => this.world.medium),
       new NormalForce(surfaces.contacts),
       new FrictionForce(surfaces.contacts),
     );
@@ -254,7 +255,7 @@ export class Game {
       tools: TOOL_ORDER.filter((id) => unlocked.has(id)).map((id) => this.tools[id]),
       active: this.activeTool.id,
       time: this.story.timeSkills(),
-      switches: [...this.story.forceSwitches()].map((id) => ({ id, on: this.forceOn(id) })),
+      switches: [...this.story.forceSwitches()].map((id) => ({ id, on: this.forceOn(id), label: this.switchLabel(id) })),
       labEnabled: this.story.free,
       running: this.sim.running,
       timeScale: this.timeScale,
@@ -296,18 +297,31 @@ export class Game {
   // ---------- interruptores de fuerza ----------
 
   private forceOn(id: ForceSwitch): boolean {
-    return id === 'gravitation' ? !!this.world.gravitation : false;
+    return id === 'gravitation' ? !!this.world.gravitation : !!this.world.medium;
+  }
+
+  private switchLabel(id: ForceSwitch): string | undefined {
+    return id === 'drag' ? `${SWITCH_NAMES.drag}: ${this.world.medium ?? 'vacío'}` : undefined;
   }
 
   private toggleForce(id: ForceSwitch): void {
     if (!this.story.forceSwitches().has(id)) return;
     // cambiar las fuerzas es preparar otro experimento: se vuelve a t = 0
     if (this.sim.hasRun) this.sim.reset();
-    const on = !this.forceOn(id);
-    if (id === 'gravitation') this.world.gravitation = on ? { G: G_GAME } : null;
-    this.toolbar.setSwitch(id, on);
-    this.toast.show(`${SWITCH_NAMES[id]} entre masas: ${on ? 'encendida' : 'apagada'}`);
-    if (on && id === 'gravitation') this.bus.emit({ type: 'gravitation-on' });
+    if (id === 'gravitation') {
+      const on = !this.world.gravitation;
+      this.world.gravitation = on ? { G: G_GAME } : null;
+      this.toast.show(`${SWITCH_NAMES[id]} entre masas: ${on ? 'encendida' : 'apagada'}`);
+      if (on) this.bus.emit({ type: 'gravitation-on' });
+    } else {
+      // vacío → aire → agua → vacío
+      const order: (MediumId | null)[] = [null, 'aire', 'agua'];
+      const next = order[(order.indexOf(this.world.medium) + 1) % order.length];
+      this.world.medium = next;
+      this.toast.show(next ? `Medio: ${next}` : 'Medio: vacío, sin arrastre');
+      if (next) this.bus.emit({ type: 'medium-set' });
+    }
+    this.toolbar.setSwitch(id, this.forceOn(id), this.switchLabel(id));
   }
 
   private rewind(): void {
@@ -536,8 +550,9 @@ export class Game {
     if (this.opts.stress && this.sim.finished) this.sim.start();
 
     // el inspector agrega filas cuando aparece el origen, la primera superficie o g
-    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.gravitation}|${!!this.world.g}`;
+    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.gravitation}|${!!this.world.medium}|${!!this.world.g}`;
     this.toolbar.setSwitch('gravitation', !!this.world.gravitation);
+    this.toolbar.setSwitch('drag', !!this.world.medium, this.switchLabel('drag'));
     if (structure !== this.structure) {
       this.structure = structure;
       this.inspector.rebuild();

@@ -15,6 +15,7 @@ export const ICONS = {
   lab: svg('<path d="M9 3h6M10 3v6l-5.5 9.5A1.6 1.6 0 0 0 5.9 21h12.2a1.6 1.6 0 0 0 1.4-2.5L14 9V3"/><path d="M7.5 15h9"/>'),
   spring: svg('<path d="M4 4h6M7 4v2l5 1.5-5 1.5 5 1.5-5 1.5 5 1.5-5 1.5 5 1.5V18"/><circle cx="12" cy="20" r="2" fill="currentColor"/>'),
   gravitation: svg('<circle cx="7" cy="12" r="3.5" fill="currentColor"/><circle cx="18" cy="12" r="2" fill="currentColor"/><path d="M12 9.5l-1.5 2.5 1.5 2.5M13 9.5l1.5 2.5-1.5 2.5"/>'),
+  drag: svg('<path d="M3 8c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 13c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/>'),
   play: svg('<path d="M7 5l12 7-12 7z" fill="currentColor"/>'),
   pause: svg('<path d="M8 5v14M16 5v14"/>'),
   step: svg('<path d="M6 5l9 7-9 7z" fill="currentColor"/><path d="M18 5v14"/>'),
