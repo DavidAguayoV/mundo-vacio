@@ -1,22 +1,30 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { Simulation } from '../src/physics/simulation';
 import { View } from '../src/render/view';
-import { freshProgress } from '../src/state/progress';
+import { freshProgress, loadProgress, type Progress } from '../src/state/progress';
 import { CHAPTERS } from '../src/story/chapters';
 import { StoryEngine } from '../src/story/storyEngine';
 import { TOOL_ORDER } from '../src/tools/registry';
 import { SKILLS, skillState } from '../src/tree/skills';
 import { World } from '../src/world/world';
 
-function setup() {
+function setup(progress: Progress = freshProgress()) {
   const world = new World();
   const view = new View();
   view.resize(1200, 800, 1);
   const sim = new Simulation(world);
-  const saved: unknown[] = [];
-  const story = new StoryEngine(CHAPTERS, freshProgress(), { world, view, sim }, (p) => saved.push(p));
-  return { world, story, saved };
+  const saved: Progress[] = [];
+  const story = new StoryEngine(CHAPTERS, progress, { world, view, sim }, (p) => saved.push(p));
+  return { world, story, saved, sim };
 }
+
+const at = (chapter: string, step: number, predictions: Record<string, string> = {}): Progress => ({
+  version: 2,
+  chapter,
+  step,
+  free: false,
+  predictions,
+});
 
 describe('relato', () => {
   it('avanza solo con el evento del paso actual', () => {
@@ -27,79 +35,135 @@ describe('relato', () => {
     expect(story.progress.step).toBe(1);
   });
 
-  it('respeta las condiciones y desbloquea herramientas al cambiar de capítulo', () => {
-    const { story, world } = setup();
+  it('el orden de los actos: velocidad antes que gravedad', () => {
+    const ids = CHAPTERS.map((c) => c.id);
+    expect(ids).toEqual(['vacio', 'particula', 'vectores', 'tiempo', 'abajo', 'blanco', 'superficies']);
+    expect(ids.indexOf('tiempo')).toBeLessThan(ids.indexOf('abajo'));
+  });
+
+  it('el tiempo y la velocidad se ganan paso a paso dentro del capítulo 4', () => {
+    const { story } = setup(at('tiempo', 0));
     let fresh: string[] = [];
-    story.onChange = (c) => (fresh = c.newTools);
-    story.handle({ type: 'origin-placed' });
-    story.handle({ type: 'frame-rotated' });
-    expect(story.progress.chapter).toBe(1);
-    expect(fresh).toEqual(['particle', 'move']);
-    expect(story.unlockedTools(TOOL_ORDER).has('particle')).toBe(true);
-    expect(story.unlockedTools(TOOL_ORDER).has('vector')).toBe(false);
-
-    world.addParticle({ x: 1, y: 1 });
-    story.handle({ type: 'particle-placed' });
-    expect(story.progress.step).toBe(1);
-    // la segunda colocación exige al menos 2 partículas
-    world.particles.length = 1;
-    story.handle({ type: 'particle-placed' });
-    expect(story.progress.step).toBe(1);
-    world.addParticle({ x: 2, y: 1 });
-    story.handle({ type: 'particle-placed' });
-    expect(story.progress.step).toBe(2);
+    story.onChange = (c) => (fresh = c.newGrants);
+    expect(story.timeSkills().size).toBe(0);
+    expect(story.unlockedTools(TOOL_ORDER).has('velocity')).toBe(false);
+    story.handle({ type: 'next' }); // «Desbloquear el tiempo»
+    expect(fresh).toEqual(['time:flow']);
+    expect([...story.timeSkills()]).toEqual(['flow']);
+    story.handle({ type: 'time-paused' });
+    expect(fresh).toEqual(['tool:velocity']);
+    expect(story.timeSkills().has('rewind')).toBe(false);
   });
 
-  it('cambiar la masa solo cuenta si ocurre durante el paso', () => {
-    const { story } = setup();
-    story.progress = { version: 1, chapter: 3, step: 2, free: false };
-    story.handle({ type: 'fell' });
-    expect(story.progress.step).toBe(2);
-    story.handle({ type: 'mass-changed' });
-    story.handle({ type: 'fell' });
-    expect(story.progress.step).toBe(3);
+  it('una predicción se guarda y cambia el texto que la retoma', () => {
+    const a = setup(at('tiempo', 3));
+    expect(a.story.step.choices?.map((c) => c.id)).toEqual(['frena', 'recto', 'curva']);
+    a.story.choose('frena');
+    expect(a.story.progress.predictions.inercia).toBe('frena');
+    a.story.handle({ type: 'coasted' });
+    expect(a.story.text()).toMatch(/inercia/);
+    expect(a.story.text()).toMatch(/Dijiste que se frenaba/);
+    const b = setup(at('tiempo', 5, { inercia: 'recto' }));
+    expect(b.story.text()).toMatch(/Lo predijiste bien/);
+    expect(b.story.text()).not.toMatch(/Dijiste/);
   });
 
-  it('el modo libre desbloquea todo e ignora el relato', () => {
+  it('las condiciones cuentan eventos desde que empezó el paso', () => {
+    const { story } = setup(at('tiempo', 6));
+    story.handle({ type: 'time-step' });
+    story.handle({ type: 'time-step' });
+    expect(story.progress.step).toBe(6);
+    story.handle({ type: 'time-step' });
+    expect(story.progress.step).toBe(7);
+    expect(story.step.kind).toBe('engineering');
+  });
+
+  it('cada capítulo cierra con una mirada de ingeniería', () => {
+    for (const c of CHAPTERS) expect(c.steps.some((s) => s.kind === 'engineering')).toBe(true);
+  });
+
+  it('el modo libre gana todo e ignora el relato', () => {
     const { story } = setup();
     story.setFree(true);
     expect(story.unlockedTools(TOOL_ORDER).size).toBe(TOOL_ORDER.length);
+    expect(story.timeSkills().size).toBe(5);
     story.handle({ type: 'origin-placed' });
     expect(story.progress.step).toBe(0);
   });
 
   it('el árbol marca disponible, próxima y bloqueada', () => {
-    const { story } = setup();
-    const states = () => Object.fromEntries(SKILLS.map((n) => [n.id, skillState(n, story.reachedChapters(), story.nextChapter())]));
-    let s = states();
+    const states = (p: Progress) => {
+      const { story } = setup(p);
+      const tp = { have: story.grants(), upcoming: story.upcomingGrants(), reached: story.reachedChapters(), next: story.nextChapter() };
+      return Object.fromEntries(SKILLS.map((n) => [n.id, skillState(n, tp)]));
+    };
+    let s = states(freshProgress());
     expect(s.origin).toBe('disponible');
     expect(s.particle).toBe('próxima');
-    expect(s.surface).toBe('bloqueada');
-    story.progress = { version: 1, chapter: 4, step: 2, free: false };
-    s = states();
-    expect(s.velocity).toBe('disponible');
-    expect(s.surface).toBe('próxima');
-    expect(s.friction).toBe('próxima');
-    expect(s.spring).toBe('bloqueada');
-    story.progress = { version: 1, chapter: 5, step: 0, free: false };
-    s = states();
+    expect(s.flow).toBe('bloqueada');
+    s = states(at('tiempo', 1));
+    expect(s.flow).toBe('disponible');
+    expect(s.velocity).toBe('próxima');
+    expect(s.step).toBe('próxima');
+    expect(s.gravity).toBe('próxima');
+    s = states(at('superficies', 0));
+    expect(s.timeline).toBe('disponible');
     expect(s.normal).toBe('disponible');
     expect(s.spring).toBe('próxima');
   });
 
-  it('el blanco del capítulo 5 queda dentro de la pantalla', () => {
-    const { story, world } = setup();
-    story.progress = { version: 1, chapter: 4, step: 0, free: false };
+  it('el blanco del capítulo «Al blanco» queda dentro de la pantalla', () => {
+    const { story, world } = setup(at('blanco', 0));
     story.resume();
-    story.handle({ type: 'v-set' });
     expect(world.targets).toHaveLength(1);
+    const v = new View();
+    v.resize(1200, 800, 1);
+    const b = v.bounds();
     const t = world.targets[0].pos;
-    const b = new View();
-    b.resize(1200, 800, 1);
-    const bb = b.bounds();
-    expect(t.x).toBeGreaterThan(bb.minX);
-    expect(t.x).toBeLessThan(bb.maxX);
-    expect(t.y).toBeGreaterThan(bb.minY);
-    expect(t.y).toBeLessThan(bb.maxY);
+    expect(t.x).toBeGreaterThan(b.minX);
+    expect(t.x).toBeLessThan(b.maxX);
+    expect(t.y).toBeGreaterThan(b.minY);
+    expect(t.y).toBeLessThan(b.maxY);
+  });
+
+  it('en «¿Dónde es abajo?» quedan dos masas distintas a la misma altura', () => {
+    const { story, world } = setup(at('abajo', 1));
+    story.resume();
+    const [a, b] = world.particles;
+    expect(a.pos.y).toBe(b.pos.y);
+    expect([a.mass, b.mass]).toEqual([1, 4]);
+    expect(world.g).not.toBeNull();
+  });
+});
+
+describe('progreso guardado', () => {
+  const store = new Map<string, string>();
+  beforeEach(() => {
+    store.clear();
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    };
+  });
+  const ids = CHAPTERS.map((c) => c.id);
+
+  it('la versión anterior (capítulo por número) se retoma en el mismo capítulo, desde su inicio', () => {
+    store.set('mundoVacio.progress', JSON.stringify({ version: 1, chapter: 4, step: 2, free: false }));
+    const p = loadProgress(ids);
+    expect(p.chapter).toBe('blanco'); // el antiguo capítulo 5, «Velocidad», es ahora «Al blanco»
+    expect(p.step).toBe(0);
+    store.set('mundoVacio.progress', JSON.stringify({ version: 1, chapter: 5, step: 3, free: true }));
+    expect(loadProgress(ids)).toMatchObject({ chapter: 'superficies', free: true });
+  });
+
+  it('la versión 2 guarda el capítulo por id y las predicciones', () => {
+    store.set('mundoVacio.progress', JSON.stringify(at('abajo', 3, { caida: 'juntas' })));
+    expect(loadProgress(ids)).toEqual(at('abajo', 3, { caida: 'juntas' }));
+  });
+
+  it('un capítulo que ya no existe vuelve al comienzo', () => {
+    store.set('mundoVacio.progress', JSON.stringify(at('no-existe', 2)));
+    expect(loadProgress(ids).chapter).toBe('vacio');
   });
 });

@@ -16,7 +16,7 @@ Parámetros de URL útiles:
 - `?debug`: muestra fps en el HUD y deja el juego en `window.mundo` para inspeccionarlo en la consola.
 - `?stress=50`: prueba de rendimiento con 50 partículas en resortes (no toca el progreso guardado).
 
-Atajos: espacio = Lanzar/Pausa, R = Reiniciar, Supr = eliminar la selección, Esc = deseleccionar.
+Atajos (cuando ya se ganó la habilidad): espacio = el tiempo fluye o se detiene, R = volver a t = 0, → = avanzar 0,1 s. Supr = eliminar la selección, Esc = deseleccionar.
 
 ## Laboratorio (modo libre)
 

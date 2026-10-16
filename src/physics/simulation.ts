@@ -16,8 +16,13 @@ interface Snapshot {
 /**
  * Corre la física con paso fijo (1/240 s) y un acumulador de tiempo real:
  * el resultado no depende de los fps del dispositivo.
- * Guarda una "foto" del estado inicial de cada lanzamiento para poder reiniciarlo,
+ * Guarda una "foto" del estado inicial de cada lanzamiento para poder volver a t = 0,
  * y la trayectoria estroboscópica (una marca cada 0,1 s).
+ *
+ * El tiempo se controla como una habilidad del jugador: fluir, detener, volver a t = 0,
+ * avanzar paso a paso e ir a cualquier instante ya recorrido (seek). Como el integrador es
+ * determinista, ir a un instante es volver a calcular desde t = 0 hasta él: el resultado es
+ * idéntico al del primer recorrido, contactos y roce incluidos.
  */
 export class Simulation {
   readonly dt = 1 / 240;
@@ -33,6 +38,8 @@ export class Simulation {
   constraints: Constraint[] = [];
 
   t = 0;
+  /** true mientras seek() recalcula el pasado: los observadores de onStep deben ignorar esos pasos */
+  replaying = false;
   /** Cambia cada vez que empieza un lanzamiento nuevo (no al reanudar una pausa). */
   runId = 0;
   running = false;
@@ -50,6 +57,8 @@ export class Simulation {
   private integrator = new RK4Integrator();
   private acc = 0;
   private steps = 0;
+  /** pasos del instante más lejano alcanzado en este lanzamiento */
+  private furthestSteps = 0;
   private snapshot: Map<string, Snapshot> | null = null;
 
   constructor(private world: SimWorld) {}
@@ -63,22 +72,44 @@ export class Simulation {
     return this.snapshot?.get(id);
   }
 
-  start(): void {
+  /** Instante más lejano alcanzado en este lanzamiento (el largo de la línea de tiempo), s. */
+  get duration(): number {
+    return this.furthestSteps * this.dt;
+  }
+
+  /** Empieza un lanzamiento: foto del estado inicial, trayectoria vacía, contactos iniciales. */
+  private begin(): void {
     if (this.finished) this.reset();
-    if (!this.snapshot) {
-      this.runId++;
-      this.snapshot = new Map();
-      this.trails.clear();
-      for (const p of this.world.particles) {
-        this.snapshot.set(p.id, { pos: { ...p.pos }, vel: { ...p.vel } });
-        this.trails.set(p.id, [{ ...p.pos }]);
-      }
-      this.t = 0;
-      this.steps = 0;
-      this.acc = 0;
-      const s = stateFromBodies(this.world.particles, 0);
-      for (const c of this.constraints) c.begin?.(s, this.world);
+    if (this.snapshot) return;
+    this.runId++;
+    this.snapshot = new Map();
+    for (const p of this.world.particles) this.snapshot.set(p.id, { pos: { ...p.pos }, vel: { ...p.vel } });
+    this.furthestSteps = 0;
+    this.restart();
+  }
+
+  /** Vuelve al instante inicial del lanzamiento actual sin olvidarlo. */
+  private restart(): void {
+    if (!this.snapshot) return;
+    for (const p of this.world.particles) {
+      const s = this.snapshot.get(p.id);
+      if (!s) continue;
+      p.pos.x = s.pos.x;
+      p.pos.y = s.pos.y;
+      p.vel.x = s.vel.x;
+      p.vel.y = s.vel.y;
     }
+    this.trails.clear();
+    for (const p of this.world.particles) this.trails.set(p.id, [{ ...p.pos }]);
+    this.t = 0;
+    this.steps = 0;
+    this.acc = 0;
+    const s = stateFromBodies(this.world.particles, 0);
+    for (const c of this.constraints) c.begin?.(s, this.world);
+  }
+
+  start(): void {
+    this.begin();
     this.running = true;
     this.onStateChange?.();
   }
@@ -113,6 +144,7 @@ export class Simulation {
   clearRun(): void {
     const changed = this.running || this.finished || this.snapshot !== null;
     this.snapshot = null;
+    this.furthestSteps = 0;
     this.trails.clear();
     for (const c of this.constraints) c.reset?.();
     this.t = 0;
@@ -121,6 +153,50 @@ export class Simulation {
     this.running = false;
     this.finished = false;
     if (changed) this.onStateChange?.();
+  }
+
+  /** Avanza exactamente `seconds` de tiempo simulado (paso a paso) y queda detenido. */
+  stepBy(seconds = 0.1): void {
+    this.begin();
+    this.running = false;
+    this.integrate(Math.round(seconds / this.dt));
+    this.checkEnd();
+    this.onStateChange?.();
+  }
+
+  /**
+   * Va al instante t (entre 0 y el más lejano ya recorrido), hacia adelante o hacia atrás,
+   * recalculando desde t = 0. Queda detenido; si después fluye, sigue desde ahí.
+   */
+  seek(t: number): void {
+    if (!this.snapshot) return;
+    const target = Math.max(0, Math.min(this.furthestSteps, Math.round(t / this.dt)));
+    const keep = this.furthestSteps;
+    this.restart();
+    this.replaying = true;
+    try {
+      this.integrate(target);
+    } finally {
+      this.replaying = false;
+    }
+    this.furthestSteps = keep;
+    this.running = false;
+    this.finished = false;
+    this.onStateChange?.();
+  }
+
+  private integrate(n: number): void {
+    if (n <= 0) return;
+    const s = stateFromBodies(this.world.particles, this.t);
+    const accel = makeAccel(this.forces, this.world);
+    for (let k = 0; k < n; k++) this.stepOnce(s, accel);
+  }
+
+  private checkEnd(): void {
+    if (this.t >= this.maxTime - 1e-9 || this.shouldStop?.()) {
+      this.running = false;
+      this.finished = true;
+    }
   }
 
   /** Avanza la simulación según el tiempo real transcurrido. */
@@ -136,11 +212,8 @@ export class Simulation {
       this.acc -= this.dt;
       this.stepOnce(s, accel);
     }
-    if (this.t >= this.maxTime - 1e-9 || this.shouldStop?.()) {
-      this.running = false;
-      this.finished = true;
-      this.onStateChange?.();
-    }
+    this.checkEnd();
+    if (this.finished) this.onStateChange?.();
   }
 
   /** Normal de contacto si la partícula está apoyada en una superficie. */
@@ -167,7 +240,9 @@ export class Simulation {
     this.integrator.step(s, this.dt, accel);
     for (const c of this.constraints) c.apply(s, this.world, this.dt);
     this.steps++;
-    this.t = s.t;
+    // el tiempo se cuenta en pasos: así t no acumula error de redondeo y seek() cae en el mismo instante
+    this.t = s.t = this.steps * this.dt;
+    if (this.steps > this.furthestSteps) this.furthestSteps = this.steps;
     if (this.steps % this.strobeSteps === 0) {
       for (const p of this.world.particles) {
         let tr = this.trails.get(p.id);

@@ -12,6 +12,7 @@ import { freshProgress, loadProgress, saveProgress, type Progress } from './stat
 import { CHAPTERS, seedFree } from './story/chapters';
 import { RunMonitor } from './story/runMonitor';
 import { StoryEngine } from './story/storyEngine';
+import type { Grant, TimeSkill } from './story/types';
 import { FrameDrag } from './tools/frameDrag';
 import { TOOL_ORDER, createTools } from './tools/registry';
 import type { Tool, ToolContext, ToolId, WorldPointer } from './tools/tool';
@@ -21,7 +22,8 @@ import { $ } from './ui/dom';
 import { Hud } from './ui/hud';
 import { Inspector, MU_MAX, clampMass } from './ui/inspector';
 import { Toast } from './ui/toast';
-import { Toolbar } from './ui/toolbar';
+import { Timeline } from './ui/timeline';
+import { TIME_NAMES, Toolbar } from './ui/toolbar';
 import { G_EARTH, World, type EntityRef } from './world/world';
 
 /** Radio de toque en píxeles según el dispositivo. */
@@ -57,6 +59,9 @@ export class Game {
   private toast = new Toast();
   private tree: TreeView;
   private lab: Lab;
+  private timeline: Timeline;
+  /** cámara lenta en el relato (en el laboratorio vale la preferencia guardada) */
+  private storyTimeScale = 1;
 
   private pointerId: number | null = null;
   private frameDrag: FrameDrag | null = null;
@@ -80,7 +85,7 @@ export class Game {
     this.monitor = new RunMonitor(this.world, this.sim, (ev) => this.bus.emit(ev));
 
     const stress = opts.stress ?? 0;
-    const progress: Progress = stress ? { ...freshProgress(), free: true } : loadProgress(CHAPTERS.length);
+    const progress: Progress = stress ? { ...freshProgress(), free: true } : loadProgress(CHAPTERS.map((c) => c.id));
     this.story = new StoryEngine(
       CHAPTERS,
       progress,
@@ -105,14 +110,17 @@ export class Game {
 
     this.card = new StoryCard({
       next: () => this.bus.emit({ type: 'next' }),
+      choose: (id) => this.story.choose(id),
       openTree: () => this.openTree(),
       goFree: () => this.setFree(true),
       openLab: () => this.lab.show(),
     });
     this.toolbar = new Toolbar({
       selectTool: (id) => this.setTool(id),
-      togglePlay: () => this.togglePlay(),
-      reset: () => this.sim.reset(),
+      flow: () => this.flow(),
+      rewind: () => this.rewind(),
+      step: () => this.stepTime(),
+      slow: () => this.cycleSlow(),
       openTree: () => this.openTree(),
       openLab: () => this.lab.show(),
     });
@@ -162,6 +170,12 @@ export class Game {
       stress === 0,
     );
 
+    this.timeline = new Timeline((t) => {
+      if (!this.has('timeline')) return;
+      this.sim.seek(t);
+      this.checkPeak();
+    });
+
     this.activeTool = this.tools[this.initialTool()];
     // ?debug deja el juego a mano en la consola para inspeccionarlo
     if (opts.debug) (window as unknown as { mundo: Game }).mundo = this;
@@ -190,22 +204,36 @@ export class Game {
 
   private initialTool(): ToolId {
     if (this.story.free) return 'move';
-    return this.story.chapter.unlocks[0] ?? 'origin';
+    const tools = [...this.unlocked()];
+    // la última herramienta ganada, o la primera disponible
+    const grants = [...this.story.grants()].filter((g): g is `tool:${ToolId}` => g.startsWith('tool:'));
+    const last = grants.at(-1)?.slice(5) as ToolId | undefined;
+    return last && tools.includes(last) ? last : (tools[0] ?? 'origin');
+  }
+
+  private has(skill: TimeSkill): boolean {
+    return this.story.timeSkills().has(skill);
+  }
+
+  private get timeScale(): number {
+    if (this.story.free) return this.lab.prefs.timeScale;
+    return this.has('slow') ? this.storyTimeScale : 1;
   }
 
   private unlocked() {
     return this.story.unlockedTools(TOOL_ORDER);
   }
 
-  private refreshUI(fresh: readonly ToolId[] = []): void {
+  private refreshUI(fresh: readonly Grant[] = []): void {
     const unlocked = this.unlocked();
     if (!unlocked.has(this.activeTool.id)) this.setTool(this.initialTool(), false);
     this.toolbar.render({
       tools: TOOL_ORDER.filter((id) => unlocked.has(id)).map((id) => this.tools[id]),
       active: this.activeTool.id,
-      simEnabled: this.story.simEnabled(),
+      time: this.story.timeSkills(),
       labEnabled: this.story.free,
       running: this.sim.running,
+      timeScale: this.timeScale,
       fresh,
     });
     this.card.render(this.story);
@@ -228,16 +256,62 @@ export class Game {
     this.inspector.show(ref);
   }
 
-  private togglePlay(): void {
-    if (!this.story.simEnabled()) return;
-    this.sim.toggle();
+  // ---------- control del tiempo (habilidades) ----------
+
+  private flow(): void {
+    if (!this.has('flow')) return;
+    if (this.sim.running) {
+      this.sim.pause();
+      if (this.sim.t >= 1) this.bus.emit({ type: 'time-paused' });
+      this.checkPeak();
+    } else {
+      this.sim.start();
+    }
+  }
+
+  private rewind(): void {
+    if (!this.has('rewind')) return;
+    this.sim.reset();
+  }
+
+  private stepTime(): void {
+    if (!this.has('step')) return;
+    this.sim.stepBy(0.1);
+    this.bus.emit({ type: 'time-step' });
+    this.checkPeak();
+  }
+
+  private cycleSlow(): void {
+    if (!this.has('slow')) return;
+    const next = this.timeScale === 1 ? 0.5 : this.timeScale === 0.5 ? 0.25 : 1;
+    if (this.story.free) this.lab.setTimeScale(next);
+    else this.storyTimeScale = next;
+    this.toolbar.setScale(next);
+    if (next < 1) this.bus.emit({ type: 'slow-set' });
+  }
+
+  /**
+   * ¿Está alguna partícula en el punto más alto de su vuelo? (detenida en el tiempo, en el aire,
+   * con la componente de v a lo largo de g casi nula y moviéndose de lado).
+   */
+  private checkPeak(): void {
+    const g = this.world.g;
+    if (!g || this.sim.running || !this.sim.hasRun) return;
+    const gL = Math.hypot(g.x, g.y);
+    const atPeak = this.world.particles.some((p) => {
+      const s = this.sim.initialState(p.id);
+      if (!s || dist(p.pos, s.pos) < 0.5 || this.sim.contactNormal(p.id)) return false;
+      const along = (p.vel.x * g.x + p.vel.y * g.y) / gL;
+      return Math.abs(along) < 0.35 && Math.hypot(p.vel.x, p.vel.y) > 0.3;
+    });
+    if (atPeak) this.bus.emit({ type: 'peak-found' });
   }
 
   private openTree(): void {
     this.restartArmed = 0;
     $('restartBtn').textContent = 'Empezar de nuevo';
     $('restartBtn').classList.remove('warn');
-    this.tree.show(this.story.reachedChapters(), this.story.nextChapter());
+    this.tree.show({ have: this.story.grants(), upcoming: this.story.upcomingGrants(), reached: this.story.reachedChapters(), next: this.story.nextChapter() });
   }
 
   /** El relato y el laboratorio tienen cada uno su propio mundo: al cambiar de modo se guarda uno y se recupera el otro. */
@@ -281,12 +355,13 @@ export class Game {
 
   private wireEvents(): void {
     this.bus.on((ev) => this.story.handle(ev));
-    this.story.onChange = ({ newTools }) => {
-      if (newTools.length) {
-        this.toast.show(`Nueva herramienta: ${newTools.map((t) => this.tools[t].name).join(', ')}`);
-        this.setTool(newTools[0], false);
-      }
-      this.refreshUI(newTools);
+    this.story.onChange = ({ newGrants }) => {
+      const tools = newGrants.filter((g) => g.startsWith('tool:')).map((g) => g.slice(5) as ToolId);
+      const skills = newGrants.filter((g) => g.startsWith('time:')).map((g) => g.slice(5) as TimeSkill);
+      const names = [...tools.map((t) => this.tools[t].name), ...skills.map((k) => TIME_NAMES[k])];
+      if (names.length) this.toast.show(`${tools.length ? 'Nueva herramienta' : 'Nueva habilidad'}: ${names.join(', ')}`);
+      if (tools.length) this.setTool(tools[0], false);
+      this.refreshUI(newGrants);
     };
 
     this.sim.onStateChange = () => this.toolbar.setRunning(this.sim.running);
@@ -295,7 +370,7 @@ export class Game {
       return this.world.particles.every((p) => p.pos.x < b.minX || p.pos.x > b.maxX || p.pos.y < b.minY || p.pos.y > b.maxY);
     };
     this.sim.onStep.push(() => {
-      if (this.hitFlash > 0) return;
+      if (this.hitFlash > 0 || this.sim.replaying) return;
       for (const t of this.world.targets) {
         if (this.world.particles.some((p) => dist(p.pos, t.pos) < t.radius)) {
           this.hitFlash = 1.2;
@@ -375,9 +450,11 @@ export class Game {
     const typing = el && el !== document.body && el !== this.canvas;
     if (e.key === ' ' && !typing) {
       e.preventDefault();
-      this.togglePlay();
+      this.flow();
     } else if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !typing) {
-      this.sim.reset();
+      this.rewind();
+    } else if (e.key === 'ArrowRight' && !typing) {
+      this.stepTime();
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && this.selection && !typing) {
       this.world.remove(this.selection);
       this.select(null);
@@ -410,6 +487,7 @@ export class Game {
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
 
     this.lab.tick(now);
+    this.sim.timeScale = this.timeScale;
     this.sim.advance(dt);
     this.monitor.update();
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
@@ -423,7 +501,8 @@ export class Game {
     }
     if (this.selection && !this.world.exists(this.selection)) this.select(null);
     this.inspector.update();
-    this.hud.update(this.world, this.sim, this.story.simEnabled(), this.fps);
+    this.hud.update(this.world, this.sim, this.has('flow'), this.fps);
+    this.timeline.update(this.has('timeline') && this.sim.hasRun && this.sim.duration > 0, this.sim.t, this.sim.duration);
 
     const tool = this.activeTool;
     drawScene({

@@ -45,6 +45,9 @@ export class RunMonitor {
       return s && dist(p.pos, s.pos) > 1;
     })) this.once('fell');
 
+    // «sigue de largo»: algo se mueve y el tiempo lleva corriendo al menos 1 s (o el lanzamiento terminó porque salió de la vista)
+    if ((sim.t >= 1 || sim.finished) && world.particles.some((p) => Math.hypot(p.vel.x, p.vel.y) > 0.3)) this.once('coasted');
+
     if (dt <= 0) return;
     const g = world.g;
     const gL = g ? Math.hypot(g.x, g.y) : 0;

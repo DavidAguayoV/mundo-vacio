@@ -87,9 +87,15 @@ export class Lab {
     return { positions: this.prefs.showPositions, trails: this.prefs.showTrails };
   }
 
-  /** Cada cuadro: cámara lenta y autoguardado (como mucho una vez por segundo, y solo si algo cambió). */
+  /** Cámara lenta del laboratorio (desde la barra o desde el panel). */
+  setTimeScale(k: LabPrefs['timeScale']): void {
+    this.prefs = { ...this.prefs, timeScale: k };
+    savePrefs(this.prefs);
+    this.panel.refresh();
+  }
+
+  /** Cada cuadro: autoguardado (como mucho una vez por segundo, y solo si algo cambió). */
   tick(now: number): void {
-    this.host.sim.timeScale = this.host.isFree() ? this.prefs.timeScale : 1;
     if (now - this.lastCheck < AUTOSAVE_EVERY) return;
     this.lastCheck = now;
     this.autosaveNow();

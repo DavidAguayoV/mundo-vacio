@@ -16,6 +16,11 @@ export type GameEvent =
   | { type: 'landed' }
   | { type: 'held' }
   | { type: 'slid' }
+  | { type: 'time-paused' }
+  | { type: 'time-step' }
+  | { type: 'slow-set' }
+  | { type: 'coasted' }
+  | { type: 'peak-found' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];

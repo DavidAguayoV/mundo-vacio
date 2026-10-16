@@ -1,5 +1,5 @@
 import { $, h } from '../ui/dom';
-import { SKILLS, TIERS, skillState } from './skills';
+import { SKILLS, TIERS, skillState, type TreeProgress } from './skills';
 
 const STATE_CLASS = { disponible: 'on', próxima: 'next', bloqueada: 'off' } as const;
 
@@ -19,9 +19,9 @@ export class TreeView {
     return !this.overlay.hidden;
   }
 
-  show(reached: ReadonlySet<string>, next: string | null): void {
+  show(progress: TreeProgress): void {
     const names = new Map(SKILLS.map((n) => [n.id, n.name]));
-    const available = new Set(SKILLS.filter((n) => skillState(n, reached, next) === 'disponible').map((n) => n.id));
+    const available = new Set(SKILLS.filter((n) => skillState(n, progress) === 'disponible').map((n) => n.id));
     this.tiers.replaceChildren(
       ...TIERS.map((title, tier) =>
         h(
@@ -32,7 +32,7 @@ export class TreeView {
             'div',
             { class: 'nodes' },
             ...SKILLS.filter((n) => n.tier === tier).map((n) => {
-              const st = skillState(n, reached, next);
+              const st = skillState(n, progress);
               // solo los requisitos que todavía faltan
               const missing = (n.requires ?? []).filter((r) => !available.has(r));
               const req = st === 'bloqueada' && missing.length ? ` Requiere: ${missing.map((r) => names.get(r)).join(', ')}.` : '';

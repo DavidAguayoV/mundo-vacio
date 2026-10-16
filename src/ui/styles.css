@@ -569,9 +569,90 @@ button {
   color: var(--muted);
 }
 
+/* ---------- relato: predicciones e ingeniería ---------- */
+
+.card .kind {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vel);
+}
+
+.card .kind:empty {
+  display: none;
+}
+
+.card.engineering .kind {
+  color: var(--vec);
+}
+
+.card.engineering p {
+  font-style: italic;
+}
+
+.card p strong {
+  font-weight: 600;
+}
+
+.card .row.choices {
+  display: grid;
+  gap: 6px;
+}
+
+.card .row.choices .btn {
+  text-align: left;
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+.card.collapsed .kind {
+  display: none;
+}
+
+/* ---------- línea de tiempo ---------- */
+
+.timeline {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  width: min(520px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: 500 12px var(--mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--vel);
+  height: 24px;
+}
+
+.timeline output {
+  min-width: 52px;
+  text-align: right;
+  color: var(--ink);
+}
+
+#app.has-timeline .toast {
+  bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+}
+
 /* ---------- celular ---------- */
 
 @media (max-width: 700px) {
+  #app.has-timeline .dock {
+    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
   .dock {
     top: auto;
     left: max(16px, env(safe-area-inset-left, 0px));
