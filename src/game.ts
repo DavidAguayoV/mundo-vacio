@@ -819,6 +819,15 @@ export class Game {
       { passive: false },
     );
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
+    // un pellizco del trackpad (rueda con Ctrl) fuera del lienzo cambiaba el zoom de toda la página
+    // y la dejaba así: sobre el árbol, la bitácora o una tarjeta no hace nada
+    window.addEventListener(
+      'wheel',
+      (e) => {
+        if (e.ctrlKey && e.target !== cv) e.preventDefault();
+      },
+      { passive: false },
+    );
 
     window.addEventListener('resize', () => this.resize());
     // guardar al salir o al cambiar de pestaña (en el celular la página puede no volver)

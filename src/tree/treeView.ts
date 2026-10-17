@@ -23,6 +23,8 @@ export class TreeView {
     this.links.setAttribute('class', 'links');
     this.links.setAttribute('aria-hidden', 'true');
     new ResizeObserver(() => this.drawLinks()).observe(this.tiers);
+    // con el zoom del navegador el árbol puede no cambiar de ancho, pero sus filas sí se mueven
+    window.addEventListener('resize', () => this.drawLinks());
   }
 
   get open(): boolean {
