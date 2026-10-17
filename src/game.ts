@@ -3,6 +3,7 @@ import { dist, type Vec2 } from './core/vec';
 import { SurfaceConstraint } from './physics/constraints';
 import { FrictionForce, G_GAME, NormalForce, Spring, SpringForces, UniformGravity, WorldDrag, WorldGravitation, type MediumId } from './physics/forces';
 import { OscillationMeter } from './physics/oscillationMeter';
+import { toWorld } from './physics/rigid';
 import { Lab } from './lab/lab';
 import { Simulation } from './physics/simulation';
 import { Painter, type Rect } from './render/painter';
@@ -255,6 +256,8 @@ export class Game {
           this.view.home = { center: { x: 0, y: 0 }, zoom: 1 };
           this.view.reset();
           this.refreshUI();
+          // la guía del laboratorio ya está dibujada en el cuadro siguiente: ahí se sabe qué tapa
+          requestAnimationFrame(() => requestAnimationFrame(() => this.fitScene(true)));
         },
         toast: (m) => this.toast.show(m),
       },
@@ -292,7 +295,7 @@ export class Game {
     }
     this.map.riseFrom(null, 0);
     this.refreshUI();
-    if (this.mode === 'site') this.fitSite();
+    if (this.mode !== 'map') this.fitScene(this.mode === 'free');
     void this.lab.loadFromHash();
     this.activeTool.onActivate?.(this.ctx);
     this.last = performance.now();
@@ -516,14 +519,19 @@ export class Game {
     void this.canvas.offsetWidth;
     this.canvas.classList.add('arrive');
     this.refreshUI();
-    this.fitSite();
+    this.fitScene();
   }
 
   /**
    * Encuadra lo que trae el rastro en la franja libre entre la tarjeta y la barra. En una pantalla
    * ancha casi nunca hace falta; en el celular evita que la mitad del rastro quede fuera.
+   *
+   * Un laboratorio (lab) además esquiva la guía, que en una pantalla ancha va al costado, y los
+   * paneles de la derecha (energía, gráficos, inspector): en una ventana angosta la escena quedaría
+   * bajo ellos. Busca el rectángulo libre donde se vea más grande; si aun así hubiera que alejar a
+   * menos de 0,45, deja la vista de siempre.
    */
-  private fitSite(): void {
+  private fitScene(lab = false): void {
     const w = this.world;
     const pts: Vec2[] = [];
     if (w.frame) pts.push(w.frame.origin, w.frame.pointToGlobal({ x: 3.4, y: 0 }), w.frame.pointToGlobal({ x: 0, y: 2.6 }));
@@ -533,6 +541,11 @@ export class Game {
     for (const p of w.particles) pts.push(p.pos);
     for (const s of w.surfaces) pts.push(s.a, s.b);
     for (const t of w.targets) pts.push(t.pos);
+    for (const body of w.bodies) {
+      if (body.shape === 'rod') pts.push(toWorld(body, { x: -body.size / 2, y: 0 }), toWorld(body, { x: body.size / 2, y: 0 }));
+      else pts.push({ x: body.pos.x - body.size, y: body.pos.y - body.size }, { x: body.pos.x + body.size, y: body.pos.y + body.size });
+      if (body.pivot) pts.push(body.pivot.at);
+    }
     if (pts.length < 2) return;
     const b = {
       minX: Math.min(...pts.map((p) => p.x)) - 0.6,
@@ -553,8 +566,44 @@ export class Game {
       }
     }
     const v = this.view;
-    const fitsNow = v.sx(b.minX) > 16 && v.sx(b.maxX) < v.W - 16 && v.sy(b.maxY) > top && v.sy(b.minY) < bottom;
-    if (!fitsNow) v.fit(b, top, bottom);
+    if (!lab) {
+      const fitsNow = v.sx(b.minX) > 16 && v.sx(b.maxX) < v.W - 16 && v.sy(b.maxY) > top && v.sy(b.minY) < bottom;
+      if (!fitsNow) v.fit(b, top, bottom);
+      return;
+    }
+    // laboratorio: se parte de la vista de siempre
+    v.home = { center: { x: 0, y: 0 }, zoom: 1 };
+    v.reset();
+    const blocks = [card, ...[...document.querySelectorAll<HTMLElement>('#dock > *')].filter((el) => !el.hidden).map((el) => el.getBoundingClientRect())].filter(
+      (r) => r.width > 0 && r.height > 0,
+    );
+    const free = (l: number, r: number, t: number, d: number) => blocks.every((k) => r <= k.left || l >= k.right || d <= k.top || t >= k.bottom);
+    const PAD = 20;
+    // ¿algo de la escena (un punto, o un tramo de una superficie) cae bajo un panel?
+    const samples = [...pts];
+    for (const sf of w.surfaces) {
+      const n = Math.ceil(Math.hypot(sf.b.x - sf.a.x, sf.b.y - sf.a.y) / 0.5);
+      for (let i = 1; i < n; i++) samples.push({ x: sf.a.x + ((sf.b.x - sf.a.x) * i) / n, y: sf.a.y + ((sf.b.y - sf.a.y) * i) / n });
+    }
+    const hidden = samples.some((q) => !free(v.sx(q.x) - 8, v.sx(q.x) + 8, v.sy(q.y) - 8, v.sy(q.y) + 8));
+    if (v.sx(b.minX) > 16 && v.sx(b.maxX) < v.W - 16 && v.sy(b.maxY) > top && v.sy(b.minY) < bottom && !hidden) return;
+    // rectángulos candidatos: sus bordes son los de la pantalla o los de los paneles
+    const Ls = [16, ...blocks.map((k) => k.right + 12)];
+    const Rs = [v.W - 16, ...blocks.map((k) => k.left - 12)];
+    const Ts = [top, ...blocks.map((k) => k.bottom + 8)];
+    const Bs = [bottom, ...blocks.map((k) => k.top - 8)];
+    const wid = Math.max(1, b.maxX - b.minX);
+    const hgt = Math.max(1, b.maxY - b.minY);
+    let best: { z: number; l: number; r: number; t: number; d: number } | null = null;
+    for (const l of Ls)
+      for (const r of Rs)
+        for (const t of Ts)
+          for (const d of Bs) {
+            if (r - l < 120 || d - t < 100 || l < 0 || r > v.W || t < top || d > bottom || !free(l, r, t, d)) continue;
+            const z = Math.min(1, (r - l - 2 * PAD) / (wid * v.base), (d - t - 2 * PAD) / (hgt * v.base));
+            if (!best || z > best.z + 1e-6) best = { z, l, r, t, d };
+          }
+    if (best && best.z >= 0.45) v.fit(b, best.t, best.d, PAD, best.l, best.r);
   }
 
   /** Volver al mapa (desde un rastro o desde el laboratorio libre). */
@@ -781,7 +830,7 @@ export class Game {
     $('recenter').addEventListener('click', () => this.view.reset());
     window.addEventListener('resize', () => {
       // si el jugador movió la cámara, se respeta su vista
-      if (this.mode === 'site' && !this.view.moved) this.fitSite();
+      if (this.mode !== 'map' && !this.view.moved) this.fitScene(this.mode === 'free');
     });
   }
 

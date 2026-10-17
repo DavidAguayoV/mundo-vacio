@@ -70,18 +70,19 @@ export class View {
   }
 
   /**
-   * Encuadra una caja del mundo en una franja de la pantalla (entre top y bottom, en px) sin acercar
-   * más que el zoom 1. Queda como la vista de inicio.
+   * Encuadra una caja del mundo en un rectángulo de la pantalla (top y bottom en px; left y right,
+   * por defecto todo el ancho) sin acercar más que el zoom 1. Queda como la vista de inicio.
    */
-  fit(b: Bounds, top: number, bottom: number, pad = 28): void {
+  fit(b: Bounds, top: number, bottom: number, pad = 28, left = 0, right = this.W): void {
     const w = Math.max(1, b.maxX - b.minX);
     const h = Math.max(1, b.maxY - b.minY);
-    const zoom = Math.max(ZOOM_MIN, Math.min(1, (this.W - 2 * pad) / (w * this.base), (bottom - top - 2 * pad) / (h * this.base)));
+    const zoom = Math.max(ZOOM_MIN, Math.min(1, (right - left - 2 * pad) / (w * this.base), (bottom - top - 2 * pad) / (h * this.base)));
     const S = this.base * zoom;
     const cx = (b.minX + b.maxX) / 2;
     const cyWorld = (b.minY + b.maxY) / 2;
+    const px = (left + right) / 2;
     const py = (top + bottom) / 2;
-    this.home = { center: { x: cx, y: cyWorld - (this.cy - py) / S }, zoom };
+    this.home = { center: { x: cx - (px - this.W / 2) / S, y: cyWorld - (this.cy - py) / S }, zoom };
     this.reset();
   }
 

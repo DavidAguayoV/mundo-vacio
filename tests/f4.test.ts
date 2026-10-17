@@ -4,7 +4,7 @@ import { View } from '../src/render/view';
 import { freshProgress, type Progress } from '../src/state/progress';
 import { SiteEngine } from '../src/story/siteEngine';
 import { SITES, ZONES } from '../src/story/sites';
-import { EXAMPLES } from '../src/lab/examples';
+import { EXAMPLES, RACE_LANE } from '../src/lab/examples';
 import { placeOnPivot } from '../src/physics/rigid';
 import { World } from '../src/world/world';
 import { worldFromJSON } from '../src/world/serialize';
@@ -114,7 +114,7 @@ describe('laboratorios de cuerpos rígidos', () => {
     const slow = time(10);
     const fast = time(40);
     expect(fast).toBeLessThan(slow);
-    // tiempo de bajada: L = a t²/2, con L = 9 − 2R (parte y para a un radio de cada punta) y a = (2/3) g sen α
-    expect(fast).toBeCloseTo(Math.sqrt((2 * 8.2) / ((2 / 3) * 9.8 * Math.sin((40 * Math.PI) / 180))), 1);
+    // tiempo de bajada: L = a t²/2, con L = largo − 2R (parte y para a un radio de cada punta) y a = (2/3) g sen α
+    expect(fast).toBeCloseTo(Math.sqrt((2 * (RACE_LANE - 0.8)) / ((2 / 3) * 9.8 * Math.sin((40 * Math.PI) / 180))), 1);
   });
 });
