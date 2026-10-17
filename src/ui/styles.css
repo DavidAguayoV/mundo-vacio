@@ -753,6 +753,16 @@ button {
   opacity: 0.6;
 }
 
+/* calor: gris, ni velocidad ni campo; dentro de Total, el mismo gris apilado sobre la mecánica */
+.energy .bar.q,
+.energy .bar.qseg {
+  fill: var(--muted);
+}
+
+.energy .bar.qseg {
+  opacity: 0.55;
+}
+
 .energy .bar.tot {
   fill: none;
   stroke: var(--ink);

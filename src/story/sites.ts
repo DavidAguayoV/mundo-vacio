@@ -20,9 +20,9 @@ export const ZONES: Zone[] = [
   { id: 'astro', name: 'El astro', at: { x: 6, y: 19 }, hint: 'algo muy masivo' },
   { id: 'mar', name: 'El mar', at: { x: -8, y: 15 }, hint: 'aire y agua' },
   { id: 'laderas', name: 'Las laderas', at: { x: -28, y: -5 }, hint: 'planos con roce' },
-  { id: 'pozo', name: 'El pozo', at: { x: -17, y: -15 }, hint: 'aquí las cosas caen' },
+  { id: 'pozo', name: 'El pozo', at: { x: -22, y: -21 }, hint: 'aquí las cosas caen' },
   { id: 'central', name: 'La central', at: { x: 0, y: -18 }, hint: 'algo se conserva' },
-  { id: 'deriva', name: 'La deriva', at: { x: 17, y: -17 }, hint: 'sin gravedad' },
+  { id: 'deriva', name: 'La deriva', at: { x: 22, y: -21 }, hint: 'sin gravedad' },
   { id: 'puente', name: 'El puente', at: { x: 31, y: -11 }, hint: 'cuerpos que giran' },
 ];
 
@@ -928,7 +928,7 @@ const altura: Site = {
   id: 'altura',
   zone: 'central',
   title: 'Justo hasta arriba',
-  at: zoneAt('central', 0, -4.5),
+  at: zoneAt('central', 0, 0),
   note: 'Quise lanzar algo para que llegara justo hasta aquí y se detuviera. Siempre me pasé o me quedé corto.',
   needs: ['lens:energy', 'tool:velocity'],
   seed: ({ world }) => {
@@ -974,6 +974,185 @@ const altura: Site = {
   ],
 };
 
+
+// ---------- La central: ¿adónde se fue? (calor) ----------
+
+/** Suelo de los rastros del calor: el roce de siempre (μₛ = 0,4; μc = 0,3). */
+const HEAT_MU_S = 0.4;
+const HEAT_MU_K = 0.3;
+const PISO_Y = -2;
+
+/** ¿La partícula se detuvo de verdad (el roce estático la sostiene) después de moverse? */
+const stopped = ({ world, sim }: StoryContext) => {
+  const p = world.particles[0];
+  return !!p && sim.hasRun && sim.t > 0.3 && p.vel.x === 0 && p.vel.y === 0;
+};
+
+const adonde: Site = {
+  id: 'adonde',
+  zone: 'central',
+  title: '¿Adónde se fue?',
+  at: zoneAt('central', 11, 0),
+  note: 'La caja se detuvo sola. Su energía tenía que estar en alguna parte: la busqué y no la encontré.',
+  needs: ['lens:energy'],
+  seed: ({ world }) => {
+    // el origen donde parte la caja, sobre el suelo: Ug = 0 todo el rato y x es lo que recorrió
+    frameAt(world, { x: -4.5, y: PISO_Y });
+    world.g = { x: 0, y: -G_EARTH };
+    world.addSurface({ x: -6, y: PISO_Y }, { x: 6, y: PISO_Y }, HEAT_MU_S, HEAT_MU_K).locked = true;
+    world.addParticle({ x: -4.5, y: PISO_Y }, 1, { x: 4, y: 0 });
+  },
+  steps: [
+    {
+      text: 'Esta caja de 1 kg sale a 4 m/s por un suelo con roce, y se va a detener. Enciende el lente Energía. Cuando se detenga, ¿qué habrá pasado con el total?',
+      on: 'end',
+      ask: 'calor',
+      correct: 'igual',
+      choices: [
+        { id: 'baja', label: 'Bajó: el roce gastó la energía' },
+        { id: 'igual', label: 'Sigue igual' },
+        { id: 'sube', label: 'Subió' },
+      ],
+    },
+    {
+      text: 'Deja fluir el tiempo y mira las barras hasta que se detenga.',
+      on: 'tick',
+      when: stopped,
+    },
+    {
+      text: reveal('calor', 'K bajó hasta cero, pero el contorno de Total no se movió: lo que perdió K apareció en **Q**, el calor. El roce no destruye energía: la convierte en energía térmica (el suelo y la caja quedan un poco más calientes). Aquí Q = ½ m v² = 8 J. Mueve la línea de tiempo: en cualquier instante, K + Q es lo mismo.', {
+        baja: 'La energía mecánica sí bajó; el total, contando el calor, no.',
+        igual: 'Lo predijiste bien.',
+        sube: 'Nada la empujó: no hay de dónde sacar energía nueva.',
+      }),
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Con roce, la energía mecánica baja, pero lo que pierde aparece como calor: K + U + Q se mantiene.',
+    measured: ({ world, sim }) => {
+      const p = world.particles[0];
+      return p && sim.hasRun && sim.heat > 0 ? `Se detuvo a ${fmt(p.pos.x + 4.5)} m de donde partió; el roce se llevó Q = ${fmt(sim.heat)} J.` : null;
+    },
+    engineering: 'Un auto eléctrico frena con su motor y recupera parte de su energía cinética en la batería (freno regenerativo). Con frenos de disco, toda esa energía se va en calor: por eso las pastillas se calientan.',
+  },
+  mastery: [
+    {
+      id: 'masa',
+      label: 'Con el doble de masa, comprueba que se detiene en el mismo lugar',
+      on: 'tick',
+      when: (ctx) => {
+        const p = ctx.world.particles[0];
+        const v0 = p ? ctx.sim.initialState(p.id)?.vel : undefined;
+        return !!p && !!v0 && p.mass >= 2 && Math.abs(len(v0) - 4) < 1e-6 && stopped(ctx);
+      },
+    },
+  ],
+};
+
+const golpe: Site = {
+  id: 'golpe',
+  zone: 'central',
+  title: 'El golpe',
+  at: zoneAt('central', -5.5, -5),
+  note: 'Dejé caer una caja desde la altura de mi cabeza. Hizo ruido y se quedó quieta.',
+  needs: ['lens:energy'],
+  seed: ({ world }) => {
+    // el origen en el suelo: y es la altura y, al final, Ug = 0
+    frameAt(world, { x: -4, y: PISO_Y });
+    world.g = { x: 0, y: -G_EARTH };
+    world.addSurface({ x: -4, y: PISO_Y }, { x: 4, y: PISO_Y }, HEAT_MU_S, HEAT_MU_K).locked = true;
+    world.addParticle({ x: 1, y: PISO_Y + 2 }, 1);
+  },
+  steps: [
+    {
+      text: 'La caja está 2 m sobre el suelo. Con el lente Energía encendido, suéltala y mira las barras justo cuando toca el suelo.',
+      on: 'tick',
+      when: (ctx) => stopped(ctx) && ctx.sim.heat > 0,
+    },
+    {
+      text: ({ sim }) =>
+        `Al tocar el suelo, toda la K pasó a Q de golpe: ${fmt(sim.heat)} J, lo mismo que la Ug que tenía arriba (m g h). En el juego los choques no rebotan; una pelota real rebota porque devuelve parte de esa energía, y la que no devuelve también se va en calor y en sonido.`,
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'En un choque sin rebote, toda la energía cinética se va en calor: Q = ½ m v² = m g h si cayó desde h.',
+    measured: ({ sim }) => (sim.hasRun && sim.heat > 0 ? `El golpe se llevó Q = ${fmt(sim.heat)} J.` : null),
+    engineering: 'La carrocería de un auto se arruga a propósito en un choque: deformarse convierte la energía cinética en calor de a poco, y así llega menos fuerza a las personas.',
+  },
+  mastery: [
+    {
+      id: 'mitad',
+      label: 'Haz que el golpe se lleve 9,8 J (cambia la altura o la masa)',
+      on: 'tick',
+      when: (ctx) => stopped(ctx) && Math.abs(ctx.sim.heat - G_EARTH) < 0.3,
+    },
+  ],
+};
+
+/** La baliza de «Justo en la marca»: 3 m más allá de donde parte la caja. */
+const MARCA_X0 = -5;
+const MARCA = { x: MARCA_X0 + 3, y: PISO_Y };
+
+const marca: Site = {
+  id: 'marca',
+  zone: 'central',
+  title: 'Justo en la marca',
+  at: zoneAt('central', 5.5, -5),
+  note: 'Quise empujar una caja para que se detuviera en una marca. Con el doble de fuerza se iba lejísimos.',
+  needs: ['lens:energy', 'tool:velocity'],
+  seed: ({ world }) => {
+    frameAt(world, { x: MARCA_X0, y: PISO_Y });
+    world.g = { x: 0, y: -G_EARTH };
+    world.addSurface({ x: -7, y: PISO_Y }, { x: 5, y: PISO_Y }, HEAT_MU_S, HEAT_MU_K).locked = true;
+    world.addParticle({ x: MARCA_X0, y: PISO_Y }, 1);
+    world.beacons = [{ id: world.newId('b'), pos: { ...MARCA }, radius: 0.35 }];
+  },
+  steps: [
+    {
+      text: `En este suelo, una caja que sale a 2 m/s se detiene a ${fmt(4 / (2 * HEAT_MU_K * G_EARTH))} m. Si sale al doble de rapidez, ¿dónde se detiene?`,
+      on: 'end',
+      ask: 'frenado',
+      correct: 'cuatro',
+      choices: [
+        { id: 'doble', label: 'Al doble de distancia' },
+        { id: 'cuatro', label: 'Cuatro veces más lejos' },
+        { id: 'igual', label: 'En el mismo lugar' },
+      ],
+    },
+    {
+      text: 'Dale velocidad con Velocidad para que se detenga dentro de la baliza, 3 m más allá. Si te pasas o te quedas corto, vuelve a t = 0 y prueba de nuevo.',
+      on: 'tick',
+      when: (ctx) => stopped(ctx) && dist(ctx.world.particles[0].pos, MARCA) < 0.35,
+    },
+    {
+      text: reveal('frenado', `Se detuvo ahí. Toda su K se va en el calor del roce: ½ m v² = μc m g d, así que **d = v² / (2 μc g)**. Con el doble de rapidez llega cuatro veces más lejos, y la masa no importa. Para 3 m hacía falta v = √(2 μc g d) ≈ ${fmt(Math.sqrt(2 * HEAT_MU_K * G_EARTH * 3))} m/s.`, {
+        doble: 'La energía crece con el cuadrado de la rapidez: el doble de rapidez es cuatro veces la energía que el roce tiene que llevarse.',
+        cuatro: 'Lo predijiste bien.',
+        igual: 'Con más rapidez trae más energía, y el roce necesita más camino para llevársela.',
+      }),
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Frenando por roce, d = v² / (2 μc g): el doble de rapidez es cuatro veces la distancia, sin importar la masa.',
+    measured: ({ world, sim }) => {
+      const p = world.particles[0];
+      const v0 = p ? sim.initialState(p.id)?.vel : undefined;
+      return v0 ? `Saliste con |v₀| = ${fmt(len(v0))} m/s (lo justo era ${fmt(Math.sqrt(2 * HEAT_MU_K * G_EARTH * 3))} m/s).` : null;
+    },
+    engineering: 'La distancia de frenado de un auto crece con el cuadrado de la rapidez: a 100 km/h necesita cuatro veces lo que a 50 km/h. De esa cuenta salen los límites de velocidad cerca de los colegios.',
+  },
+  mastery: [
+    {
+      id: 'primera',
+      label: 'Lógralo en el primer intento',
+      on: 'tick',
+      when: (ctx) => ctx.runs() <= 1 && stopped(ctx) && dist(ctx.world.particles[0].pos, MARCA) < 0.35,
+    },
+  ],
+};
 
 // ---------- El puente: cuerpos rígidos ----------
 
@@ -1359,7 +1538,7 @@ export const SITES: Site[] = [
     at: zoneAt('mar', 4.5, 0),
     note: 'En el agua, las piedras no caen como allá afuera.',
     needs: ['force:drag'],
-    law: 'El arrastre crece hasta igualar el peso: desde ahí se cae a velocidad constante, la velocidad terminal.',
+    law: 'El arrastre crece hasta igualar el peso: desde ahí se cae a velocidad constante, la velocidad terminal. Con el lente Energía se ve adónde va lo que pierde Ug: toda se vuelve calor, Q.',
   }),
   paracaidas,
   fromChapter('energia', {
@@ -1367,7 +1546,7 @@ export const SITES: Site[] = [
     title: 'Lo que no cambia',
     steps: [0, 4],
     zone: 'central',
-    at: zoneAt('central', -4.5, 0),
+    at: zoneAt('central', -5.5, 5),
     note: 'Algo se conserva cuando todo cambia. Me falta saber qué.',
     needs: ['tool:gravity'],
     law: 'Sin roce ni aire, lo que gana la energía cinética lo pierde la potencial: K + U se mantiene.',
@@ -1377,7 +1556,7 @@ export const SITES: Site[] = [
     title: '¿Dónde está el cero?',
     steps: [4, 8],
     zone: 'central',
-    at: zoneAt('central', 0, 4.5),
+    at: zoneAt('central', 5.5, 5),
     note: 'Medí la energía desde dos lugares distintos y me dio distinto. Las dos veces tenía razón.',
     needs: ['lens:energy', 'tool:velocity'],
     law: 'El cero de la energía potencial es una elección: lo que tiene sentido físico son las diferencias.',
@@ -1388,12 +1567,15 @@ export const SITES: Site[] = [
     title: 'Resorte y energía',
     steps: [8, 10],
     zone: 'central',
-    at: zoneAt('central', 4.5, 0),
+    at: zoneAt('central', -11, 0),
     note: 'Colgué algo de un resorte y miré cómo se pasaban la energía.',
     needs: ['lens:energy', 'tool:spring'],
     law: 'K, Ug y Ue se pasan la energía de una a otra; la suma no cambia.',
   }),
   altura,
+  adonde,
+  golpe,
+  marca,
   balanza,
   palanca,
   pendulo,

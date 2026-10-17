@@ -272,6 +272,7 @@ export const EXAMPLES: Example[] = [
       goal: 'Predecir con tan α y μₛ si una partícula se queda o desliza en una pendiente.',
       measure: ['|N| y |f| en el panel de cada partícula.', 'tan α de cada plano (panel del plano).'],
       questions: ['¿Con qué μₛ la de 40° también se queda?', '¿Por qué |f| no es μₛ|N| en la que se queda?'],
+      lenses: ['energy'],
       controls: [muControl],
     },
     build() {
@@ -350,8 +351,8 @@ export const EXAMPLES: Example[] = [
     guide: {
       goal: 'Ver cómo el aire hace que la masa sí importe: cada una llega a su velocidad terminal.',
       measure: ['La velocidad terminal de cada una en v_y(t).', 'El instante en que v_y deja de cambiar.'],
-      questions: ['¿Cómo cambia la velocidad terminal con la masa?', '¿Por qué en el vacío caían juntas?'],
-      lenses: ['graphs'],
+      questions: ['¿Cómo cambia la velocidad terminal con la masa?', '¿Por qué en el vacío caían juntas?', 'Con el lente Energía: ¿adónde va la Ug que pierden?'],
+      lenses: ['graphs', 'energy'],
       controls: [massControl(0, 'm₁'), massControl(1, 'm₂')],
     },
     build() {
@@ -359,6 +360,44 @@ export const EXAMPLES: Example[] = [
       w.medium = 'aire';
       w.addParticle({ x: -2, y: 4 }, 0.5);
       w.addParticle({ x: 2, y: 4 }, 8);
+      return exp(w, this.name, this.description);
+    },
+  },
+  {
+    id: 'frenado',
+    name: 'Frenado',
+    description: 'Una caja sale deslizando por un suelo con roce. ¿Dónde se detiene y adónde va su energía?',
+    guide: {
+      goal: 'Ver que el roce convierte la energía cinética en calor, y medir la distancia de frenado: d = v² / (2 μc g).',
+      measure: ['Dónde se detiene (la malla es de 1 m).', 'Q en el medidor de energía, al final.'],
+      questions: ['¿Cuánto más lejos llega con el doble de rapidez?', 'Si cambias μc, ¿cambia Q? ¿Y la distancia?'],
+      lenses: ['energy'],
+      controls: [
+        speedControl(0, 8),
+        {
+          id: 'muk',
+          label: 'μc',
+          unit: '',
+          min: 0.05,
+          max: 1,
+          step: 0.05,
+          decimals: 2,
+          get: (w) => w.surfaces[0]?.muK ?? null,
+          set: (w, v) => {
+            for (const f of w.surfaces) {
+              f.muK = v;
+              // el estático siempre algo mayor que el cinético
+              f.muS = Math.round(((4 * v) / 3) * 100) / 100;
+            }
+          },
+        },
+      ],
+    },
+    build() {
+      const w = base();
+      // el suelo a la altura del origen: Ug = 0 y en las barras solo se ve K pasando a Q
+      w.addSurface({ x: -7, y: 0 }, { x: 7, y: 0 }, 0.4, 0.3);
+      w.addParticle({ x: -6, y: 0 }, 1, { x: 4, y: 0 });
       return exp(w, this.name, this.description);
     },
   },

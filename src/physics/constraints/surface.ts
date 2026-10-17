@@ -21,12 +21,33 @@ export class SurfaceConstraint implements Constraint {
   readonly contacts = new ContactSet();
   /** lado (+1 / −1) de cada par partícula|superficie */
   private side = new Map<string, number>();
+  /** energía que se llevaron las correcciones desde la última vez que se preguntó (J) */
+  private heat = 0;
 
   constructor(private surfaces: () => readonly SurfaceLike[]) {}
 
   reset(): void {
     this.contacts.clear();
     this.side.clear();
+    this.heat = 0;
+  }
+
+  takeHeat(): number {
+    const q = this.heat;
+    this.heat = 0;
+    return q;
+  }
+
+  /**
+   * ½ m v² + m |g| h de la partícula i: lo que cambia al corregirla es lo que se lleva el choque.
+   * Contar también la altura importa: al volver a la superficie, la partícula sube lo poco que la
+   * había cruzado en el paso, y esa energía no es calor.
+   */
+  private mech(s: SystemState, i: number, world: ForceWorld): number {
+    const p = s.pos[i];
+    const v = s.vel[i];
+    const g = world.gAt ? world.gAt(p) : world.g;
+    return s.mass[i] * (0.5 * (v.x * v.x + v.y * v.y) - (g ? g.x * p.x + g.y * p.y : 0));
   }
 
   /** Al empezar un lanzamiento: anota de qué lado está cada partícula y cuáles ya están apoyadas. */
@@ -52,13 +73,17 @@ export class SurfaceConstraint implements Constraint {
     }
   }
 
-  apply(s: SystemState): void {
+  apply(s: SystemState, world: ForceWorld): void {
     const surfaces = this.surfaces();
     for (let i = 0; i < s.ids.length; i++) {
       const id = s.ids[i];
       const c = this.contacts.get(id);
+      const before = this.mech(s, i, world);
       if (c) {
-        if (this.maintain(s, i, c)) continue;
+        if (this.maintain(s, i, c)) {
+          this.heat += before - this.mech(s, i, world);
+          continue;
+        }
         this.contacts.delete(id);
       }
       for (const surf of surfaces) {
@@ -76,6 +101,7 @@ export class SurfaceConstraint implements Constraint {
         this.project(s, i, surf);
         this.removeInward(s.vel[i], n);
         this.contacts.set(id, { surface: surf, n, slide: this.slideOf(s.vel[i], n) });
+        this.heat += before - this.mech(s, i, world);
         break;
       }
     }

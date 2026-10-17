@@ -14,6 +14,11 @@ export interface EnergyBreakdown {
   Ue: number;
   /** potencial de la atracción entre masas, Σ_{i<j} −G mᵢ mⱼ / √(r² + ε²) */
   UG: number;
+  /** calor del lanzamiento: lo que se llevaron el roce, el arrastre y los choques (lo mide la simulación) */
+  Q: number;
+  /** energía mecánica, K + Ug + Ue + UG */
+  mech: number;
+  /** mecánica más calor: lo que se conserva */
   total: number;
 }
 
@@ -29,8 +34,9 @@ export interface EnergyWorld {
  * Energía mecánica del sistema. La potencial gravitatoria se mide desde `origin`
  * (el origen del jugador): el cero es una elección, y moverlo cambia Ug en una constante.
  * La potencial entre masas usa el mismo suavizado que la fuerza, para que sean consistentes.
+ * `heat` es el calor del lanzamiento (Simulation.heat): con él, el total se conserva aunque haya roce.
  */
-export function systemEnergy(w: EnergyWorld, origin: Vec2 = { x: 0, y: 0 }): EnergyBreakdown {
+export function systemEnergy(w: EnergyWorld, origin: Vec2 = { x: 0, y: 0 }, heat = 0): EnergyBreakdown {
   let K = 0;
   let Ug = 0;
   for (const p of w.particles) {
@@ -69,5 +75,6 @@ export function systemEnergy(w: EnergyWorld, origin: Vec2 = { x: 0, y: 0 }): Ene
     Ug += e.Ug;
   }
 
-  return { K, Ug, Ue, UG, total: K + Ug + Ue + UG };
+  const mech = K + Ug + Ue + UG;
+  return { K, Ug, Ue, UG, Q: heat, mech, total: mech + heat };
 }

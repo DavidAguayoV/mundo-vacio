@@ -8,6 +8,7 @@ import { ZERO, type Force, type ForceJSON } from './force';
  */
 export class Drag implements Force {
   readonly kind = 'drag' as const;
+  readonly dissipative = true;
 
   constructor(
     public linear: number, // b, kg/s
@@ -51,6 +52,7 @@ export const MEDIA: Record<MediumId, Medium> = {
 /** Arrastre del medio en que está el mundo (el interruptor «Medio»). */
 export class WorldDrag implements Force {
   readonly kind = 'drag' as const;
+  readonly dissipative = true;
 
   constructor(private medium: () => MediumId | null) {}
 
