@@ -63,6 +63,11 @@ export class WorldMap {
     this.layer.replaceChildren(...this.markers.values());
   }
 
+  /** Vista de inicio del mapa: en pantallas anchas, algo corrida a la derecha para no quedar bajo la tarjeta. */
+  private get home(): Vec2 {
+    return this.view.W < 700 ? { x: 0, y: 0 } : { x: -5, y: 0 };
+  }
+
   resize(W: number, H: number, dpr: number): void {
     // el mapa se centra en la pantalla (en el celular, algo más abajo para dejar ver la tarjeta)
     this.view.cyRatio = W < 700 ? 0.56 : 0.5;
@@ -112,7 +117,7 @@ export class WorldMap {
   /** Salir de un rastro: el mapa parte acercado sobre él y se aleja. */
   riseFrom(site: Site | null, dur = 650): void {
     if (site) this.view.reset(site.at, ENTER_ZOOM);
-    this.flyTo({ x: 0, y: 0 }, 1, dur);
+    this.flyTo(this.home, 1, dur);
   }
 
   get flying(): boolean {

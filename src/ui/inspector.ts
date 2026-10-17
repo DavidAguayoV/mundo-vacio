@@ -2,6 +2,7 @@ import { fmt, fmtDeg, fmtVec, subscript } from '../core/format';
 import { angleDeg, len, type Vec2 } from '../core/vec';
 import type { ForcePart } from '../physics/forces';
 import { IDENTITY_FRAME } from '../world/frame';
+import { gravityTorque, inertiaAboutPivot, ownInertia, rollAcceleration, totalMass } from '../physics/rigid';
 import type { EntityRef, World } from '../world/world';
 import { $, h, setText, symbol } from './dom';
 
@@ -14,6 +15,10 @@ export interface InspectorActions {
   remove(ref: EntityRef): void;
   /** invierte una tarjeta de la sonda (A → −A) */
   flip(id: string): void;
+  /** multiplica la masa de una pesa (factor) o la quita (factor 0) */
+  changeLoad(bodyId: string, loadId: string, factor: number): void;
+  /** multiplica la masa propia de un cuerpo rígido */
+  changeBodyMass(bodyId: string, factor: number): void;
   close(): void;
   /** fuerzas sobre una partícula en el estado actual (null si no hay simulación que consultar) */
   forces(id: string): ForcePart[] | null;
@@ -133,6 +138,7 @@ export class Inspector {
     if (ref.kind === 'particle') this.buildParticle(ref.id, dl, del, close);
     else if (ref.kind === 'surface') this.buildSurface(ref.id, dl, del, close);
     else if (ref.kind === 'spring') this.buildSpring(ref.id, dl, del, close);
+    else if (ref.kind === 'body') this.buildBody(ref.id, dl, del, close);
     else if (ref.kind === 'vector') {
       const v = () => this.world.vector(ref.id);
       const label = v()?.label ?? '';
@@ -227,7 +233,9 @@ export class Inspector {
         return f ? `${fmt(len(f.F))} N${f.note ? ` · ${f.note}` : ''}` : '—';
       });
     }
-    this.el.replaceChildren(close, h('h2', {}, `Partícula ${label}`), mass, dl, del);
+    // la masa de una partícula del escenario no se cambia: solo se lee
+    const massRow = p()?.locked ? h('div', { class: 'mass' }, h('span', {}, `m = ${fmt(p()?.mass ?? 0, (p()?.mass ?? 0) < 1 ? 2 : 1)} kg`)) : mass;
+    this.el.replaceChildren(close, h('h2', {}, `Partícula ${label}`), massRow, dl, del);
   }
 
   private buildSurface(id: string, dl: HTMLElement, del: HTMLElement, close: HTMLElement): void {
@@ -281,6 +289,88 @@ export class Inspector {
     this.el.replaceChildren(close, h('h2', {}, 'Superficie'), ...mu, dl, note, del);
   }
 
+  /** Cuerpo rígido: su giro, su inercia, el torque de la gravedad y cada pesa con su distancia al eje. */
+  private buildBody(id: string, dl: HTMLElement, del: HTMLElement, close: HTMLElement): void {
+    const b = () => this.world.body(id);
+    const body = b();
+    if (!body) return;
+    const NAMES = { rod: 'Barra', disc: 'Disco', ring: 'Aro', box: 'Caja' } as const;
+    const parts: HTMLElement[] = [];
+    if (body.shape !== 'rod') {
+      parts.push(
+        this.stepper(
+          () => `m = ${fmt(b()?.mass ?? 0, (b()?.mass ?? 0) < 1 ? 2 : 1)} kg`,
+          ['Reducir la masa a la mitad', 'Duplicar la masa'],
+          () => this.actions.changeBodyMass(id, 0.5),
+          () => this.actions.changeBodyMass(id, 2),
+          () => (b()?.mass ?? 0) > MASS_MIN,
+          () => (b()?.mass ?? 0) < MASS_MAX,
+        ),
+      );
+    }
+    if (body.pivot) {
+      this.row(dl, 'θ', '', () => fmtDeg(((b()?.angle ?? 0) * 180) / Math.PI));
+      this.row(dl, 'ω', 'vel', () => `${fmt(b()?.omega ?? 0)} rad/s`);
+      this.row(dl, 'I', '', () => {
+        const q = b();
+        return q ? `${fmt(inertiaAboutPivot(q))} kg·m²` : '—';
+      });
+      this.row(dl, 'τ', 'vec', () => {
+        const q = b();
+        return q ? `${fmt(gravityTorque(q, { bodies: this.world.bodies, surfaces: this.world.surfaces, gAt: (p) => this.world.gAt(p) }))} N·m` : '—';
+      });
+      this.row(dl, 'M', '', () => {
+        const q = b();
+        return q ? `${fmt(totalMass(q))} kg` : '—';
+      });
+    } else if (body.roll) {
+      this.row(dl, 'v', 'vel', () => `${fmt(b()?.roll?.v ?? 0)} m/s`);
+      this.row(dl, 'a', '', () => {
+        const q = b();
+        return q ? `${fmt(rollAcceleration(q, { bodies: this.world.bodies, surfaces: this.world.surfaces, gAt: (p) => this.world.gAt(p) }))} m/s²` : '—';
+      });
+      this.row(dl, 'I', '', () => {
+        const q = b();
+        return q ? `${fmt(ownInertia(q))} kg·m²` : '—';
+      });
+      this.row(dl, 'llegó', '', () => {
+        const t = b()?.roll?.arrived;
+        return t === null || t === undefined ? '—' : `t = ${fmt(t)} s`;
+      });
+    } else {
+      this.row(dl, 'ω', 'vel', () => `${fmt(b()?.omega ?? 0)} rad/s`);
+    }
+    // cada pesa: su masa y su distancia al eje (el brazo de palanca)
+    const loads = body.loads.map((l) => {
+      const arm = () => {
+        const q = b();
+        const ll = q?.loads.find((x) => x.id === l.id);
+        return q && ll ? ll.s - (q.pivot?.local.x ?? 0) : 0;
+      };
+      const text = h('span');
+      const value = () => {
+        const ll = b()?.loads.find((x) => x.id === l.id);
+        return ll ? `${fmt(ll.mass, ll.mass < 1 ? 2 : 1)} kg a ${fmt(arm())} m` : '—';
+      };
+      if (l.locked) {
+        this.rows.push({ dd: text, value });
+        return h('div', { class: 'mass load' }, text);
+      }
+      const minus = h('button', { class: 'btn', type: 'button', 'aria-label': 'Reducir la pesa a la mitad' }, '−');
+      const plus = h('button', { class: 'btn', type: 'button', 'aria-label': 'Duplicar la pesa' }, '+');
+      const drop = h('button', { class: 'btn', type: 'button', 'aria-label': 'Quitar la pesa' }, '×');
+      minus.addEventListener('click', () => this.actions.changeLoad(id, l.id, 0.5));
+      plus.addEventListener('click', () => this.actions.changeLoad(id, l.id, 2));
+      drop.addEventListener('click', () => this.actions.changeLoad(id, l.id, 0));
+      this.rows.push({ dd: text, value });
+      return h('div', { class: 'mass load' }, text, h('span', {}, minus, ' ', plus, ' ', drop));
+    });
+    const note = body.pivot
+      ? h('p', { class: 'note' }, 'Distancias medidas desde el eje (negativas a la izquierda). τ > 0: gira en sentido antihorario.')
+      : h('p', { class: 'note' }, 'Rueda sin deslizar: a = g sen α / (1 + I/(m R²)).');
+    this.el.replaceChildren(close, h('h2', {}, `${NAMES[body.shape]} ${body.label}`), ...parts, dl, ...loads, note, del);
+  }
+
   private buildSpring(id: string, dl: HTMLElement, del: HTMLElement, close: HTMLElement): void {
     const sp = () => this.world.spring(id);
     const L = () => {
@@ -311,7 +401,8 @@ export class Inspector {
       return T === null ? '—' : `${fmt(T)} s`;
     });
     const note = h('p', { class: 'note' }, 'ΔL > 0: estirado; ΔL < 0: comprimido. T se mide solo al completar una oscilación.');
-    this.el.replaceChildren(close, h('h2', {}, 'Resorte'), k, L0, dl, note, del);
+    const fixed = sp()?.locked ? [h('div', { class: 'mass' }, h('span', {}, `k = ${fmt(sp()?.k ?? 0, 0)} N/m   L₀ = ${fmt(sp()?.restLength ?? 0)} m`))] : [k, L0];
+    this.el.replaceChildren(close, h('h2', {}, 'Resorte'), ...fixed, dl, note, del);
   }
 
   /** Refresca los valores (cada cuadro). */

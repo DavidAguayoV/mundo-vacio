@@ -4,6 +4,7 @@ import type { Endpoint } from '../physics/forces/force';
 import type { MediumId } from '../physics/forces/drag';
 import type { SpringLike } from '../physics/forces/springs';
 import type { Body, ForceWorld } from '../physics/state';
+import type { Load, RigidBody } from '../physics/rigid';
 import { ReferenceFrame } from './frame';
 
 export const G_EARTH = 9.8; // m/s²
@@ -85,7 +86,8 @@ export type EntityRef =
   | { kind: 'vector'; id: string }
   | { kind: 'sum'; id: string }
   | { kind: 'surface'; id: string }
-  | { kind: 'spring'; id: string };
+  | { kind: 'spring'; id: string }
+  | { kind: 'body'; id: string };
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -111,6 +113,8 @@ export class World implements ForceWorld {
   beacons: Beacon[] = [];
   /** regiones con su propia gravedad */
   regions: GRegion[] = [];
+  /** cuerpos rígidos: barras, discos, aros y cajas */
+  bodies: RigidBody[] = [];
   /** con qué cadenas llegó la sonda a una baliza en este rastro («A,B», «B,A»…), para los retos */
   probeLog: string[] = [];
 
@@ -143,6 +147,26 @@ export class World implements ForceWorld {
     this.beacons = [];
     this.probeLog = [];
     this.regions = [];
+    this.bodies = [];
+  }
+
+  // ----- cuerpos rígidos -----
+
+  addBody(b: Omit<RigidBody, 'id' | 'label' | 'loads' | 'vel' | 'omega'> & Partial<Pick<RigidBody, 'loads' | 'vel' | 'omega' | 'label'>>): RigidBody {
+    const body: RigidBody = { vel: { x: 0, y: 0 }, omega: 0, loads: [], label: String(this.bodies.length + 1), ...b, id: this.newId('c') };
+    this.bodies.push(body);
+    return body;
+  }
+
+  body(id: string): RigidBody | undefined {
+    return this.bodies.find((b) => b.id === id);
+  }
+
+  /** Agrega una carga a una barra en la posición s (desde su centro). */
+  addLoad(body: RigidBody, s: number, mass: number, locked = false): Load {
+    const l: Load = { id: this.newId('l'), s, mass, ...(locked ? { locked: true } : {}) };
+    body.loads.push(l);
+    return l;
   }
 
   /** La región que contiene un punto (la última, si se superponen). */
@@ -213,6 +237,8 @@ export class World implements ForceWorld {
     if (ref.kind === 'particle') return !!this.particle(ref.id)?.locked;
     if (ref.kind === 'vector') return !!this.vector(ref.id)?.fixed;
     if (ref.kind === 'surface') return !!this.surface(ref.id)?.locked;
+    if (ref.kind === 'spring') return !!this.spring(ref.id)?.locked;
+    if (ref.kind === 'body') return !!this.body(ref.id)?.locked;
     return false;
   }
 
@@ -350,6 +376,7 @@ export class World implements ForceWorld {
     if (ref.kind === 'vector') return !!this.vector(ref.id);
     if (ref.kind === 'surface') return !!this.surface(ref.id);
     if (ref.kind === 'spring') return !!this.spring(ref.id);
+    if (ref.kind === 'body') return !!this.body(ref.id);
     return !!this.sum(ref.id);
   }
 
@@ -358,6 +385,7 @@ export class World implements ForceWorld {
     else if (ref.kind === 'vector') this.removeVector(ref.id);
     else if (ref.kind === 'surface') this.removeSurface(ref.id);
     else if (ref.kind === 'spring') this.removeSpring(ref.id);
+    else if (ref.kind === 'body') this.bodies = this.bodies.filter((b) => b.id !== ref.id);
     else this.removeSum(ref.id);
   }
 }

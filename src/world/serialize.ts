@@ -2,6 +2,7 @@ import type { Vec2 } from '../core/vec';
 import { ReferenceFrame } from './frame';
 import { MEDIA, type MediumId } from '../physics/forces/drag';
 import type { Endpoint } from '../physics/forces/force';
+import type { RigidBody } from '../physics/rigid';
 import { World, type Beacon, type GRegion, type FreeVector, type Particle, type SpringLink, type Surface, type Target, type VectorSum } from './world';
 
 /** Formato de un experimento guardado. Cambiar `version` si cambia la forma. */
@@ -25,6 +26,8 @@ export interface WorldJSON {
   beacons?: Beacon[];
   /** regiones con su propia gravedad */
   regions?: GRegion[];
+  /** cuerpos rígidos */
+  bodies?: RigidBody[];
 }
 
 const v2 = (v: Vec2): Vec2 => ({ x: v.x, y: v.y });
@@ -39,10 +42,11 @@ export function worldToJSON(w: World): WorldJSON {
     sums: w.sums.map((s) => ({ ...s })),
     targets: w.targets.map((t) => ({ id: t.id, pos: v2(t.pos), radius: t.radius })),
     surfaces: w.surfaces.map((s) => ({ ...s, a: v2(s.a), b: v2(s.b) })),
-    springs: w.springs.map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength })),
+    springs: w.springs.map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength, ...(s.locked ? { locked: true } : {}) })),
     gravitation: w.gravitation ? { G: w.gravitation.G } : null,
     medium: w.medium,
     ...(w.probe ? { probe: v2(w.probe) } : {}),
+    ...(w.bodies.length ? { bodies: w.bodies.map((b) => JSON.parse(JSON.stringify(b)) as RigidBody) } : {}),
     ...(w.regions.length ? { regions: w.regions.map((r) => ({ id: r.id, min: v2(r.min), max: v2(r.max), g: r.g ? v2(r.g) : null, ...(r.name ? { name: r.name } : {}) })) } : {}),
     ...(w.beacons.length ? { beacons: w.beacons.map((b) => ({ id: b.id, pos: v2(b.pos), radius: b.radius, ...(b.hidden ? { hidden: true } : {}) })) } : {}),
   };
@@ -91,6 +95,17 @@ export function worldFromJSON(data: unknown, into = new World()): World {
     g: r.g ? v2(r.g) : null,
     ...(isStr(r.name) ? { name: r.name } : {}),
   }));
+  const shapes = ['rod', 'disc', 'ring', 'box'];
+  w.bodies = arr<RigidBody>(
+    d.bodies,
+    (b) => isStr(b?.id) && shapes.includes(b.shape) && isNum(b.size) && b.size > 0 && isNum(b.mass) && b.mass >= 0 && isVec(b.pos) && isNum(b.angle) && Array.isArray(b.loads ?? []),
+    'cuerpos',
+  ).map((b) => ({
+    ...(JSON.parse(JSON.stringify(b)) as RigidBody),
+    vel: isVec(b.vel) ? v2(b.vel) : { x: 0, y: 0 },
+    omega: isNum(b.omega) ? b.omega : 0,
+    loads: (b.loads ?? []).filter((l) => isStr(l?.id) && isNum(l.s) && isNum(l.mass) && l.mass > 0),
+  }));
   w.beacons = arr<Beacon>(d.beacons, (b) => isStr(b?.id) && isVec(b.pos) && isNum(b.radius), 'balizas').map((b) => ({ id: b.id, pos: v2(b.pos), radius: b.radius, ...(b.hidden ? { hidden: true } : {}) }));
   const vecIds = new Set(w.vectors.map((v) => v.id));
   w.sums = sums.filter((s) => vecIds.has(s.a) && vecIds.has(s.b)).map((s) => ({ ...s }));
@@ -98,7 +113,7 @@ export function worldFromJSON(data: unknown, into = new World()): World {
   w.surfaces = surfaces.map((s) => ({ id: s.id, a: v2(s.a), b: v2(s.b), muS: isNum(s.muS) ? s.muS : 0, muK: isNum(s.muK) ? s.muK : 0, ...(s.locked ? { locked: true } : {}) }));
   const ids = new Set(w.particles.map((p) => p.id));
   const alive = (e: Endpoint) => 'anchor' in e || ids.has(e.particle);
-  w.springs = springs.filter((s) => alive(s.a) && alive(s.b)).map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength }));
-  w.bumpIds([...w.particles, ...w.vectors, ...w.sums, ...w.targets, ...w.surfaces, ...w.springs, ...w.beacons, ...w.regions].map((e) => e.id));
+  w.springs = springs.filter((s) => alive(s.a) && alive(s.b)).map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength, ...(s.locked ? { locked: true } : {}) }));
+  w.bumpIds([...w.particles, ...w.vectors, ...w.sums, ...w.targets, ...w.surfaces, ...w.springs, ...w.beacons, ...w.regions, ...w.bodies, ...w.bodies.flatMap((b) => b.loads)].map((e) => e.id));
   return w;
 }

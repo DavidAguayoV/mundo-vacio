@@ -7,6 +7,7 @@ import { particlesLayer, trailsLayer } from './layers/particles';
 import { targetLayer } from './layers/target';
 import { vectorsLayer } from './layers/vectors';
 import { beaconsLayer, probeLayer } from './layers/probe';
+import { bodiesLayer } from './layers/bodies';
 import type { Layer, Scene } from './scene';
 
 /** Orden de las capas, del fondo al frente. */
@@ -20,6 +21,7 @@ const LAYERS: Layer[] = [
   beaconsLayer,
   trailsLayer,
   springsLayer,
+  bodiesLayer,
   vectorsLayer,
   probeLayer,
   particlesLayer,

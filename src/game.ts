@@ -212,6 +212,23 @@ export class Game {
         this.select(null);
       },
       forces: (id) => this.sim.forcesOn(id)?.parts ?? null,
+      changeLoad: (bodyId, loadId, k) => {
+        const b = this.world.body(bodyId);
+        const l = b?.loads.find((x) => x.id === loadId);
+        if (!b || !l || l.locked) return;
+        if (this.sim.hasRun) this.sim.reset();
+        if (k === 0) b.loads = b.loads.filter((x) => x !== l);
+        else l.mass = clampMass(l.mass * k);
+        this.inspector.rebuild();
+        this.bus.emit({ type: 'load-moved' });
+      },
+      changeBodyMass: (bodyId, k) => {
+        const b = this.world.body(bodyId);
+        if (!b) return;
+        if (this.sim.hasRun) this.sim.reset();
+        b.mass = clampMass(b.mass * k);
+        this.bus.emit({ type: 'mass-changed' });
+      },
       flip: (id) => {
         const v = this.world.vector(id);
         if (!v?.fixed) return;
@@ -720,6 +737,7 @@ export class Game {
       // sin área visible (página oculta o aún sin diseño) no hay «fuera de la vista»
       if (!this.view.W || !this.view.H) return false;
       const b = this.view.homeBounds(Math.max(this.view.W, this.view.H) * 0.5);
+      if (!this.world.particles.length) return false;
       return this.world.particles.every((p) => p.pos.x < b.minX || p.pos.x > b.maxX || p.pos.y < b.minY || p.pos.y > b.maxY);
     };
     this.sim.onStep.push(() => {
@@ -961,7 +979,7 @@ export class Game {
     if (this.opts.stress && this.sim.finished) this.sim.start();
 
     // el inspector agrega filas cuando aparece el origen, la primera superficie o g
-    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.gravitation}|${!!this.world.medium}|${!!this.world.g}`;
+    const structure = `${this.world.bodies.map((b) => b.loads.length).join(',')}|${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.gravitation}|${!!this.world.medium}|${!!this.world.g}`;
     this.toolbar.setSwitch('gravitation', !!this.world.gravitation);
     this.toolbar.setSwitch('drag', !!this.world.medium, this.switchLabel('drag'));
     if (structure !== this.structure) {
