@@ -74,15 +74,24 @@ export function stopAll({ world, sim }: StoryContext): void {
   for (const p of world.particles) p.vel = { x: 0, y: 0 };
 }
 
-/** Dos partículas a la misma altura, de 1 kg y 4 kg, en reposo. */
+/**
+ * Dos partículas a la misma altura, de 1 kg y 4 kg, en reposo. «Altura» se mide a lo largo de g:
+ * quedan sobre la recta perpendicular a g, a `height` m «arriba» del centro, aunque el jugador haya
+ * puesto g de lado. Con g hacia abajo de la pantalla quedan en (−2 ; height) y (2 ; height).
+ */
 export function twoMasses(ctx: StoryContext, height = 3): void {
   const { world } = ctx;
   stopAll(ctx);
   while (world.particles.length < 2) world.addParticle({ x: 0, y: 0 }, 1);
   const [a, b] = world.particles;
-  a.pos = { x: -2, y: height };
+  const g = world.g ?? { x: 0, y: -G_EARTH };
+  const gL = Math.hypot(g.x, g.y) || 1;
+  const down = { x: g.x / gL, y: g.y / gL };
+  const side = { x: -down.y, y: down.x };
+  const up = { x: -down.x * height, y: -down.y * height };
+  a.pos = { x: up.x - 2 * side.x, y: up.y - 2 * side.y };
   a.mass = 1;
-  b.pos = { x: 2, y: height };
+  b.pos = { x: up.x + 2 * side.x, y: up.y + 2 * side.y };
   b.mass = 4;
 }
 
@@ -112,9 +121,17 @@ export function spawnTarget(ctx: StoryContext): void {
 // ---------- ayudas para escribir los pasos ----------
 
 /** Tarjeta que retoma una predicción: texto común y una línea según lo que eligió el jugador. */
+/**
+ * Cierre de una predicción: primero se contrasta con lo que dijo el jugador y después va la explicación.
+ * Los comentarios que ya nombran la respuesta («Lo predijiste bien…», «Dijiste que…») van al comienzo;
+ * los que la comentan sin nombrarla van después de la explicación, precedidos por la opción elegida.
+ */
 export const reveal = (key: string, base: string, byChoice: Record<string, string>): Step['text'] => (ctx) => {
   const extra = byChoice[ctx.prediction(key) ?? ''];
-  return extra ? `${base} ${extra}` : base;
+  if (!extra) return base;
+  if (/^(Lo predijiste bien|Dijiste)/.test(extra)) return `${extra} ${base}`;
+  const label = ctx.predictionLabel?.(key);
+  return label ? `Dijiste «${label}». ${base} ${extra}` : `${base} ${extra}`;
 };
 
 const engineering = (text: string): Step => ({ text, on: 'next', kind: 'engineering' });
@@ -261,6 +278,8 @@ export const CHAPTERS: Chapter[] = [
     seed: (ctx) => {
       ensureFrame(ctx);
       ensureParticles(ctx);
+      // una sola partícula: la de 4 kg quedaba justo en el camino del tiro y se confundía con la lanzada
+      ctx.world.particles = ctx.world.particles.slice(0, 1);
       ensureG(ctx);
       stopAll(ctx);
     },
@@ -274,20 +293,22 @@ export const CHAPTERS: Chapter[] = [
         },
       },
       {
-        text: '¡Le diste! Ganaste la **línea de tiempo**: arrástrala para recorrer el vuelo hacia adelante y hacia atrás. Busca el punto más alto de la trayectoria.',
-        on: 'peak-found',
-        grants: ['time:timeline'],
-        enter: ensureG,
-      },
-      {
-        text: 'Estás en el punto más alto. ¿Cuánto vale ahí la velocidad?',
+        // la predicción va antes de la línea de tiempo: en la cima, la flecha v, el panel y los gráficos ya dan la respuesta
+        text: '¡Le diste! Antes de mirar el vuelo con calma: en el punto más alto de la trayectoria, ¿cuánto vale la velocidad?',
         on: 'end',
         ask: 'cima',
         correct: 'horizontal',
+        enter: ensureG,
         choices: [
           { id: 'cero', label: 'Cero: se detiene un instante' },
           { id: 'horizontal', label: 'No es cero: solo deja de subir' },
         ],
+      },
+      {
+        text: 'Compruébalo. Ganaste la **línea de tiempo**: arrástrala para recorrer el vuelo hacia adelante y hacia atrás, y detente en el punto más alto.',
+        on: 'peak-found',
+        grants: ['time:timeline'],
+        enter: ensureG,
       },
       {
         text: reveal('cima', 'Mira la flecha cian: en el punto más alto queda perpendicular a g. La velocidad no es cero; lo que se anula es su parte a lo largo de g. La otra parte no cambió en todo el vuelo, porque nada empuja de lado.', {

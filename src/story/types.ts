@@ -31,6 +31,8 @@ export interface StoryContext {
   count(type: GameEventType): number;
   /** la opción que eligió el jugador en una predicción (undefined si no respondió) */
   prediction(key: string): string | undefined;
+  /** el texto de la opción que eligió el jugador (para repetírselo al revelar) */
+  predictionLabel?(key: string): string | undefined;
   /** cuántas veces ocurrió desde que se entró al rastro (para los retos de maestría) */
   total(type: GameEventType): number;
   /** cuántos lanzamientos distintos hubo desde que se entró al rastro */

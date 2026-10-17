@@ -31,6 +31,7 @@ import { Timeline } from './ui/timeline';
 import { EnergyMeter } from './ui/energyMeter';
 import { GraphsPanel } from './ui/graphs';
 import { LENS_NAMES, SWITCH_NAMES, TIME_NAMES, Toolbar } from './ui/toolbar';
+import { ReferenceFrame } from './world/frame';
 import { G_EARTH, World, type EntityRef } from './world/world';
 
 /** Segundos que tarda la sonda en cada salto. */
@@ -64,6 +65,8 @@ export class Game {
   private probeKey = '';
   /** lanzamiento en que ya se alcanzó la boya (para avisar una sola vez) */
   private caughtRun = -1;
+  /** los ejes que el jugador eligió en el claro: siguen con él de un rastro del claro al otro */
+  private claroFrame: { origin: Vec2; angle: number } | null = null;
 
   private tools = createTools();
   private activeTool: Tool;
@@ -504,9 +507,21 @@ export class Game {
     else this.enterSite(id);
   }
 
+  /** Si se está saliendo de un rastro del claro, guarda los ejes del jugador. */
+  private rememberClaroFrame(): void {
+    const f = this.world.frame;
+    if (this.story.site?.zone === 'claro' && f) this.claroFrame = { origin: { ...f.origin }, angle: f.angle };
+  }
+
   private enterSite(id: string): void {
+    this.rememberClaroFrame();
     this.sim.clearRun();
     this.world.clear();
+    // en el claro, «los ejes son una elección tuya»: el rastro siguiente parte con los que eligió el jugador
+    const target = this.story.siteById(id);
+    if (target?.zone === 'claro' && id !== 'vacio' && this.claroFrame) {
+      this.world.frame = new ReferenceFrame({ ...this.claroFrame.origin }, this.claroFrame.angle);
+    }
     this.select(null);
     this.highlighted.clear();
     this.view.home = { center: { x: 0, y: 0 }, zoom: 1 };
@@ -613,6 +628,7 @@ export class Game {
       if (this.story.site) this.story.leave();
     }
     const site = this.story.site;
+    this.rememberClaroFrame();
     this.sim.clearRun();
     this.world.clear();
     this.select(null);
