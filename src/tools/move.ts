@@ -155,6 +155,10 @@ export class MoveTool implements Tool {
       return;
     }
     const anchor = hitSpringAnchor(world, p, tol);
+    if (anchor?.sp.locked) {
+      ctx.select({ kind: 'spring', id: anchor.sp.id });
+      return;
+    }
     if (anchor) {
       ctx.select({ kind: 'spring', id: anchor.sp.id });
       this.drag = { kind: 'anchor', d: new AnchorDrag(anchor.sp, anchor.end) };

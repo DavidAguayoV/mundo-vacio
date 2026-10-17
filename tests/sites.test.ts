@@ -286,10 +286,10 @@ describe('capítulos que siguen como rastros', () => {
     expect(t.y).toBeLessThan(b.maxY);
   });
 
-  it('«Resortes»: al retomarlo quedan un resorte colgado y gravedad', () => {
-    const p = having(['vacio', 'particula', 'desde-siempre', 'abajo']);
-    p.site = 'resortes';
-    p.step = 4;
+  it('«El ritmo»: al retomarlo quedan un resorte colgado y gravedad', () => {
+    const p = having(['vacio', 'particula', 'desde-siempre', 'abajo', 'hooke']);
+    p.site = 'periodo';
+    p.step = 0;
     const { story, world } = setup(p);
     story.resume();
     expect(world.springs).toHaveLength(1);

@@ -12,7 +12,8 @@ Después del primer rastro («El vacío») se revela el **mapa**: zonas alrededo
 - **El pozo** tiene regiones con su propia gravedad: un rincón donde «abajo» es hacia el lado y la Luna junto a la Tierra, para comparar el mismo tiro.
 - **Las laderas** separan la normal («El suelo empuja»), el roce estático («¿Se queda o desliza?») y la medición de μₛ con una pendiente cuyo roce no se muestra («La pendiente justa»).
 - El lente **Gráficos** (se gana en «Desde siempre») muestra x(t), y(t), vₓ(t) y v_y(t) de la partícula elegida, en tus ejes; la línea de tiempo es su cursor, al pasar el puntero se lee el valor y al tocar se va a ese instante.
-- Los capítulos de resortes, gravitación, arrastre y energía siguen jugables como rastros de sus zonas, a la espera de rehacerse (fase F3 de `PROPUESTA_MUNDO_ABIERTO.md`).
+- **El taller** (la ley del resorte, el ritmo y «Al mismo compás»: afinar un resorte al de otro), **el astro** (atracción, órbita y escape), **el mar** (la pluma y la piedra, velocidad terminal y «El paracaídas»: aterrizar a menos de 2,5 m/s) y **la central** (lo que no cambia, dónde está el cero, resorte y energía, y «Justo hasta arriba»: detenerla en la baliza).
+- Cada zona tiene al menos un reto de maestría (una estrella extra): poner el origen sobre una partícula, una órbita casi circular, escapar con lo justo, aterrizar suave en el aire…
 - **Cámara**: rueda o pellizco para acercar; arrastrar el espacio vacío con Mover (o con el botón del medio o el derecho) para recorrer; «Centrar la vista» o la tecla 0 para volver. Teclas + y − también acercan y alejan.
 
 El avance guardado del relato lineal se migra solo: lo de los capítulos terminados queda resuelto.

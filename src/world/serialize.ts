@@ -39,7 +39,7 @@ export function worldToJSON(w: World): WorldJSON {
     sums: w.sums.map((s) => ({ ...s })),
     targets: w.targets.map((t) => ({ id: t.id, pos: v2(t.pos), radius: t.radius })),
     surfaces: w.surfaces.map((s) => ({ ...s, a: v2(s.a), b: v2(s.b) })),
-    springs: w.springs.map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength })),
+    springs: w.springs.map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength, ...(s.locked ? { locked: true } : {}) })),
     gravitation: w.gravitation ? { G: w.gravitation.G } : null,
     medium: w.medium,
     ...(w.probe ? { probe: v2(w.probe) } : {}),
@@ -98,7 +98,7 @@ export function worldFromJSON(data: unknown, into = new World()): World {
   w.surfaces = surfaces.map((s) => ({ id: s.id, a: v2(s.a), b: v2(s.b), muS: isNum(s.muS) ? s.muS : 0, muK: isNum(s.muK) ? s.muK : 0, ...(s.locked ? { locked: true } : {}) }));
   const ids = new Set(w.particles.map((p) => p.id));
   const alive = (e: Endpoint) => 'anchor' in e || ids.has(e.particle);
-  w.springs = springs.filter((s) => alive(s.a) && alive(s.b)).map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength }));
+  w.springs = springs.filter((s) => alive(s.a) && alive(s.b)).map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength, ...(s.locked ? { locked: true } : {}) }));
   w.bumpIds([...w.particles, ...w.vectors, ...w.sums, ...w.targets, ...w.surfaces, ...w.springs, ...w.beacons, ...w.regions].map((e) => e.id));
   return w;
 }

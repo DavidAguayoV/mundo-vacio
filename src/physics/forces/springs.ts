@@ -11,6 +11,8 @@ export interface SpringLike {
   k: number;
   /** largo natural L₀, m */
   restLength: number;
+  /** parte del escenario de un rastro (el resorte que marca el ritmo): no se cambia ni se borra */
+  locked?: boolean;
 }
 
 /** Posición de un extremo en el estado s (null si la partícula ya no existe). */

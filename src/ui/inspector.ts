@@ -227,7 +227,9 @@ export class Inspector {
         return f ? `${fmt(len(f.F))} N${f.note ? ` · ${f.note}` : ''}` : '—';
       });
     }
-    this.el.replaceChildren(close, h('h2', {}, `Partícula ${label}`), mass, dl, del);
+    // la masa de una partícula del escenario no se cambia: solo se lee
+    const massRow = p()?.locked ? h('div', { class: 'mass' }, h('span', {}, `m = ${fmt(p()?.mass ?? 0, (p()?.mass ?? 0) < 1 ? 2 : 1)} kg`)) : mass;
+    this.el.replaceChildren(close, h('h2', {}, `Partícula ${label}`), massRow, dl, del);
   }
 
   private buildSurface(id: string, dl: HTMLElement, del: HTMLElement, close: HTMLElement): void {
@@ -311,7 +313,8 @@ export class Inspector {
       return T === null ? '—' : `${fmt(T)} s`;
     });
     const note = h('p', { class: 'note' }, 'ΔL > 0: estirado; ΔL < 0: comprimido. T se mide solo al completar una oscilación.');
-    this.el.replaceChildren(close, h('h2', {}, 'Resorte'), k, L0, dl, note, del);
+    const fixed = sp()?.locked ? [h('div', { class: 'mass' }, h('span', {}, `k = ${fmt(sp()?.k ?? 0, 0)} N/m   L₀ = ${fmt(sp()?.restLength ?? 0)} m`))] : [k, L0];
+    this.el.replaceChildren(close, h('h2', {}, 'Resorte'), ...fixed, dl, note, del);
   }
 
   /** Refresca los valores (cada cuadro). */

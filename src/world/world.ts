@@ -213,6 +213,7 @@ export class World implements ForceWorld {
     if (ref.kind === 'particle') return !!this.particle(ref.id)?.locked;
     if (ref.kind === 'vector') return !!this.vector(ref.id)?.fixed;
     if (ref.kind === 'surface') return !!this.surface(ref.id)?.locked;
+    if (ref.kind === 'spring') return !!this.spring(ref.id)?.locked;
     return false;
   }
 
