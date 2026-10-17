@@ -1,4 +1,5 @@
 import type { SiteEngine } from '../story/siteEngine';
+import { starLine } from './card';
 import { $, h } from './dom';
 
 /** «una **idea** clave» → texto con <strong>, sin innerHTML. */
@@ -47,13 +48,11 @@ export class Journal {
             if (!done) {
               return h('article', { class: 'page blank', id: `page-${s.id}` }, h('h4', {}, s.title), h('p', { class: 'note' }, 'Página en blanco.'));
             }
-            const got = story.stars(s.id).length;
-            const max = story.maxStars(s);
             const missing = (s.mastery ?? []).filter((m) => !story.stars(s.id).includes(m.id));
             return h(
               'article',
               { class: 'page', id: `page-${s.id}` },
-              h('h4', {}, s.title, h('span', { class: 'stars', 'aria-label': `${got} de ${max} estrellas` }, '★'.repeat(got) + '☆'.repeat(Math.max(0, max - got)))),
+              h('h4', {}, s.title, starLine(story, s)),
               h('blockquote', {}, `«${s.note}»`),
               h('p', { class: 'law' }, ...rich(s.page.law)),
               ...(done.measured ? [h('p', { class: 'measured' }, done.measured)] : []),

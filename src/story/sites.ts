@@ -5,6 +5,7 @@ import type { World } from '../world/world';
 import { placeOnPivot, placeOnSurface } from '../physics/rigid';
 import { G_EARTH } from '../world/world';
 import { CHAPTERS, reveal } from './chapters';
+import { CATCH_DIST } from './missMonitor';
 import type { Grant, Mastery, Page, Site, Step, StoryContext, Zone, ZoneId } from './types';
 
 // ---------- el mapa ----------
@@ -322,6 +323,20 @@ const betMiss = (w: World): number | null => {
   return Math.min(...bets.map((p) => dist(p.pos, DRIFT_AT_4)));
 };
 
+/** Hasta dónde se ve el movimiento antes de apostar (s). */
+const BET_PEEK = 1;
+
+/**
+ * La apuesta se juzga una sola vez: la primera vez que el tiempo pasa por t = 4 s con una marca
+ * puesta. Así, mover la marca después de haber visto el resultado no cambia el veredicto ni el reto.
+ */
+export const driftBet = { miss: null as number | null };
+
+/** El tiempo no pasa de t = 1 s hasta que haya una marca: la apuesta se hace sin haber visto el resto. */
+const holdForBet = ({ sim }: StoryContext) => {
+  sim.pauseAt = BET_PEEK;
+};
+
 const desdeSiempre: Site = {
   id: 'desde-siempre',
   zone: 'deriva',
@@ -329,16 +344,16 @@ const desdeSiempre: Site = {
   at: zoneAt('deriva', -3.2, 1.6),
   note: 'Esta partícula ya se movía cuando llegué. Nadie la empuja. Nunca se detuvo.',
   needs: ['tool:particle'],
-  grants: ['time:flow'],
   seed: ({ world }) => {
     frameAt(world, { x: -7, y: -2 });
     world.g = null;
     const p = world.addParticle(DRIFT_START, 1, DRIFT_V);
     p.locked = true;
+    driftBet.miss = null;
   },
   steps: [
     {
-      text: 'Aquí no hay gravedad. Ganaste el **tiempo**: con ▶ fluye y con ‖ se detiene. Antes de tocarlo, ¿qué hará esta partícula?',
+      text: 'Aquí no hay gravedad, y esta partícula se mueve sola. ¿Qué hará si dejas pasar el tiempo?',
       on: 'end',
       ask: 'inercia',
       correct: 'recto',
@@ -349,8 +364,15 @@ const desdeSiempre: Site = {
       ],
     },
     {
-      text: 'Deja fluir el tiempo y mira las marcas: cada punto es su posición cada 0,1 s.',
-      on: 'coasted',
+      text: 'Ganaste el **tiempo**: con ▶ fluye y con ‖ se detiene. Déjalo fluir y mira las marcas: cada punto es su posición cada 0,1 s. Se detendrá solo en t = 1 s.',
+      on: 'tick',
+      grants: ['time:flow'],
+      enter: (ctx) => {
+        // quien ya tenía el tiempo pudo dejarlo correr antes de responder: se vuelve a t = 0
+        if (ctx.sim.hasRun && ctx.sim.t > BET_PEEK) ctx.sim.reset();
+        holdForBet(ctx);
+      },
+      when: ({ sim }) => sim.hasRun && sim.t >= BET_PEEK - 1e-6,
     },
     {
       text: reveal('inercia', 'Sigue recto, y las marcas quedan igual de separadas: recorre lo mismo cada 0,1 s. Eso es su **velocidad**, v = Δr/Δt. Nada la frena porque nada la toca: es la **inercia**.', {
@@ -359,25 +381,31 @@ const desdeSiempre: Site = {
         curva: 'Dijiste que se curvaba. Para curvarse, algo tendría que empujarla de lado, y aquí no hay nada.',
       }),
       on: 'next',
+      enter: holdForBet,
+    },
+    {
+      text: 'Ahora una apuesta: coloca una partícula donde crees que estará a t = 4 s. El tiempo queda detenido hasta que pongas tu marca; después déjalo fluir.',
+      on: 'tick',
+      enter: holdForBet,
+      when: ({ world, sim }) => {
+        sim.pauseAt = betMiss(world) === null ? BET_PEEK : null;
+        if (driftBet.miss === null && sim.t >= 4 - 1e-6) driftBet.miss = betMiss(world);
+        return driftBet.miss !== null && sim.t >= 4.2;
+      },
+    },
+    {
+      text: () => {
+        const miss = driftBet.miss ?? 0;
+        const verdict = miss < 0.5 ? 'Le achuntaste: a t = 4 s pasó por tu marca.' : `A t = 4 s pasó a ${fmt(miss)} m de tu marca.`;
+        return `${verdict} Con velocidad constante, la posición cambia lo mismo cada segundo: r = r₀ + v t. Si sabes v, sabes dónde estará.`;
+      },
+      on: 'next',
     },
     {
       text: 'Toca t = 0 para volver al inicio y luego +0,1 s para avanzar paso a paso. Selecciona la partícula y mira en el panel cuánto cambia r en cada paso.',
       on: 'time-step',
       when: (ctx) => ctx.count('time-step') >= 3,
       grants: ['time:rewind', 'time:step'],
-    },
-    {
-      text: 'Ahora una apuesta: coloca una partícula donde crees que estará a t = 4 s. Después vuelve a t = 0 y deja fluir el tiempo.',
-      on: 'tick',
-      when: ({ world, sim }) => sim.t >= 4.2 && betMiss(world) !== null,
-    },
-    {
-      text: ({ world }) => {
-        const miss = betMiss(world) ?? 0;
-        const verdict = miss < 0.5 ? 'Le achuntaste: a t = 4 s pasó por tu marca.' : `A t = 4 s pasó a ${fmt(miss)} m de tu marca.`;
-        return `${verdict} Con velocidad constante, la posición cambia lo mismo cada segundo: r = r₀ + v t. Si sabes v, sabes dónde estará.`;
-      },
-      on: 'next',
     },
     {
       text: 'Ganaste los **gráficos**: abajo a la derecha están x(t), y(t), vₓ(t) y v_y(t) de la partícula elegida. Con velocidad constante, x(t) es una recta y vₓ(t) es plana. Vuelve a t = 0 y míralos crecer mientras fluye el tiempo.',
@@ -398,13 +426,12 @@ const desdeSiempre: Site = {
       id: 'apuesta',
       label: 'Acierta dónde estará a t = 4 s (a menos de 0,5 m)',
       on: 'tick',
-      when: ({ world, sim }) => sim.t >= 4 && (betMiss(world) ?? Infinity) < 0.5,
+      when: () => driftBet.miss !== null && driftBet.miss < 0.5,
     },
   ],
 };
 
-/** Distancia a la que se considera que la partícula alcanzó a la boya (m). */
-export const CATCH_DIST = 0.4;
+export { CATCH_DIST };
 
 const boya: Site = {
   id: 'boya',
@@ -672,6 +699,16 @@ const quedarse: Site = {
 
 /** μₛ del plano de «La pendiente justa»: el jugador no lo ve. */
 const SECRET_MU = 0.45;
+/** Ángulo en que empieza a deslizar: tan α = μₛ (≈ 24,2°). */
+const CRITICAL_DEG = deg(Math.atan(SECRET_MU));
+/** Si empezó a deslizar más de esto sobre el ángulo justo, la medición no vale: se pide repetir de a poco. */
+export const OVERSHOOT_DEG = 5;
+
+/** Inclinación del plano de «La pendiente justa», en grados. */
+const slopeAngle = (world: World): number | null => {
+  const s = world.surfaces[0];
+  return s ? inclineDeg(world, s.a, s.b) : null;
+};
 
 const pendiente: Site = {
   id: 'mu',
@@ -694,6 +731,11 @@ const pendiente: Site = {
     {
       text: 'Con Mover, inclina el plano de a poco arrastrando su extremo derecho y deja fluir el tiempo en cada ángulo. Busca el ángulo justo en que la partícula empieza a deslizar; el panel del plano muestra α.',
       on: 'slid',
+      retry: ({ world }) => {
+        const a = slopeAngle(world);
+        if (a === null || a - CRITICAL_DEG <= OVERSHOOT_DEG) return null;
+        return `Deslizó con α = ${fmt(a, 1)}°, pero ahí ya no se mide el ángulo justo: te pasaste. Baja el plano y súbelo de a poco, uno o dos grados cada vez.`;
+      },
     },
     {
       text: ({ world }) => {
