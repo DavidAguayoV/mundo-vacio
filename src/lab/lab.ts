@@ -3,7 +3,7 @@ import type { Simulation } from '../physics/simulation';
 import { loadPrefs, savePrefs, type LabPrefs } from '../state/prefs';
 import { worldFromJSON } from '../world/serialize';
 import { G_EARTH, type World } from '../world/world';
-import { EXAMPLES } from './examples';
+import { EXAMPLES, type Example } from './examples';
 import { SHARE_PREFIX, decodeShare, fileName, makeExperiment, parseExperimentText, setupState, shareUrl, type Experiment } from './experiment';
 import { LabPanel } from './labPanel';
 import { ExperimentLibrary, type WorldSlot } from './library';
@@ -21,6 +21,8 @@ export interface LabHost {
 }
 
 const AUTOSAVE_EVERY = 1000; // ms
+/** Laboratorio con guía abierto (se recuerda al recargar la página). */
+const GUIDE_KEY = 'mundoVacio.labGuide';
 
 /**
  * Laboratorio: guarda y abre experimentos (en este navegador, como archivo .json o como enlace),
@@ -33,6 +35,8 @@ export class Lab {
   private panel: LabPanel;
   private lastSaved: Partial<Record<WorldSlot, string>> = {};
   private lastCheck = 0;
+  /** id del laboratorio con guía que está abierto (null si el mundo es otro) */
+  private guideId: string | null = null;
 
   constructor(
     private host: LabHost,
@@ -40,7 +44,7 @@ export class Lab {
     private persist = true,
   ) {
     this.panel = new LabPanel({
-      state: () => ({ name: this.name, saved: this.library.list(), g: host.world.g, gravitation: !!host.world.gravitation, medium: host.world.medium, prefs: this.prefs }),
+      state: () => ({ name: this.name, saved: this.library.list(), g: host.world.g, gravitation: !!host.world.gravitation, medium: host.world.medium, prefs: this.prefs, free: host.isFree() }),
       save: (name) => this.save(name),
       download: (name) => this.download(name),
       share: (name) => this.share(name),
@@ -55,7 +59,8 @@ export class Lab {
       openFile: (f) => this.openFile(f),
       openExample: (id) => {
         const e = EXAMPLES.find((x) => x.id === id);
-        if (e) this.load(e.build());
+        if (!e) return;
+        this.load(e.build(), e.id);
       },
       setG: (g) => this.setG(g),
       setMedium: (m) => {
@@ -146,11 +151,36 @@ export class Lab {
 
   // ---------- abrir ----------
 
-  load(exp: Experiment): void {
+  /** El laboratorio con guía abierto, si el mundo es uno de ellos. */
+  get guide(): Example | null {
+    if (!this.host.isFree()) return null;
+    if (this.guideId === null) {
+      try {
+        this.guideId = localStorage.getItem(GUIDE_KEY) ?? '';
+      } catch {
+        this.guideId = '';
+      }
+    }
+    return EXAMPLES.find((e) => e.id === this.guideId && e.guide) ?? null;
+  }
+
+  private setGuide(id: string): void {
+    this.guideId = id;
+    try {
+      if (id) localStorage.setItem(GUIDE_KEY, id);
+      else localStorage.removeItem(GUIDE_KEY);
+    } catch {
+      /* sin almacenamiento */
+    }
+  }
+
+  /** @param guide id del laboratorio con guía (vacío si se abre otra cosa) */
+  load(exp: Experiment, guide = ''): void {
     if (!this.host.isFree()) this.host.enterFree();
     this.host.sim.clearRun();
     worldFromJSON(exp.world, this.host.world);
     this.name = exp.name;
+    this.setGuide(guide);
     this.host.afterWorldReplaced();
     this.autosaveNow('lab');
     this.panel.hide();
@@ -252,6 +282,7 @@ export class Lab {
     w.targets = [];
     w.surfaces = [];
     this.name = 'Mi experimento';
+    this.setGuide('');
     this.host.afterWorldReplaced();
     this.panel.refresh();
   }

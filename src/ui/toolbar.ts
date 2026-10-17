@@ -51,6 +51,7 @@ export const SWITCH_NAMES: Record<ForceSwitch, string> = {
 
 export const LENS_NAMES: Record<LensId, string> = {
   energy: 'Energía',
+  graphs: 'Gráficos',
 };
 
 const scaleLabel = (k: number) => (k === 0.5 ? '×½' : k === 0.25 ? '×¼' : '×1');

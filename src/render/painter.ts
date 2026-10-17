@@ -25,6 +25,8 @@ interface LabelRequest {
   candidates: Pt[];
   /** los de menor prioridad se ubican primero */
   priority: number;
+  /** si ningún candidato está libre, no se dibuja (en vez de usar el primero) */
+  optional?: boolean;
 }
 
 const SUB: Record<string, string> = {
@@ -133,8 +135,14 @@ export class Painter {
   }
 
   /** Rótulo de texto que prueba varias posiciones (en px). */
-  labelAt(text: string, candidates: Pt[], color: string, size = 12.5, kind: 'symbol' | 'text' = 'text', priority = 1): void {
-    this.queue.push({ text, color, size, kind, candidates, priority });
+  labelAt(text: string, candidates: Pt[], color: string, size = 12.5, kind: 'symbol' | 'text' = 'text', priority = 1, optional = false): void {
+    this.queue.push({ text, color, size, kind, candidates, priority, optional });
+  }
+
+  /** Ancho de un texto de interfaz en la sans (para ubicar rótulos por su borde). */
+  textWidth(text: string, size = 12.5): number {
+    this.ctx.font = `500 ${size}px ${this.pal.sans}`;
+    return this.ctx.measureText(text).width;
   }
 
   /** Símbolo al costado del punto medio de un segmento (de preferencia a la izquierda del sentido a → b). */
@@ -182,7 +190,8 @@ export class Painter {
           break;
         }
       }
-      // sin lugar libre: el primer candidato, salvo que quede tapado por la interfaz
+      if (!chosen && r.optional) continue;
+      // sin lugar libre: el primer candidato
       if (!chosen) {
         const c = r.candidates[0];
         chosen = { x: c.x - w / 2 - 4, y: c.y - h / 2 - 1, w: w + 8, h: h + 2 };
