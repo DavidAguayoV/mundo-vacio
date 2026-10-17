@@ -1,4 +1,5 @@
 import { hitParticle, snapToSurface } from './hit';
+import { hitBody, rodS } from './rigidHit';
 import { ICONS } from './icons';
 import { ParticleDrag } from './move';
 import type { Tool, ToolContext, WorldPointer } from './tool';
@@ -20,6 +21,17 @@ export class ParticleTool implements Tool {
     }
     // editar el mundo vuelve al estado de preparación del experimento
     if (sim.hasRun) sim.reset();
+    // sobre una barra que acepta cargas: una pesa de 1 kg, ajustada cada 0,25 m
+    const rod = hitBody(world, p, tol);
+    if (rod?.shape === 'rod' && rod.loadable) {
+      const s = rodS(rod, p);
+      const same = rod.loads.find((l) => Math.abs(l.s - s) < 1e-9);
+      if (same) same.mass = Math.min(64, same.mass + 1);
+      else world.addLoad(rod, s, 1);
+      ctx.select({ kind: 'body', id: rod.id });
+      ctx.emit({ type: 'load-placed' });
+      return;
+    }
     const n = world.addParticle(snapToSurface(world, p, view.m(12)), 1);
     ctx.select({ kind: 'particle', id: n.id });
     this.drag = new ParticleDrag(n, p, view.m(4));

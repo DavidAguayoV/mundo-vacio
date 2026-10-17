@@ -2,10 +2,14 @@ import type { Vec2 } from '../core/vec';
 import type { Constraint } from './constraints';
 import { forceParts, makeAccel, type Force, type ForcePart } from './forces';
 import { RK4Integrator } from './integrator';
+import { applyState, bodyState, stepBodies, type BodyState, type RigidWorld } from './rigid';
 import { stateFromBodies, type Body, type ForceWorld, type SystemState } from './state';
 
 export interface SimWorld extends ForceWorld {
   particles: Body[];
+  /** cuerpos rígidos (opcional: los tests de partículas no los usan) */
+  bodies?: RigidWorld['bodies'];
+  surfaces?: RigidWorld['surfaces'];
 }
 
 interface Snapshot {
@@ -62,6 +66,8 @@ export class Simulation {
   /** pasos del instante más lejano alcanzado en este lanzamiento */
   private furthestSteps = 0;
   private snapshot: Map<string, Snapshot> | null = null;
+  /** estado inicial de los cuerpos rígidos del lanzamiento */
+  private bodySnapshot = new Map<string, BodyState>();
 
   constructor(private world: SimWorld) {}
 
@@ -72,6 +78,17 @@ export class Simulation {
 
   initialState(id: string): Snapshot | undefined {
     return this.snapshot?.get(id);
+  }
+
+  /** Estado inicial de un cuerpo rígido en el lanzamiento en curso. */
+  initialBody(id: string): BodyState | undefined {
+    return this.snapshot ? this.bodySnapshot.get(id) : undefined;
+  }
+
+  private get rigid(): RigidWorld | null {
+    const w = this.world;
+    if (!w.bodies?.length) return null;
+    return { bodies: w.bodies, surfaces: w.surfaces ?? [], gAt: (p) => (w.gAt ? w.gAt(p) : w.g) };
   }
 
   /** Instante más lejano alcanzado en este lanzamiento (el largo de la línea de tiempo), s. */
@@ -86,6 +103,7 @@ export class Simulation {
     this.runId++;
     this.snapshot = new Map();
     for (const p of this.world.particles) this.snapshot.set(p.id, { pos: { ...p.pos }, vel: { ...p.vel } });
+    this.bodySnapshot = new Map((this.world.bodies ?? []).map((b) => [b.id, bodyState(b)]));
     this.furthestSteps = 0;
     this.restart();
   }
@@ -93,6 +111,10 @@ export class Simulation {
   /** Vuelve al instante inicial del lanzamiento actual sin olvidarlo. */
   private restart(): void {
     if (!this.snapshot) return;
+    for (const b of this.world.bodies ?? []) {
+      const s = this.bodySnapshot.get(b.id);
+      if (s) applyState(b, s);
+    }
     for (const p of this.world.particles) {
       const s = this.snapshot.get(p.id);
       if (!s) continue;
@@ -131,6 +153,10 @@ export class Simulation {
   /** Vuelve todas las partículas a como estaban al lanzar. */
   reset(): void {
     if (this.snapshot) {
+      for (const b of this.world.bodies ?? []) {
+        const s = this.bodySnapshot.get(b.id);
+        if (s) applyState(b, s);
+      }
       for (const p of this.world.particles) {
         const s = this.snapshot.get(p.id);
         if (!s) continue;
@@ -240,6 +266,8 @@ export class Simulation {
   }
 
   private stepOnce(s: SystemState, accel: ReturnType<typeof makeAccel>): void {
+    const rigid = this.rigid;
+    if (rigid) stepBodies(rigid, this.dt, this.t);
     this.integrator.step(s, this.dt, accel);
     for (const c of this.constraints) c.apply(s, this.world, this.dt);
     this.steps++;

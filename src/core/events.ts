@@ -37,6 +37,10 @@ export type GameEvent =
   | { type: 'probe-blocked' }
   | { type: 'beacon-found' }
   | { type: 'caught' }
+  // cuerpos rígidos
+  | { type: 'load-placed' }
+  | { type: 'load-moved' }
+  | { type: 'pivot-moved' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];

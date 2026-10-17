@@ -4,6 +4,9 @@ import type { FreeVector, Particle, SpringLink, Surface } from '../world/world';
 import { FrameDrag } from './frameDrag';
 import { hitParticle, hitSpring, hitSpringAnchor, hitSum, hitSurfaceBody, hitSurfaceEnd, hitVectorBody, hitVectorTip, snapToSurface } from './hit';
 import { ICONS } from './icons';
+import { hitBody, hitLoad, hitMovablePivot, rodS } from './rigidHit';
+import type { Load, RigidBody } from '../physics/rigid';
+import { placeOnPivot, toWorld } from '../physics/rigid';
 import type { Tool, ToolContext, WorldPointer } from './tool';
 
 /** Distancia en píxeles a la que una partícula soltada se apoya sola en una superficie. */
@@ -120,7 +123,11 @@ type Drag =
   | { kind: 'tip'; v: FreeVector }
   | { kind: 'body'; v: FreeVector; last: Vec2 }
   /** arrastrar el espacio vacío recorre el mundo */
-  | { kind: 'pan'; grab: Vec2 };
+  | { kind: 'pan'; grab: Vec2 }
+  /** una pesa a lo largo de su barra */
+  | { kind: 'load'; body: RigidBody; load: Load; moved: boolean }
+  /** el eje de la palanca a lo largo de la barra */
+  | { kind: 'pivot'; body: RigidBody; moved: boolean };
 
 export class MoveTool implements Tool {
   readonly id = 'move' as const;
@@ -133,6 +140,18 @@ export class MoveTool implements Tool {
     const fd = FrameDrag.tryStart(p, tol, ctx, false);
     if (fd) {
       this.drag = { kind: 'frame', d: fd };
+      return;
+    }
+    const piv = hitMovablePivot(world, p, tol);
+    if (piv) {
+      ctx.select({ kind: 'body', id: piv.id });
+      this.drag = { kind: 'pivot', body: piv, moved: false };
+      return;
+    }
+    const ld = hitLoad(world, view, p, tol);
+    if (ld) {
+      ctx.select({ kind: 'body', id: ld.body.id });
+      if (!ld.load.locked) this.drag = { kind: 'load', body: ld.body, load: ld.load, moved: false };
       return;
     }
     const q = hitParticle(world, view, p, tol);
@@ -197,6 +216,11 @@ export class MoveTool implements Tool {
       if (!surf.locked) this.drag = { kind: 'surface', d: new SurfaceDrag(surf, null, p) };
       return;
     }
+    const rb = hitBody(world, p, tol);
+    if (rb) {
+      ctx.select({ kind: 'body', id: rb.id });
+      return;
+    }
     ctx.select(null);
     this.drag = { kind: 'pan', grab: { ...p } };
   }
@@ -205,7 +229,24 @@ export class MoveTool implements Tool {
     const d = this.drag;
     if (!d) return;
     if (d.kind === 'frame' || d.kind === 'particle' || d.kind === 'surface' || d.kind === 'anchor') d.d.move(p, ctx);
-    else if (d.kind === 'pan') {
+    else if (d.kind === 'load') {
+      const s = rodS(d.body, p);
+      if (s !== d.load.s) {
+        if (!d.moved && ctx.sim.hasRun) ctx.sim.reset();
+        d.load.s = s;
+        d.moved = true;
+      }
+    } else if (d.kind === 'pivot') {
+      const b = d.body;
+      const s = rodS(b, p);
+      if (b.pivot && s !== b.pivot.local.x) {
+        if (!d.moved && ctx.sim.hasRun) ctx.sim.reset();
+        // el eje se corre por la barra; la barra se queda donde está
+        b.pivot = { ...b.pivot, local: { x: s, y: 0 }, at: toWorld(b, { x: s, y: 0 }) };
+        placeOnPivot(b);
+        d.moved = true;
+      }
+    } else if (d.kind === 'pan') {
       // el punto tomado queda bajo el puntero
       ctx.view.center = { x: ctx.view.center.x + d.grab.x - p.x, y: ctx.view.center.y + d.grab.y - p.y };
     } else if (d.kind === 'tip') d.v.tip = { ...p };
@@ -219,6 +260,8 @@ export class MoveTool implements Tool {
   }
 
   onPointerUp(_e: WorldPointer, ctx: ToolContext): void {
+    if (this.drag?.kind === 'load' && this.drag.moved) ctx.emit({ type: 'load-moved' });
+    if (this.drag?.kind === 'pivot' && this.drag.moved) ctx.emit({ type: 'pivot-moved' });
     if (this.drag?.kind === 'frame') this.drag.d.end(ctx);
     if (this.drag?.kind === 'particle') this.drag.d.finish(ctx);
     // una tarjeta soltada cerca de la sonda o de la punta de otra queda pegada: cola con punta

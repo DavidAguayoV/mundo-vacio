@@ -2,6 +2,7 @@ import type { Vec2 } from '../core/vec';
 import { SOFTENING } from './forces/gravitation';
 import type { SpringLike } from './forces/springs';
 import type { Endpoint } from './forces/force';
+import { bodyEnergy, type RigidBody } from './rigid';
 
 /** Energías del sistema completo, en J. */
 export interface EnergyBreakdown {
@@ -21,6 +22,7 @@ export interface EnergyWorld {
   g: Vec2 | null;
   springs: readonly SpringLike[];
   gravitation: { G: number } | null;
+  bodies?: readonly RigidBody[];
 }
 
 /**
@@ -59,6 +61,12 @@ export function systemEnergy(w: EnergyWorld, origin: Vec2 = { x: 0, y: 0 }): Ene
         UG -= (w.gravitation.G * ps[i].mass * ps[j].mass) / Math.sqrt(dx * dx + dy * dy + eps2);
       }
     }
+  }
+
+  for (const b of w.bodies ?? []) {
+    const e = bodyEnergy(b, w.g, origin);
+    K += e.K;
+    Ug += e.Ug;
   }
 
   return { K, Ug, Ue, UG, total: K + Ug + Ue + UG };

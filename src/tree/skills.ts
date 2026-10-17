@@ -39,6 +39,7 @@ export const SKILLS: SkillNode[] = [
   { id: 'gravitation', tier: 5, grant: 'force:gravitation', name: 'Gravitación', desc: 'Masas que se atraen entre sí: órbitas y escape.' },
   { id: 'drag', tier: 5, grant: 'force:drag', name: 'Arrastre', desc: 'Aire y agua: la velocidad terminal.' },
   { id: 'energy', tier: 6, grant: 'lens:energy', name: 'Energía', desc: 'Lo que se conserva cuando todo cambia.' },
+  { id: 'rigid', tier: 6, chapter: 'balanza', name: 'Cuerpos rígidos', desc: 'Torque, palancas y cosas que ruedan.' },
   { id: 'heat', tier: 6, name: 'Calor', desc: 'Adónde va la energía cuando algo frena.', requires: ['energy'] },
   { id: 'accel-frame', tier: 6, name: 'Marco acelerado', desc: '¿Qué ve alguien dentro de un ascensor?', requires: ['gravity'] },
   { id: '3d', tier: 6, name: 'Tercera dimensión', desc: 'El mismo juego con un eje z.' },

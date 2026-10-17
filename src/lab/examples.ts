@@ -4,6 +4,7 @@ import { worldToJSON } from '../world/serialize';
 import { G_GAME } from '../physics/forces/gravitation';
 import { G_EARTH, World } from '../world/world';
 import type { LensId } from '../story/types';
+import { placeOnSurface } from '../physics/rigid';
 import { makeExperiment, type Experiment } from './experiment';
 
 export const G_MOON = 1.62;
@@ -168,6 +169,41 @@ function inclineWithParticle(w: World, a: Vec2, L: number, alphaDeg: number, at:
 
 const exp = (w: World, name: string, description: string) => makeExperiment(worldToJSON(w), name, description);
 
+// ---------- cuerpos rígidos ----------
+
+/** Masa o distancia de una pesa del balancín. */
+const loadControl = (i: number, what: 'mass' | 's'): LabControl => ({
+  id: `${what}${i}`,
+  label: what === 'mass' ? `m${'₁₂'[i]}` : `d${'₁₂'[i]}`,
+  unit: what === 'mass' ? 'kg' : 'm',
+  min: what === 'mass' ? 0.25 : -2,
+  max: what === 'mass' ? 8 : 2,
+  step: 0.25,
+  decimals: 2,
+  get: (w) => w.bodies[0]?.loads[i]?.[what] ?? null,
+  set: (w, v) => {
+    const l = w.bodies[0]?.loads[i];
+    if (l) l[what] = v;
+  },
+});
+
+/** Las tres pistas de la carrera, inclinadas alpha grados; los cuerpos vuelven arriba. */
+function raceLanes(w: World, alphaDeg: number): void {
+  const th = (alphaDeg * Math.PI) / 180;
+  w.surfaces.forEach((surf, i) => {
+    const y0 = 3.2 - i * 1.7;
+    // a la derecha del eje y: la guía del laboratorio ocupa la izquierda
+    surf.a = { x: -2.5, y: y0 };
+    surf.b = { x: -2.5 + 9 * Math.cos(th), y: y0 - 9 * Math.sin(th) };
+  });
+  const rw = { bodies: w.bodies, surfaces: w.surfaces, gAt: (p: Vec2) => w.gAt(p) };
+  for (const b of w.bodies) {
+    if (!b.roll) continue;
+    b.roll = { ...b.roll, s: 0, v: 0, arrived: null };
+    placeOnSurface(b, rw);
+  }
+}
+
 /** Experimentos listos para usar en clase. Todos con g = 9,80 m/s² salvo el de la Luna. */
 export const EXAMPLES: Example[] = [
   {
@@ -321,6 +357,74 @@ export const EXAMPLES: Example[] = [
       w.medium = 'aire';
       w.addParticle({ x: -2, y: 4 }, 0.5);
       w.addParticle({ x: 2, y: 4 }, 8);
+      return exp(w, this.name, this.description);
+    },
+  },
+  {
+    id: 'balancin',
+    name: 'Balancín',
+    description: 'Una barra con eje al centro y dos pesas. ¿Cuándo queda derecha?',
+    guide: {
+      goal: 'Encontrar cuándo un balancín queda en equilibrio: cuando los torques de los dos lados se compensan.',
+      measure: ['El torque τ en el panel de la barra.', 'm₁ d₁ y m₂ d₂ en cada intento.'],
+      questions: ['¿Qué combinaciones de masa y distancia lo equilibran?', '¿Importa la masa de la barra si el eje está en su centro?'],
+      controls: [loadControl(0, 'mass'), loadControl(0, 's'), loadControl(1, 'mass'), loadControl(1, 's')],
+    },
+    build() {
+      const w = base();
+      const rod = w.addBody({ shape: 'rod', size: 4, mass: 0.5, pos: { x: 0, y: 0 }, angle: 0, pivot: { at: { x: 0, y: 0 }, local: { x: 0, y: 0 }, limit: 0.35 }, loadable: true });
+      w.addLoad(rod, -1, 2);
+      w.addLoad(rod, 1.5, 1);
+      return exp(w, this.name, this.description);
+    },
+  },
+  {
+    id: 'carrera',
+    name: 'La carrera',
+    description: 'Un disco, un aro y una caja sin roce bajan pendientes iguales.',
+    guide: {
+      goal: 'Ver cómo la forma decide quién llega primero al rodar: a = g sen α / (1 + I/(m R²)).',
+      measure: ['El instante de llegada de cada uno (panel de cada cuerpo).', 'La aceleración a en el panel.'],
+      questions: ['¿Cambia el orden si el aro tiene más masa?', '¿Qué pasa con los tiempos si inclinas más las pistas?'],
+      lenses: ['energy'],
+      controls: [
+        {
+          id: 'alpha',
+          label: 'α',
+          unit: '°',
+          min: 5,
+          max: 45,
+          step: 1,
+          decimals: 0,
+          get: (w) => {
+            const s = w.surfaces[0];
+            return s ? Math.round((Math.atan2(s.a.y - s.b.y, s.b.x - s.a.x) * 180) / Math.PI) : null;
+          },
+          set: (w, v) => raceLanes(w, v),
+        },
+        {
+          id: 'mring',
+          label: 'm aro',
+          unit: 'kg',
+          min: 0.25,
+          max: 8,
+          step: 0.25,
+          decimals: 2,
+          get: (w) => w.bodies.find((b) => b.shape === 'ring')?.mass ?? null,
+          set: (w, v) => {
+            const r = w.bodies.find((b) => b.shape === 'ring');
+            if (r) r.mass = v;
+          },
+        },
+      ],
+    },
+    build() {
+      const w = base();
+      (['box', 'disc', 'ring'] as const).forEach((shape) => {
+        const surf = w.addSurface({ x: 0, y: 0 }, { x: 1, y: 0 }, 0, 0);
+        w.addBody({ shape, size: shape === 'box' ? 0.6 : 0.4, size2: 0.6, mass: 1, pos: { x: 0, y: 0 }, angle: 0, roll: { surface: surf.id, s: 0, v: 0, arrived: null } });
+      });
+      raceLanes(w, 20);
       return exp(w, this.name, this.description);
     },
   },
