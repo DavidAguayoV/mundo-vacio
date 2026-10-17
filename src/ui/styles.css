@@ -854,14 +854,15 @@ button {
   transform: translateX(-50%);
   bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--bg) 70%, transparent);
   color: var(--ink);
   font-size: var(--t-md);
-  white-space: nowrap;
-  max-width: calc(100% - 32px);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* los avisos largos («te pasaste del ángulo justo…») se parten en líneas parejas, no se cortan */
+  width: max-content;
+  max-width: min(34em, calc(100% - 32px));
+  text-align: center;
+  text-wrap: balance;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
@@ -1644,8 +1645,68 @@ button {
   white-space: nowrap;
 }
 
+/* estrellas con nombre: «★ resuelto · ☆ predicción · ★☆ retos» */
+.stars.named {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  letter-spacing: 0;
+  white-space: normal;
+  font-size: var(--t-sm);
+  vertical-align: baseline;
+}
+
+.stars.named .star-part {
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.stars.named .star-icons {
+  letter-spacing: 2px;
+}
+
+/* lo que falta queda atenuado */
+.stars.named .star-part.missing {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+.journal h4 .stars.named {
+  margin-left: 10px;
+  font-family: var(--body);
+  font-weight: 400;
+}
+
+/* los retos del rastro: «Si te atreves: …» */
+.card .dares-box:empty {
+  display: none;
+}
+
+.card .dares {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t-sm);
+  line-height: 1.45;
+  color: var(--muted);
+  max-width: 40em;
+}
+
+.card .dares .dare-mark {
+  color: var(--muted);
+}
+
+.card .dares li.won {
+  opacity: 0.85;
+}
+
+.card .dares li.won .dare-mark {
+  color: var(--ink);
+}
+
 .card.collapsed .trace,
-.card.collapsed .extra {
+.card.collapsed .extra,
+.card.collapsed .dares-box {
   display: none;
 }
 

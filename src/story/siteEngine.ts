@@ -24,6 +24,16 @@ export interface StoryChange {
   newStars?: string[];
   /** el rastro en curso se acaba de resolver */
   solved?: boolean;
+  /** aviso para el jugador (un paso que no se dio por cumplido y pide repetir) */
+  notice?: string;
+}
+
+/** Un tipo de estrella de un rastro: cuántas tiene el jugador de las que da. */
+export interface StarPart {
+  id: string;
+  label: string;
+  got: number;
+  max: number;
 }
 
 /** Cómo se ve un rastro desde el mapa. */
@@ -136,7 +146,32 @@ export class SiteEngine {
 
   /** Cuántas estrellas puede dar un rastro. */
   maxStars(site: Site): number {
-    return 1 + (site.steps.some((s) => s.correct) ? 1 : 0) + (site.mastery?.length ?? 0);
+    return this.starParts(site).reduce((n, p) => n + p.max, 0);
+  }
+
+  /** Las estrellas de un rastro con nombre: resuelto, predicción (si tiene) y retos, cuántas tiene y cuántas da cada una. */
+  starParts(site: Site): StarPart[] {
+    const have = this.stars(site.id);
+    const parts: StarPart[] = [{ id: STAR_SOLVED, label: 'resuelto', got: have.includes(STAR_SOLVED) ? 1 : 0, max: 1 }];
+    if (site.steps.some((s) => s.correct)) parts.push({ id: STAR_PREDICTION, label: 'predicción', got: have.includes(STAR_PREDICTION) ? 1 : 0, max: 1 });
+    const dares = site.mastery ?? [];
+    if (dares.length) {
+      const got = dares.filter((m) => have.includes(m.id)).length;
+      parts.push({ id: 'reto', label: dares.length > 1 ? 'retos' : 'reto', got, max: dares.length });
+    }
+    return parts;
+  }
+
+  /**
+   * ¿El rastro en curso espera ahora este evento? (en el paso actual o en un reto que falta).
+   * Sirve para avisar de un fallo solo cuando acertar todavía cuenta.
+   */
+  listensFor(type: GameEventType): boolean {
+    const site = this.site;
+    if (!site) return false;
+    if (this.step?.on === type) return true;
+    const have = this.stars(site.id);
+    return (site.mastery ?? []).some((m) => m.on === type && !have.includes(m.id));
   }
 
   /** Dónde se gana algo (para explicar una puerta cerrada: «se gana en La deriva»). */
@@ -234,6 +269,7 @@ export class SiteEngine {
     if (!site || this.free || this.status(site) === 'cerrado') return false;
     this.progress = { ...this.progress, site: id, step: 0, earned: { ...this.progress.earned, [id]: [] } };
     this.resetCounters();
+    this.ctx.sim.pauseAt = null;
     site.seed?.(this.ctx);
     const fresh = this.give(this.siteGrants(site, 0));
     site.steps[0]?.enter?.(this.ctx);
@@ -247,6 +283,7 @@ export class SiteEngine {
     if (!this.progress.site) return;
     this.progress = { ...this.progress, site: null, step: 0 };
     this.resetCounters();
+    this.ctx.sim.pauseAt = null;
     this.save(this.progress);
     this.onChange?.({ newGrants: [] });
   }
@@ -277,6 +314,11 @@ export class SiteEngine {
     const st = this.step;
     if (!st || st.on !== ev.type) return;
     if (st.when && !st.when(this.ctx)) return;
+    const retry = st.retry?.(this.ctx);
+    if (retry) {
+      this.onChange?.({ newGrants: [], notice: retry });
+      return;
+    }
     this.advance();
   }
 
@@ -350,6 +392,7 @@ export class SiteEngine {
   setFree(free: boolean): void {
     this.progress = { ...this.progress, free };
     this.resetCounters();
+    this.ctx.sim.pauseAt = null;
     this.save(this.progress);
     this.onChange?.({ newGrants: [] });
   }

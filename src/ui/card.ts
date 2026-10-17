@@ -1,7 +1,7 @@
 import { fmt } from '../core/format';
 import type { LabControl, LabGuide } from '../lab/examples';
 import type { SiteEngine } from '../story/siteEngine';
-import type { Grant } from '../story/types';
+import type { Grant, Site } from '../story/types';
 import { $, h, symbol } from './dom';
 
 export interface CardActions {
@@ -35,7 +35,48 @@ function rich(text: string): Node[] {
 /** Nombre legible de lo que se gana (para «te falta Velocidad»). */
 export type GrantNamer = (g: Grant) => string;
 
-const starLine = (got: number, max: number) => h('span', { class: 'stars', 'aria-label': `${got} de ${max} estrellas` }, '★'.repeat(got) + '☆'.repeat(Math.max(0, max - got)));
+/**
+ * Las estrellas con nombre: «★ resuelto · ☆ predicción · ★☆ retos». Lo que falta queda atenuado
+ * y lo dice en voz alta («falta predicción»).
+ */
+export function starLine(story: SiteEngine, site: Site): HTMLElement {
+  const parts = story.starParts(site);
+  const said = parts.map((p) => (p.got >= p.max ? p.label : p.max > 1 && p.got ? `${p.label}, ${p.got} de ${p.max}` : `falta ${p.label}`));
+  return h(
+    'span',
+    { class: 'stars named', role: 'img', 'aria-label': `Estrellas: ${said.join('; ')}` },
+    ...parts.map((p) =>
+      h(
+        'span',
+        { class: p.got >= p.max ? 'star-part' : 'star-part missing', title: p.got >= p.max ? '' : 'Falta' },
+        h('span', { class: 'star-icons', 'aria-hidden': 'true' }, '★'.repeat(p.got) + '☆'.repeat(Math.max(0, p.max - p.got))),
+        ` ${p.label}`,
+      ),
+    ),
+  );
+}
+
+/** Los retos del rastro: «Si te atreves: …». Los ganados quedan tachados y marcados con ★. */
+export function dareList(story: SiteEngine, site: Site): HTMLElement | null {
+  const dares = site.mastery ?? [];
+  if (!dares.length) return null;
+  const have = story.stars(site.id);
+  return h(
+    'ul',
+    { class: 'dares', 'aria-label': 'Retos' },
+    ...dares.map((m) => {
+      const won = have.includes(m.id);
+      const label = m.label.charAt(0).toLowerCase() + m.label.slice(1);
+      return h(
+        'li',
+        { class: won ? 'won' : '' },
+        won ? h('span', { class: 'dare-mark', 'aria-label': 'Logrado' }, '★') : h('span', { class: 'dare-mark', 'aria-hidden': 'true' }, '☆'),
+        ' Si te atreves: ',
+        won ? h('s', {}, label) : label,
+      );
+    }),
+  );
+}
 
 /** Tarjeta del relato: el mapa, el rastro en curso o la página de un rastro resuelto. */
 export class StoryCard {
@@ -49,6 +90,8 @@ export class StoryCard {
   private kind = h('div', { class: 'kind' });
   private quote = h('blockquote', { class: 'trace' });
   private extra = h('p', { class: 'extra' });
+  /** los retos del rastro («Si te atreves: …») */
+  private dares = h('div', { class: 'dares-box' });
   /** listas «qué medir» y «preguntas» de un laboratorio */
   private lists = h('div', { class: 'lab-lists' });
   /** deslizadores del profesor */
@@ -63,7 +106,7 @@ export class StoryCard {
   ) {
     this.minBtn.addEventListener('click', () => this.setCollapsed(!this.card.classList.contains('collapsed')));
     this.text.before(this.kind, this.quote);
-    this.text.after(this.extra, this.lists, this.controls);
+    this.text.after(this.extra, this.dares, this.lists, this.controls);
   }
 
   setCollapsed(c: boolean): void {
@@ -98,6 +141,7 @@ export class StoryCard {
     this.kind.textContent = '';
     this.quote.textContent = '';
     this.extra.replaceChildren();
+    this.dares.replaceChildren();
     this.lists.replaceChildren();
     this.dots.replaceChildren();
     this.eyebrow.removeAttribute('title');
@@ -121,6 +165,7 @@ export class StoryCard {
     // la nota de quien estuvo antes abre el rastro
     if (story.progress.step === 0) this.quote.textContent = `«${site.note}»`;
     this.text.replaceChildren(...rich(story.text()));
+    this.showDares(story, site);
     if (step.choices) {
       this.row.classList.add('choices');
       for (const c of step.choices) {
@@ -133,6 +178,11 @@ export class StoryCard {
     // un paso nuevo siempre se muestra completo
     this.setCollapsed(false);
     this.enter(`${site.id}:${story.progress.step}`);
+  }
+
+  private showDares(story: SiteEngine, site: Site): void {
+    const list = dareList(story, site);
+    this.dares.replaceChildren(...(list ? [list] : []));
   }
 
   private renderFree(): void {
@@ -229,13 +279,12 @@ export class StoryCard {
       this.text.textContent = `Para resolverlo te falta: ${missing.join('; ')}.`;
       this.row.append(this.button('Entrar', true, () => {}, true));
     } else if (st === 'resuelto') {
-      const got = story.stars(site.id).length;
-      this.text.replaceChildren(document.createTextNode('Ya lo resolviste. '), starLine(got, story.maxStars(site)));
-      const todo = (site.mastery ?? []).filter((m) => !story.stars(site.id).includes(m.id));
-      if (todo.length) this.extra.textContent = `Reto pendiente: ${todo.map((m) => m.label.charAt(0).toLowerCase() + m.label.slice(1)).join('; ')}.`;
+      this.text.replaceChildren(document.createTextNode('Ya lo resolviste. '), starLine(story, site));
+      this.showDares(story, site);
       this.row.append(this.button('Repetir', true, () => this.actions.enter(site.id)), this.button('Ver su página', false, () => this.actions.openJournal(site.id)));
     } else {
       this.text.textContent = 'Todavía no lo resuelves.';
+      this.showDares(story, site);
       this.row.append(this.button('Entrar', true, () => this.actions.enter(site.id)));
     }
     this.setCollapsed(false);
@@ -250,13 +299,8 @@ export class StoryCard {
     this.kind.textContent = 'Nueva página en la bitácora';
     this.title.textContent = site.title;
     this.text.replaceChildren(...rich(site.page.law));
-    const got = story.stars(site.id).length;
-    const todo = (site.mastery ?? []).filter((m) => !story.stars(site.id).includes(m.id));
-    this.extra.replaceChildren(
-      ...(done?.measured ? [document.createTextNode(`${done.measured} `)] : []),
-      starLine(got, story.maxStars(site)),
-      ...(todo.length ? [document.createTextNode(` Reto: ${todo.map((m) => m.label.charAt(0).toLowerCase() + m.label.slice(1)).join('; ')}.`)] : []),
-    );
+    this.extra.replaceChildren(...(done?.measured ? [document.createTextNode(`${done.measured} `)] : []), starLine(story, site));
+    this.showDares(story, site);
     // la primera vez que se resuelve el vacío, el mapa se revela
     const first = site.id === 'vacio' && Object.keys(story.progress.solved).length === 1;
     this.row.append(

@@ -227,19 +227,68 @@ describe('la deriva', () => {
   it('«Desde siempre»: se gana el tiempo y la apuesta a t = 4 s da su estrella', () => {
     const { story, world, sim } = setup(having(['vacio', 'particula']));
     story.enter('desde-siempre');
+    // el tiempo se gana después de predecir, no al entrar
+    expect(story.timeSkills().has('flow')).toBe(false);
+    story.choose('recto');
     expect(story.timeSkills().has('flow')).toBe(true);
-    story.progress = { ...story.progress, step: 4 };
     const drifter = world.particles[0];
-    world.addParticle({ x: drifter.pos.x + 4 * drifter.vel.x, y: drifter.pos.y + 4 * drifter.vel.y + 0.2 }, 1);
-    sim.maxTime = 30;
+    const start = { ...drifter.pos };
+    const v = { ...drifter.vel };
+    const run = (seconds: number) => {
+      for (let i = 0; i < 60 * seconds && !story.done; i++) {
+        sim.advance(1 / 60);
+        story.tick();
+      }
+    };
+    sim.start();
+    run(3);
+    // se detuvo solo en t = 1 s y pasó a la explicación de la inercia
+    expect(sim.t).toBeCloseTo(1, 6);
+    expect(sim.running).toBe(false);
+    expect(story.progress.step).toBe(2);
+    story.advance();
+    expect(story.step?.text).toMatch(/apuesta/);
+    // sin marca, el tiempo no pasa de t = 1 s
+    sim.start();
+    run(1);
+    expect(sim.t).toBeCloseTo(1, 6);
+    // la marca se pone (y el lanzamiento vuelve a t = 0, como al colocar una partícula)
+    sim.reset();
+    world.addParticle({ x: start.x + 4 * v.x, y: start.y + 4 * v.y + 0.2 }, 1);
+    sim.start();
+    run(5);
+    expect(story.stars('desde-siempre')).toContain('apuesta');
+    expect(story.progress.step).toBe(4);
+    expect(story.text()).toMatch(/achuntaste/);
+  });
+
+  it('«Desde siempre»: mover la marca después de ver el resultado no cambia la apuesta', () => {
+    const { story, world, sim } = setup(having(['vacio', 'particula']));
+    story.enter('desde-siempre');
+    const drifter = world.particles[0];
+    const start = { ...drifter.pos };
+    const v = { ...drifter.vel };
+    story.progress = { ...story.progress, step: 3 };
+    story.step?.enter?.(story.ctx);
+    // 3 m sobre donde estará a t = 4 s: falla
+    const bet = world.addParticle({ x: start.x + 4 * v.x, y: start.y + 4 * v.y + 3 }, 1);
     sim.start();
     for (let i = 0; i < 60 * 4.4 && !story.done; i++) {
       sim.advance(1 / 60);
       story.tick();
     }
-    expect(story.stars('desde-siempre')).toContain('apuesta');
-    expect(story.progress.step).toBe(5);
-    expect(story.text()).toMatch(/achuntaste/);
+    expect(story.progress.step).toBe(4);
+    expect(story.text()).toMatch(/pasó a 3,00 m de tu marca/);
+    // ya vio dónde estaba: corre la marca justo ahí y deja fluir de nuevo
+    sim.reset();
+    bet.pos = { x: start.x + 4 * v.x, y: start.y + 4 * v.y };
+    sim.start();
+    for (let i = 0; i < 60 * 4.4; i++) {
+      sim.advance(1 / 60);
+      story.tick();
+    }
+    expect(story.stars('desde-siempre')).not.toContain('apuesta');
+    expect(story.text()).not.toMatch(/achuntaste/);
   });
 
   it('«La boya»: hay una velocidad menor que 1,5 m/s que la alcanza', () => {

@@ -62,6 +62,11 @@ export class Simulation {
   onRestart: ((sim: Simulation) => void)[] = [];
   /** Si devuelve true, el lanzamiento termina. */
   shouldStop: (() => boolean) | null = null;
+  /**
+   * Tope para fluir: al llegar a este instante el tiempo se detiene solo, y no pasa de ahí mientras
+   * el tope siga puesto (un rastro lo usa para que el jugador apueste antes de ver el resto).
+   */
+  pauseAt: number | null = null;
   /** Avisa cuando cambia running/finished (para la barra de herramientas). */
   onStateChange: (() => void) | null = null;
 
@@ -246,12 +251,21 @@ export class Simulation {
     if (this.acc < due) return;
     const s = stateFromBodies(this.world.particles, this.t);
     const accel = makeAccel(this.forces, this.world);
+    let capped = false;
     while (this.acc >= due) {
+      if (this.pauseAt !== null && this.t >= this.pauseAt - 1e-9) {
+        capped = true;
+        break;
+      }
       this.acc -= this.dt;
       this.stepOnce(s, accel);
     }
     this.checkEnd();
-    if (this.finished) this.onStateChange?.();
+    if (capped || (this.pauseAt !== null && this.t >= this.pauseAt - 1e-9)) {
+      this.acc = 0;
+      this.running = false;
+    }
+    if (this.finished || !this.running) this.onStateChange?.();
   }
 
   /** Normal de contacto si la partícula está apoyada en una superficie. */

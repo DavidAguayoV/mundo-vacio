@@ -12,6 +12,7 @@ import { applyTheme, loadTheme, readPalette } from './render/theme';
 import { View } from './render/view';
 import { freshProgress, loadProgress, saveProgress, type Progress } from './state/progress';
 import { seedFree } from './story/chapters';
+import { MissMonitor } from './story/missMonitor';
 import { RunMonitor } from './story/runMonitor';
 import { SiteEngine } from './story/siteEngine';
 import { CATCH_DIST, SITES, SITE_IDS, ZONES } from './story/sites';
@@ -99,6 +100,7 @@ export class Game {
   private lastWorldPointer: WorldPointer | null = null;
   private hitFlash = 0;
   private monitor: RunMonitor;
+  private misses: MissMonitor;
   private meter: OscillationMeter;
   private structure = '';
   private last = 0;
@@ -132,6 +134,12 @@ export class Game {
     const stress = opts.stress ?? 0;
     const progress: Progress = stress ? { ...freshProgress(), free: true } : loadProgress(SITE_IDS);
     this.story = new SiteEngine(SITES, ZONES, progress, { world: this.world, view: this.view, sim: this.sim }, stress ? () => {} : saveProgress);
+    // un tiro que no llega dice a qué distancia pasó, mientras acertar todavía cuente en el rastro
+    this.misses = new MissMonitor(this.world, this.sim, (m) => this.toast.show(m, 3600), () => ({
+      targets: this.story.listensFor('target-hit'),
+      buoys: this.story.listensFor('caught'),
+    }));
+    this.sim.onStep.push(() => this.misses.sample());
     this.map = new WorldMap(this.story, {
       select: (id) => this.selectSite(id),
       enter: (id) => this.goToSite(id),
@@ -775,8 +783,9 @@ export class Game {
 
   private wireEvents(): void {
     this.bus.on((ev) => this.story.handle(ev));
-    this.story.onChange = ({ newGrants, newStars, solved }) => {
+    this.story.onChange = ({ newGrants, newStars, solved, notice }) => {
       const site = this.story.site;
+      if (notice) this.toast.show(notice, 5000);
       if (site && newStars?.length) {
         const labels = newStars.map((id) => site.mastery?.find((m) => m.id === id)?.label).filter(Boolean);
         if (labels.length) this.toast.show(`★ ${labels.join(' · ')}`, 3400);
@@ -1049,6 +1058,7 @@ export class Game {
     this.sim.timeScale = this.timeScale;
     this.sim.advance(dt);
     this.monitor.update();
+    this.misses.update();
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - dt);
     if (this.opts.stress && this.sim.finished) this.sim.start();
 

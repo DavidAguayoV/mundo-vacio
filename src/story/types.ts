@@ -54,6 +54,11 @@ export interface Step {
   on: GameEventType | 'end' | 'tick';
   /** condición adicional que debe cumplirse cuando llega el evento */
   when?(ctx: StoryContext): boolean;
+  /**
+   * Cuando llega el evento, si devuelve un texto el paso no se da por cumplido: el texto se muestra
+   * como aviso y pide repetir (por ejemplo, «te pasaste del ángulo justo»).
+   */
+  retry?(ctx: StoryContext): string | null;
   /** se llama al entrar al paso, y también al retomarlo tras recargar la página */
   enter?(ctx: StoryContext): void;
   /** herramientas o habilidades que se ganan al llegar a este paso */
