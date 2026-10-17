@@ -7,6 +7,7 @@ import {
   STAR_PREDICTION,
   STAR_SOLVED,
   TIME_SKILLS,
+  type Choice,
   type ForceSwitch,
   type Grant,
   type LensId,
@@ -45,6 +46,8 @@ export type SiteStatus = 'resuelto' | 'disponible' | 'cerrado';
  * al resolver. Conserva la forma del antiguo motor de capítulos para que el resto del juego no cambie.
  */
 export class SiteEngine {
+  /** lo prestado por el rastro en curso (ver lend) */
+  private lent = new Set<Grant>();
   private seenSinceStep = new Map<GameEventType, number>();
   private seenSinceEnter = new Map<GameEventType, number>();
   private runIds = new Set<number>();
@@ -68,7 +71,7 @@ export class SiteEngine {
         if (id === undefined) return undefined;
         for (const site of this.sites) {
           const step = site.steps.find((st) => st.ask === k);
-          const choice = step?.choices?.find((c) => c.id === id);
+          const choice = step ? this.choices(step).find((c) => c.id === id) : undefined;
           if (choice) return choice.label;
         }
         return undefined;
@@ -204,7 +207,12 @@ export class SiteEngine {
       LENSES.forEach((l) => all.add(`lens:${l}`));
       return all;
     }
-    return new Set(this.progress.have);
+    return new Set([...this.progress.have, ...this.lent]);
+  }
+
+  /** Lo que el rastro en curso presta y el jugador todavía no tiene: se pierde al salir sin resolverlo. */
+  get borrowed(): ReadonlySet<Grant> {
+    return this.lent;
   }
 
   /** Lo que se puede ganar en los rastros abiertos que faltan (el árbol lo marca como «próxima»). */
@@ -254,10 +262,22 @@ export class SiteEngine {
     return null;
   }
 
+  /** Se queda con el jugador para siempre (al resolver el rastro). */
   private give(grants: Iterable<Grant>): Grant[] {
     const have = new Set(this.progress.have);
     const fresh = [...grants].filter((g) => !have.has(g));
     if (fresh.length) this.progress = { ...this.progress, have: [...have, ...fresh] };
+    return fresh;
+  }
+
+  /**
+   * Se presta mientras dure la visita al rastro. Las puertas del mapa miran solo lo que el jugador
+   * tiene de verdad: entrar a un rastro y salir sin resolverlo no abre nada nuevo.
+   */
+  private lend(grants: Iterable<Grant>): Grant[] {
+    const have = this.grants();
+    const fresh = [...grants].filter((g) => !have.has(g));
+    fresh.forEach((g) => this.lent.add(g));
     return fresh;
   }
 
@@ -270,8 +290,9 @@ export class SiteEngine {
     this.progress = { ...this.progress, site: id, step: 0, earned: { ...this.progress.earned, [id]: [] } };
     this.resetCounters();
     this.ctx.sim.pauseAt = null;
+    this.lent.clear();
     site.seed?.(this.ctx);
-    const fresh = this.give(this.siteGrants(site, 0));
+    const fresh = this.lend(this.siteGrants(site, 0));
     site.steps[0]?.enter?.(this.ctx);
     this.save(this.progress);
     this.onChange?.({ newGrants: fresh });
@@ -284,6 +305,7 @@ export class SiteEngine {
     this.progress = { ...this.progress, site: null, step: 0 };
     this.resetCounters();
     this.ctx.sim.pauseAt = null;
+    this.lent.clear();
     this.save(this.progress);
     this.onChange?.({ newGrants: [] });
   }
@@ -294,7 +316,9 @@ export class SiteEngine {
     if (!site) return;
     // si el mundo del rastro se recuperó del autoguardado, no se vuelve a armar encima
     if (seed) site.seed?.(this.ctx);
-    this.give(this.siteGrants(site, this.progress.step));
+    this.lent.clear();
+    if (this.done) this.give(this.siteGrants(site));
+    else this.lend(this.siteGrants(site, this.progress.step));
     this.step?.enter?.(this.ctx);
   }
 
@@ -348,7 +372,19 @@ export class SiteEngine {
     const st = this.step;
     if (!st?.choices) return;
     if (st.ask) this.progress = { ...this.progress, predictions: { ...this.progress.predictions, [st.ask]: id } };
+    // una pregunta con respuesta (no una predicción) puede pedir mirar de nuevo
+    const retry = st.retry?.(this.ctx);
+    if (retry) {
+      this.onChange?.({ newGrants: [], notice: retry });
+      return;
+    }
     this.advance();
+  }
+
+  /** Las opciones del paso en curso (pueden depender del tiro del jugador). */
+  choices(step: Step | null = this.step): Choice[] {
+    if (!step?.choices) return [];
+    return typeof step.choices === 'function' ? step.choices(this.ctx) : step.choices;
   }
 
   advance(): void {
@@ -361,7 +397,7 @@ export class SiteEngine {
       this.solve(site);
       return;
     }
-    const fresh = this.give(site.steps[next].grants ?? []);
+    const fresh = this.lend(site.steps[next].grants ?? []);
     site.steps[next].enter?.(this.ctx);
     this.save(this.progress);
     this.onChange?.({ newGrants: fresh });
@@ -385,6 +421,9 @@ export class SiteEngine {
       ...this.progress,
       solved: { ...this.progress.solved, [site.id]: { stars: [...stars], measured, at: Date.now() } },
     };
+    // lo prestado se queda: ahora sí abre las puertas del mapa
+    this.give(this.siteGrants(site));
+    this.lent.clear();
     this.save(this.progress);
     this.onChange?.({ newGrants: [], newStars: fresh, solved: true });
   }
@@ -393,6 +432,8 @@ export class SiteEngine {
     this.progress = { ...this.progress, free };
     this.resetCounters();
     this.ctx.sim.pauseAt = null;
+    // al volver del laboratorio al rastro en curso, Game llama a resume(), que vuelve a prestar
+    this.lent.clear();
     this.save(this.progress);
     this.onChange?.({ newGrants: [] });
   }
@@ -400,6 +441,7 @@ export class SiteEngine {
   restart(): void {
     this.progress = freshProgress();
     this.resetCounters();
+    this.lent.clear();
     this.save(this.progress);
     this.onChange?.({ newGrants: [] });
   }

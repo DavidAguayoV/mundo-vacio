@@ -111,6 +111,7 @@ const dosSaltos: Site = {
     {
       text: 'Cada flecha es una instrucción: cuánto saltar y hacia dónde. Elige Mover y arrastra la flecha A hasta que su cola quede sobre la sonda.',
       on: 'vector-snapped',
+      tool: 'tool:move',
       when: ({ world }) => world.probeChain().vectors.length >= 1,
     },
     {
@@ -140,6 +141,7 @@ const dosSaltos: Site = {
         largo: 'El largo no importa: cualquier orden llega al mismo punto.',
       }),
       on: 'next',
+      tool: 'tool:vector',
       grants: ['tool:vector', 'tool:sum'],
     },
   ],
@@ -200,6 +202,16 @@ const atajo: Site = {
       on: 'probe-arrived',
       when: ({ world }) => world.probeLog.includes('A,B,C') && world.probeLog.includes('C,B,A'),
     },
+    {
+      id: 'directa',
+      label: 'Dibuja con Vector la flecha que va directo de la sonda a la baliza',
+      on: 'tick',
+      when: ({ world }) => {
+        const probe = world.probe;
+        const goal = world.beacons[0]?.pos;
+        return !!probe && !!goal && world.vectors.some((v) => !v.fixed && dist(v.tail, probe) < 0.3 && dist(v.tip, goal) < 0.3);
+      },
+    },
   ],
 };
 
@@ -222,6 +234,7 @@ const escalar: Site = {
   steps: [
     {
       text: 'Tres copias de A y una B. Llega a la baliza. Pista: toca una flecha con Mover; en el panel la puedes **invertir**.',
+      tool: 'tool:move',
       on: 'probe-arrived',
     },
     {
@@ -367,6 +380,7 @@ const desdeSiempre: Site = {
       text: 'Ganaste el **tiempo**: con ▶ fluye y con ‖ se detiene. Déjalo fluir y mira las marcas: cada punto es su posición cada 0,1 s. Se detendrá solo en t = 1 s.',
       on: 'tick',
       grants: ['time:flow'],
+      tool: 'time:flow',
       enter: (ctx) => {
         // quien ya tenía el tiempo pudo dejarlo correr antes de responder: se vuelve a t = 0
         if (ctx.sim.hasRun && ctx.sim.t > BET_PEEK) ctx.sim.reset();
@@ -386,6 +400,7 @@ const desdeSiempre: Site = {
     {
       text: 'Ahora una apuesta: coloca una partícula donde crees que estará a t = 4 s. El tiempo queda detenido hasta que pongas tu marca; después déjalo fluir.',
       on: 'tick',
+      tool: 'tool:particle',
       enter: holdForBet,
       when: ({ world, sim }) => {
         sim.pauseAt = betMiss(world) === null ? BET_PEEK : null;
@@ -401,17 +416,6 @@ const desdeSiempre: Site = {
       },
       on: 'next',
     },
-    {
-      text: 'Toca t = 0 para volver al inicio y luego +0,1 s para avanzar paso a paso. Selecciona la partícula y mira en el panel cuánto cambia r en cada paso.',
-      on: 'time-step',
-      when: (ctx) => ctx.count('time-step') >= 3,
-      grants: ['time:rewind', 'time:step'],
-    },
-    {
-      text: 'Ganaste los **gráficos**: abajo a la derecha están x(t), y(t), vₓ(t) y v_y(t) de la partícula elegida. Con velocidad constante, x(t) es una recta y vₓ(t) es plana. Vuelve a t = 0 y míralos crecer mientras fluye el tiempo.',
-      on: 'next',
-      grants: ['lens:graphs'],
-    },
   ],
   page: {
     law: 'Sin nada que la empuje, una partícula sigue recto con la misma velocidad: r = r₀ + v t.',
@@ -419,7 +423,7 @@ const desdeSiempre: Site = {
       const v = userVec(ctx, DRIFT_V);
       return `v = ${fmtVec(v, 'm/s')}: avanza ${fmt(len(v))} m cada segundo.`;
     },
-    engineering: 'Algunos países controlan la velocidad por tramo: dos cámaras registran tu auto y se divide la distancia por el tiempo. Lo que miden es tu velocidad media en ese tramo.',
+    engineering: 'Las sondas Voyager viajan desde 1977 con los motores apagados: allá afuera no hay aire ni roce que las frene, y solo la gravedad del Sol las retiene un poco.',
   },
   mastery: [
     {
@@ -429,6 +433,48 @@ const desdeSiempre: Site = {
       when: () => driftBet.miss !== null && driftBet.miss < 0.5,
     },
   ],
+};
+
+/** La misma partícula de «Desde siempre», mirada de a 0,1 s y en gráficos. */
+const cuadro: Site = {
+  id: 'cuadro-a-cuadro',
+  zone: 'deriva',
+  title: 'Cuadro a cuadro',
+  at: zoneAt('deriva', -1, -4.6),
+  note: 'Anoté dónde estaba cada décima de segundo. Los números decían algo que a simple vista no se ve.',
+  needs: ['time:flow'],
+  seed: ({ world }) => {
+    frameAt(world, { x: -7, y: -2 });
+    world.g = null;
+    world.addParticle(DRIFT_START, 1, DRIFT_V).locked = true;
+  },
+  steps: [
+    {
+      text: 'Ganaste dos controles del tiempo: **t = 0** vuelve al inicio y **+0,1 s** avanza un paso. Toca la partícula y avanza de a un paso: mira en el panel cuánto cambia r en cada uno.',
+      on: 'time-step',
+      when: (ctx) => ctx.count('time-step') >= 3,
+      grants: ['time:rewind', 'time:step'],
+      tool: 'time:step',
+    },
+    {
+      text: (ctx) => {
+        const v = userVec(ctx, DRIFT_V);
+        const dr = { x: v.x * 0.1, y: v.y * 0.1 };
+        return `En cada paso, r cambió lo mismo: Δr = ${fmtVec(dr, 'm')}. Dividido por Δt = 0,1 s da v = ${fmtVec(v, 'm/s')}: la **velocidad** es Δr/Δt, y aquí no cambia.`;
+      },
+      on: 'next',
+    },
+    {
+      text: 'Ganaste los **gráficos**: abajo a la derecha están x(t), y(t), vₓ(t) y v_y(t) de la partícula elegida. Con velocidad constante, x(t) es una recta y vₓ(t) es plana. Vuelve a t = 0 y míralos crecer mientras fluye el tiempo.',
+      on: 'next',
+      grants: ['lens:graphs'],
+      tool: 'lens:graphs',
+    },
+  ],
+  page: {
+    law: 'La velocidad es cuánto cambia r en cada intervalo: v = Δr/Δt. Con v constante, x(t) es una recta y vₓ(t) es plana.',
+    engineering: 'Algunos países controlan la velocidad por tramo: dos cámaras registran tu auto y se divide la distancia por el tiempo. Lo que miden es tu velocidad media en ese tramo.',
+  },
 };
 
 export { CATCH_DIST };
@@ -452,6 +498,7 @@ const boya: Site = {
     {
       text: 'Elige **Velocidad** y arrastra desde tu partícula para darle una velocidad. Después deja fluir el tiempo. Si no la alcanzas, vuelve a t = 0 y prueba otra.',
       on: 'caught',
+      tool: 'tool:velocity',
     },
     {
       text: 'La alcanzaste. No apuntaste a donde estaba la boya, sino a donde iba a estar: las dos tenían que llegar al mismo punto en el mismo instante.',
@@ -585,6 +632,7 @@ const luna: Site = {
     {
       text: 'A la derecha, g es la de la Luna: 1,62 m/s². Elige Velocidad, dale una a la partícula de la Luna y deja fluir el tiempo para que caiga en el blanco.',
       on: 'target-hit',
+      tool: 'tool:velocity',
     },
     {
       text: 'Si la partícula de la Tierra sale con exactamente la misma velocidad, ¿hasta dónde llega?',
@@ -600,6 +648,7 @@ const luna: Site = {
     {
       text: 'Le di a la de la Tierra la misma velocidad. Vuelve a t = 0 y deja fluir el tiempo hasta que las dos toquen el suelo.',
       on: 'tick',
+      tool: 'time:rewind',
       enter: (ctx) => {
         const v = moonV0(ctx);
         const earth = ctx.world.particles.find((p) => p.locked);
@@ -731,6 +780,7 @@ const pendiente: Site = {
     {
       text: 'Con Mover, inclina el plano de a poco arrastrando su extremo derecho y deja fluir el tiempo en cada ángulo. Busca el ángulo justo en que la partícula empieza a deslizar; el panel del plano muestra α.',
       on: 'slid',
+      tool: 'tool:move',
       retry: ({ world }) => {
         const a = slopeAngle(world);
         if (a === null || a - CRITICAL_DEG <= OVERSHOOT_DEG) return null;
@@ -936,6 +986,7 @@ const paracaidas: Site = {
   steps: [
     {
       text: `Esta partícula se rompe si toca el suelo a más de ${fmt(SAFE_LANDING, 1)} m/s. Haz que aterrice suave: puedes cambiar el Medio en la barra y su masa en el panel. Si llega muy rápido, vuelve a t = 0 y prueba otra cosa.`,
+      tool: 'force:drag',
       on: 'tick',
       when: (ctx) => {
         const v = watchLanding(ctx);
@@ -984,6 +1035,7 @@ const altura: Site = {
   steps: [
     {
       text: 'Lánzala hacia arriba con Velocidad para que se detenga justo dentro del blanco, 5 m más arriba. Mira las barras de energía: arriba, toda la K se volvió Ug.',
+      tool: 'tool:velocity',
       on: 'tick',
       when: ({ world, sim }) => {
         const p = world.particles[0];
@@ -1049,6 +1101,7 @@ const adonde: Site = {
     {
       text: 'Esta caja de 1 kg sale a 4 m/s por un suelo con roce, y se va a detener. Enciende el lente Energía. Cuando se detenga, ¿qué habrá pasado con el total?',
       on: 'end',
+      tool: 'lens:energy',
       ask: 'calor',
       correct: 'igual',
       choices: [
@@ -1090,6 +1143,18 @@ const adonde: Site = {
         return !!p && !!v0 && p.mass >= 2 && Math.abs(len(v0) - 4) < 1e-6 && stopped(ctx);
       },
     },
+    {
+      id: 'mitad',
+      label: 'Con la línea de tiempo, encuentra el instante en que Q iguala a K',
+      on: 'timeline-seek',
+      when: ({ world, sim }) => {
+        const p = world.particles[0];
+        if (!p || !sim.hasRun) return false;
+        const K = 0.5 * p.mass * (p.vel.x ** 2 + p.vel.y ** 2);
+        const Q = sim.heat;
+        return K > 0.2 && Math.abs(Q - K) <= 0.05 * (K + Q);
+      },
+    },
   ],
 };
 
@@ -1110,6 +1175,7 @@ const golpe: Site = {
   steps: [
     {
       text: 'La caja está 2 m sobre el suelo. Con el lente Energía encendido, suéltala y mira las barras justo cuando toca el suelo.',
+      tool: 'lens:energy',
       on: 'tick',
       when: (ctx) => stopped(ctx) && ctx.sim.heat > 0,
     },
@@ -1168,6 +1234,7 @@ const marca: Site = {
       text: 'Dale velocidad con Velocidad para que se detenga dentro de la baliza, 3 m más allá. Si te pasas o te quedas corto, vuelve a t = 0 y prueba de nuevo.',
       on: 'tick',
       when: (ctx) => stopped(ctx) && dist(ctx.world.particles[0].pos, MARCA) < 0.35,
+      tool: 'tool:velocity',
     },
     {
       text: reveal('frenado', `Se detuvo ahí. Toda su K se va en el calor del roce: ½ m v² = μc m g d, así que **d = v² / (2 μc g)**. Con el doble de rapidez llega cuatro veces más lejos, y la masa no importa. Para 3 m hacía falta v = √(2 μc g d) ≈ ${fmt(Math.sqrt(2 * HEAT_MU_K * G_EARTH * 3))} m/s.`, {
@@ -1223,6 +1290,7 @@ const balanza: Site = {
   steps: [
     {
       text: 'Con Partícula, toca la barra para poner pesas de 1 kg; tocar la misma marca suma otro kilo, y con Mover las corres. Logra que el balancín se quede derecho cuando dejes fluir el tiempo. Toca la barra con Mover para ver cada pesa y su distancia al eje.',
+      tool: 'tool:particle',
       on: 'tick',
       when: (ctx) => balanced(ctx) && ctx.world.bodies[0].loads.length >= 2,
     },
@@ -1266,6 +1334,7 @@ const palanca: Site = {
   steps: [
     {
       text: 'Corre el apoyo (el triángulo) a lo largo de la barra con Mover. Busca dónde ponerlo para que 1 kg levante los 5 kg, y deja fluir el tiempo.',
+      tool: 'tool:move',
       on: 'tick',
       when: ({ world, sim }) => {
         const b = world.bodies[0];
@@ -1453,6 +1522,7 @@ export const SITES: Site[] = [
   escalar,
   ejesAjenos,
   desdeSiempre,
+  cuadro,
   boya,
   fromChapter('abajo', {
     zone: 'pozo',
@@ -1467,6 +1537,13 @@ export const SITES: Site[] = [
         on: 'fell',
         when: ({ world }) => !!world.g && Math.abs(world.g.x) > Math.abs(world.g.y),
       },
+      {
+        // solo con +0,1 s se cae justo en el instante: fluyendo, la pausa nunca queda exacta
+        id: 'paso',
+        label: 'Con +0,1 s, detente justo cuando su rapidez llega a 9,80 m/s',
+        on: 'time-step',
+        when: ({ world }) => world.particles.some((q) => Math.abs(len(q.vel) - G_EARTH) < 0.02),
+      },
     ],
   }),
   rincon,
@@ -1475,7 +1552,8 @@ export const SITES: Site[] = [
     zone: 'pozo',
     at: zoneAt('pozo', 0.5, 4.5),
     note: 'Nunca le acerté a este blanco. Siempre me quedé corto o me pasé.',
-    needs: ['tool:gravity', 'tool:velocity'],
+    // la cima se lee en vₓ(t): hacen falta los gráficos de «Cuadro a cuadro»
+    needs: ['tool:gravity', 'tool:velocity', 'lens:graphs'],
     law: 'En un tiro, la parte de v perpendicular a g no cambia; en la cima solo se anula la parte a lo largo de g.',
     mastery: [
       {

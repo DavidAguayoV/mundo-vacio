@@ -1,4 +1,4 @@
-import type { ForceSwitch, LensId, TimeSkill } from '../story/types';
+import type { ForceSwitch, Grant, LensId, TimeSkill } from '../story/types';
 import { ICONS } from '../tools/icons';
 import type { Tool, ToolId } from '../tools/tool';
 import { $, h } from './dom';
@@ -20,6 +20,19 @@ export interface ToolbarState {
   timeScale: number;
   /** herramientas o habilidades recién ganadas: brillan un momento */
   fresh?: readonly string[];
+  /** lo que pide la tarjeta (Step.tool): queda a la vista, fuera de «Más», y destacado */
+  wanted?: Grant | null;
+}
+
+/** El botón de la barra que corresponde a algo que se gana («tool:velocity» → [data-tool="velocity"]). */
+function selectorOf(g: Grant): string | null {
+  const [kind, id] = g.split(':');
+  if (kind === 'tool') return `[data-tool="${id}"]`;
+  if (kind === 'force') return `[data-switch="${id}"]`;
+  if (kind === 'lens') return `[data-lens="${id}"]`;
+  // la línea de tiempo no está en la barra
+  if (kind === 'time' && id !== 'timeline') return `[data-cmd="${id}"]`;
+  return null;
 }
 
 export interface ToolbarActions {
@@ -188,6 +201,16 @@ export class Toolbar {
 
     const labeled = s.tools.length <= LABELED_MAX && !s.switches?.length && !s.lenses?.length;
     this.bar.classList.toggle('labeled', labeled);
+    // dentro de un rastro (con herramientas y tiempo), a la derecha basta un botón: el resto va a «Más»
+    this.bar.classList.toggle('working', s.tools.length > 0 && s.time.size > 0);
+    // lo que pide la tarjeta se destaca (y layout() no lo manda a «Más»)
+    const sel = s.wanted ? selectorOf(s.wanted) : null;
+    for (const b of [...this.toolItems, ...time]) {
+      const want = !!sel && b.matches(sel);
+      b.classList.toggle('wanted', want);
+      if (want) b.setAttribute('aria-description', 'La tarjeta pide usar esto');
+      else b.removeAttribute('aria-description');
+    }
     this.setMenu(false);
     this.layout();
   }
@@ -216,11 +239,12 @@ export class Toolbar {
     }
     if (!fits(tools) || overflow.length) {
       tools.insertBefore(this.more, this.menu);
+      // lo que pide la tarjeta nunca se esconde; la herramienta elegida, solo si no hay otra salida
+      // (un interruptor o un lente encendido sí puede ir a «Más»: ahí se ve encendido)
+      const buttons = () => [...tools.children].filter((c): c is HTMLButtonElement => c instanceof HTMLButtonElement && c !== this.more && !c.classList.contains('wanted'));
+      const isActiveTool = (c: HTMLButtonElement) => !!c.dataset.tool && c.getAttribute('aria-pressed') === 'true';
       while (!fits(tools)) {
-        const movable = [...tools.children].filter(
-          (c): c is HTMLButtonElement => c instanceof HTMLButtonElement && c !== this.more && c.getAttribute('aria-pressed') !== 'true',
-        );
-        const victim = movable.at(-1);
+        const victim = buttons().filter((c) => !isActiveTool(c)).at(-1) ?? buttons().at(-1);
         if (!victim) break;
         overflow.unshift(victim);
         victim.remove();
@@ -239,7 +263,7 @@ export class Toolbar {
     this.bar.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach((b) => {
       b.setAttribute('aria-pressed', String(b.dataset.tool === id));
     });
-    // la herramienta activa siempre queda a la vista
+    // la herramienta activa queda a la vista (salvo que no quepa junto a la que pide la tarjeta)
     if (this.menu.querySelector(`[data-tool="${id}"]`)) this.layout();
   }
 

@@ -27,6 +27,44 @@ export interface MapActions {
   enter(id: string): void;
 }
 
+/** Distancia (unidades del mapa) hasta la que una zona cuenta como vecina de una abierta. */
+const NEIGHBOR = 20;
+
+/**
+ * Zonas que llevan nombre en el mapa: las abiertas (el claro y las que tienen algún rastro
+ * disponible o resuelto) y sus vecinas. El resto se ve como puntos atenuados, sin nombre.
+ */
+export function namedZones(story: SiteEngine): Set<string> {
+  const open = story.zones.filter((z) => z.id === 'claro' || story.sites.some((s) => s.zone === z.id && story.status(s) !== 'cerrado'));
+  const out = new Set(open.map((z) => z.id));
+  for (const z of story.zones) if (open.some((o) => Math.hypot(o.at.x - z.at.x, o.at.y - z.at.y) <= NEIGHBOR)) out.add(z.id);
+  return out;
+}
+
+/** Un rectángulo en píxeles de pantalla. */
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const overlaps = (a: Box, b: Box, pad = 2) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
+
+/**
+ * Qué etiquetas se muestran: recorre `boxes` en orden de prioridad y se queda con las que caben
+ * enteras en la pantalla (W × H) y no pisan a una ya elegida ni a lo que está en `taken`.
+ */
+export function pickLabels(boxes: Box[], W: number, H: number, taken: Box[] = []): boolean[] {
+  const kept = [...taken];
+  return boxes.map((b) => {
+    const inside = b.x >= 0 && b.y >= 0 && b.x + b.w <= W && b.y + b.h <= H;
+    if (!inside || kept.some((k) => overlaps(k, b))) return false;
+    kept.push(b);
+    return true;
+  });
+}
+
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
@@ -48,6 +86,12 @@ export class WorldMap {
   private stars = makeStars(160);
   private flight: Flight | null = null;
   selected: string | null = null;
+  /** zonas con nombre (ver namedZones); se recalcula en refresh() */
+  private named = new Set<string>();
+  /** rótulos de zona dibujados en este cuadro: los nombres de los rastros no se les montan */
+  private zoneBoxes: Box[] = [];
+  /** vista y avance con que se repartieron los nombres por última vez */
+  private labelKey = '';
 
   constructor(
     private story: SiteEngine,
@@ -81,12 +125,16 @@ export class WorldMap {
 
   /** Estado de cada marcador (llamar cuando cambia el avance o la selección). */
   refresh(): void {
+    this.named = namedZones(this.story);
+    this.labelKey = '';
     for (const s of this.story.sites) {
       const b = this.markers.get(s.id)!;
       const st = this.story.status(s);
       const stars = this.story.stars(s.id).length;
       const max = this.story.maxStars(s);
-      b.className = `site-marker ${st}${this.selected === s.id ? ' selected' : ''}`;
+      // en una zona sin nombre, el rastro es solo un punto atenuado (el nombre aparece al enfocarlo)
+      const quiet = !this.named.has(s.zone) && this.selected !== s.id;
+      b.className = `site-marker ${st}${this.selected === s.id ? ' selected' : ''}${quiet ? ' quiet' : ''}`;
       b.setAttribute('aria-pressed', String(this.selected === s.id));
       const zone = this.story.zone(s.zone)?.name ?? '';
       const what = st === 'resuelto' ? `resuelto, ${stars} de ${max} estrellas` : st === 'disponible' ? 'disponible' : 'todavía cerrado';
@@ -127,7 +175,8 @@ export class WorldMap {
   private tickFlight(now: number): void {
     const f = this.flight;
     if (!f) return;
-    const t = Math.min(1, (now - f.t0) / f.dur);
+    // el tiempo de un cuadro puede ser algo anterior al instante en que empezó el vuelo
+    const t = Math.min(1, Math.max(0, (now - f.t0) / f.dur));
     const k = ease(t);
     // el zoom se interpola en escala logarítmica: se siente parejo al acercarse
     const z = Math.exp(Math.log(f.from.zoom) + (Math.log(f.to.zoom) - Math.log(f.from.zoom)) * k);
@@ -197,21 +246,98 @@ export class WorldMap {
         ctx.lineCap = 'butt';
         ctx.globalAlpha = 1;
       }
-      // nombre de la zona y qué física hay allí, sobre el rastro más alto de la zona
-      const top = Math.max(z.at.y + 1, ...sites.map((s) => s.at.y)) - z.at.y + 2.6;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      ctx.globalAlpha = solved || open ? 0.95 : 0.45;
+      // una zona sin nombre es un punto atenuado
+      if (!this.named.has(z.id)) {
+        ctx.fillStyle = pal.muted;
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+    this.drawZoneLabels(ctx, pal);
+    this.placeMarkers();
+  }
+
+  /** La tarjeta y la barra tapan el mapa: ningún rótulo ni nombre se dibuja debajo. */
+  private uiBoxes(): Box[] {
+    const out: Box[] = [];
+    const origin = this.layer.getBoundingClientRect();
+    const add = (r: DOMRect) => {
+      if (r.width && r.height) out.push({ x: r.left - origin.left - 6, y: r.top - origin.top - 6, w: r.width + 12, h: r.height + 12 });
+    };
+    // de la tarjeta, solo lo escrito (cada renglón con su largo real) y sus botones: el resto de su caja es vacío
+    const card = document.getElementById('card');
+    if (card && !card.hidden && this.view.W <= 700) {
+      // en el celular la tarjeta lleva un fondo a todo el ancho que llega bajo los botones
+      const r = card.getBoundingClientRect();
+      add(new DOMRect(0, r.top, this.view.W, r.height + 28));
+    } else if (card && !card.hidden) {
+      const range = document.createRange();
+      for (const el of card.querySelectorAll<HTMLElement>('.eyebrow, h1, p, blockquote')) {
+        if (!el.textContent?.trim() || !el.offsetParent) continue;
+        range.selectNodeContents(el);
+        for (const r of range.getClientRects()) add(r);
+      }
+      card.querySelectorAll<HTMLElement>('button').forEach((b) => b.offsetParent && add(b.getBoundingClientRect()));
+    }
+    // de la barra, sus botones (la zona vacía del medio no tapa nada)
+    document.querySelectorAll<HTMLElement>('#bar .tool').forEach((b) => b.offsetParent && add(b.getBoundingClientRect()));
+    return out;
+  }
+
+  /**
+   * Nombre de cada zona con nombre y qué física hay allí, sobre su rastro más alto. Se corren hacia
+   * adentro si quedarían cortados en el borde, y si dos se pisan queda el de la zona abierta.
+   */
+  private drawZoneLabels(ctx: CanvasRenderingContext2D, pal: Palette): void {
+    const v = this.view;
+    const nameFont = `italic 400 ${Math.round(Math.min(30, Math.max(17, v.S * 0.75)))}px ${pal.serif}`;
+    const hintFont = `400 11.5px ${pal.sans}`;
+    const nameSize = Math.round(Math.min(30, Math.max(17, v.S * 0.75)));
+    const items = this.story.zones
+      .filter((z) => this.named.has(z.id))
+      .map((z) => {
+        const sites = this.story.sites.filter((s) => s.zone === z.id);
+        const lit = sites.some((s) => this.story.status(s) !== 'cerrado');
+        const top = Math.max(z.at.y + 1, ...sites.map((s) => s.at.y)) - z.at.y + 2.6;
+        const yName = v.sy(z.at.y) - top * v.S - 14;
+        const yHint = v.sy(z.at.y) - top * v.S + 2;
+        ctx.font = nameFont;
+        const wName = ctx.measureText(z.name).width;
+        ctx.font = hintFont;
+        const wHint = ctx.measureText(z.hint).width;
+        const w = Math.max(wName, wHint);
+        // corrido hacia adentro: el nombre nunca queda cortado en el borde
+        const x = Math.min(Math.max(v.sx(z.at.x), w / 2 + 8), v.W - w / 2 - 8);
+        const box: Box = { x: x - w / 2, y: yName - nameSize * 0.85, w, h: yHint + 3 - (yName - nameSize * 0.85) };
+        return { z, lit, x, yName, yHint, box };
+      })
+      // primero el claro y las zonas abiertas; después las vecinas
+      .sort((a, b) => Number(b.z.id === 'claro') - Number(a.z.id === 'claro') || Number(b.lit) - Number(a.lit));
+    // los puntos de los rastros no quedan bajo un rótulo: si pisa uno, el rótulo sube un poco
+    const dots: Box[] = this.story.sites.map((s) => ({ x: v.sx(s.at.x) - 8, y: v.sy(s.at.y) - 8, w: 16, h: 16 }));
+    this.zoneBoxes = [...this.uiBoxes()];
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    items.forEach((it) => {
+      const lift = [0, 14, 28, 42, 56, -14, -28].find((dy) => pickLabels([{ ...it.box, y: it.box.y - dy }], v.W, v.H, [...this.zoneBoxes, ...dots])[0]);
+      if (lift === undefined) return;
+      it.box = { ...it.box, y: it.box.y - lift };
+      it.yName -= lift;
+      it.yHint -= lift;
+      this.zoneBoxes.push(it.box);
+      ctx.globalAlpha = it.lit ? 0.95 : 0.5;
       ctx.fillStyle = pal.ink;
-      ctx.font = `italic 400 ${Math.round(Math.min(30, Math.max(17, v.S * 0.75)))}px ${pal.serif}`;
-      ctx.fillText(z.name, x, y - top * v.S - 14);
+      ctx.font = nameFont;
+      ctx.fillText(it.z.name, it.x, it.yName);
       ctx.globalAlpha *= 0.75;
       ctx.fillStyle = pal.muted;
-      ctx.font = `400 11.5px ${pal.sans}`;
-      ctx.fillText(z.hint, x, y - top * v.S + 2);
-      ctx.globalAlpha = 1;
-    }
-    this.placeMarkers();
+      ctx.font = hintFont;
+      ctx.fillText(it.z.hint, it.x, it.yHint);
+    });
+    ctx.globalAlpha = 1;
   }
 
   private placeMarkers(): void {
@@ -221,6 +347,55 @@ export class WorldMap {
       const t = `translate(${Math.round(v.sx(s.at.x))}px, ${Math.round(v.sy(s.at.y))}px)`;
       if (b.style.transform !== t) b.style.transform = t;
     }
+    const key = `${v.center.x.toFixed(2)}|${v.center.y.toFixed(2)}|${v.zoom.toFixed(3)}|${v.W}|${v.H}|${this.selected}`;
+    if (key !== this.labelKey && !this.layer.hidden) {
+      this.labelKey = key;
+      this.layoutNames();
+    }
+  }
+
+  /**
+   * Nombres de los rastros: el elegido siempre; después los disponibles, los resueltos y los
+   * cerrados, cada uno solo si cabe entero en la pantalla y no pisa un rótulo de zona, otro nombre
+   * ni el punto de otro rastro. Los que no caben aparecen al pasar el mouse o al enfocarlos.
+   */
+  private layoutNames(): void {
+    const origin = this.layer.getBoundingClientRect();
+    const rel = (r: DOMRect): Box => ({ x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height });
+    const rank = { disponible: 1, resuelto: 2, cerrado: 3 } as const;
+    const cx = this.view.W / 2;
+    const cy = this.view.H / 2;
+    const entries = this.story.sites
+      .map((s) => ({ s, b: this.markers.get(s.id)! }))
+      .filter(({ b }) => !b.classList.contains('quiet'));
+    entries.forEach(({ b }) => b.classList.remove('nameless'));
+    const dots = this.story.sites.map((s) => rel(this.markers.get(s.id)!.querySelector('.dot')!.getBoundingClientRect()));
+    const boxOf = (b: HTMLButtonElement): Box => {
+      const parts = [b.querySelector('.name')!, b.querySelector('.stars')!].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
+      const left = Math.min(...parts.map((r) => r.left));
+      const top = Math.min(...parts.map((r) => r.top));
+      const right = Math.max(...parts.map((r) => r.right));
+      const bottom = Math.max(...parts.map((r) => r.bottom));
+      return rel(new DOMRect(left, top, right - left, bottom - top));
+    };
+    const ordered = entries
+      .map((e) => ({ ...e, box: boxOf(e.b), sel: e.s.id === this.selected }))
+      .sort(
+        (a, b) =>
+          Number(b.sel) - Number(a.sel) ||
+          rank[this.story.status(a.s)] - rank[this.story.status(b.s)] ||
+          Math.hypot(a.box.x - cx, a.box.y - cy) - Math.hypot(b.box.x - cx, b.box.y - cy),
+      );
+    // el elegido se muestra siempre; los demás, si caben
+    const forced = ordered.filter((o) => o.sel).map((o) => o.box);
+    const rest = ordered.filter((o) => !o.sel);
+    const show = pickLabels(
+      rest.map((o) => o.box),
+      this.view.W,
+      this.view.H,
+      [...this.zoneBoxes, ...forced, ...dots],
+    );
+    rest.forEach((o, k) => o.b.classList.toggle('nameless', !show[k]));
   }
 
   // ---------- puntero sobre el mapa ----------

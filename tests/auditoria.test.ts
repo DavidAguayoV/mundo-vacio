@@ -95,7 +95,7 @@ describe('cierre de las predicciones', () => {
 });
 
 describe('«Al blanco»', () => {
-  const ready = ['vacio', 'particula', 'desde-siempre', 'boya', 'abajo'];
+  const ready = ['vacio', 'particula', 'desde-siempre', 'cuadro-a-cuadro', 'boya', 'abajo'];
 
   it('pregunta por la cima antes de entregar la línea de tiempo', () => {
     const { story } = setup(having(ready));

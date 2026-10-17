@@ -21,6 +21,8 @@ export type GameEvent =
   | { type: 'slow-set' }
   | { type: 'coasted' }
   | { type: 'peak-found' }
+  /** el jugador recorrió el lanzamiento con la línea de tiempo */
+  | { type: 'timeline-seek' }
   | { type: 'spring-made' }
   | { type: 'spring-stretched' }
   | { type: 'oscillated' }

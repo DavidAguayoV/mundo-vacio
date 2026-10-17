@@ -1,3 +1,4 @@
+import { fmt } from '../core/format';
 import { G_GAME } from '../physics/forces/gravitation';
 import { ReferenceFrame } from '../world/frame';
 import { G_EARTH } from '../world/world';
@@ -118,6 +119,41 @@ export function spawnTarget(ctx: StoryContext): void {
   world.targets = [{ id: world.newId('t'), pos: t, radius: 0.45 }];
 }
 
+/**
+ * vₓ en la cima del tiro del jugador, en sus ejes: en la cima la velocidad es perpendicular a g, así
+ * que es la parte de v₀ perpendicular a g (esa parte no cambia en todo el vuelo). Null si no hay tiro.
+ */
+export function peakVx({ world, sim }: StoryContext): { vx: number; v0: { x: number; y: number } } | null {
+  const p = world.particles.find((q) => !q.locked);
+  const v0 = p ? sim.initialState(p.id)?.vel : undefined;
+  const g = world.g;
+  if (!v0 || !g) return null;
+  const gL = Math.hypot(g.x, g.y) || 1;
+  const along = (v0.x * g.x + v0.y * g.y) / gL;
+  const perp = { x: v0.x - (along * g.x) / gL, y: v0.y - (along * g.y) / gL };
+  const frame = world.frame ?? new ReferenceFrame();
+  return { vx: frame.toUser(perp).x, v0: frame.toUser(v0) };
+}
+
+/**
+ * Opciones para «¿cuánto vale vₓ en la cima?»: la correcta y dos confusiones típicas (cero, como si
+ * se detuviera; v_y al salir, o la rapidez al salir), ordenadas de menor a mayor para no delatar cuál es.
+ */
+export function peakChoices(ctx: StoryContext): { id: string; label: string }[] {
+  const r = peakVx(ctx);
+  if (!r) return [{ id: 'sin-tiro', label: 'Vuelve a lanzar para leerlo' }];
+  const label = (v: number) => `${fmt(v)} m/s`;
+  const opts: { id: string; v: number }[] = [{ id: 'vx', v: r.vx }];
+  for (const [id, v] of [
+    ['cero', 0],
+    ['vy0', r.v0.y],
+    ['rapidez', Math.hypot(r.v0.x, r.v0.y)],
+  ] as const) {
+    if (opts.length < 3 && opts.every((o) => label(o.v) !== label(v))) opts.push({ id, v });
+  }
+  return opts.sort((a, b) => a.v - b.v).map((o) => ({ id: o.id, label: label(o.v) }));
+}
+
 // ---------- ayudas para escribir los pasos ----------
 
 /** Tarjeta que retoma una predicción: texto común y una línea según lo que eligió el jugador. */
@@ -155,6 +191,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Esto es un espacio vacío. Sin un punto de referencia no hay un «aquí» ni un «allá»: nada tiene posición. Toca en cualquier lugar para fijar un **origen**.',
         on: 'origin-placed',
+        tool: 'tool:origin',
       },
       {
         text: 'Ahora tienes un **sistema de referencia**: un origen y dos ejes perpendiculares. ¿Tiene que apuntar x a la derecha? Arrastra el círculo en la punta del eje x y gíralos.',
@@ -177,6 +214,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: '¿Qué es lo más simple que puede existir? Un punto con masa y nada más: una **partícula**. Elige Partícula y coloca una.',
         on: 'particle-placed',
+        tool: 'tool:particle',
       },
       {
         text: 'La flecha punteada que va del origen a la partícula es su **vector posición** r; el panel muestra sus componentes en tus ejes. Coloca una segunda partícula.',
@@ -197,6 +235,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Compruébalo: elige Mover y arrastra el origen a otro lugar.',
         on: 'origin-moved',
+        tool: 'tool:move',
       },
       {
         text: reveal('origen', 'Las partículas no se movieron, pero sus vectores r cambiaron. La posición no es una propiedad de la partícula: depende de quién mide y desde dónde.', {
@@ -226,6 +265,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Lo que se mueve en el vacío sigue recto para siempre. Pero lo que sueltas en la vida real cae. ¿Dónde es abajo? Elige Gravedad y arrastra en la dirección en que crees que caen las cosas.',
         on: 'g-set',
+        tool: 'tool:gravity',
       },
       {
         text: '**Abajo** es la dirección de g, no el borde de tu pantalla. Aquí hay dos partículas a la misma altura: una de 1 kg y otra de 4 kg. Si dejas fluir el tiempo, ¿cuál cae más rápido?',
@@ -259,6 +299,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Mira las marcas: ya no quedan igual de separadas, porque la velocidad cambia. Ganaste la **cámara lenta**: vuelve a t = 0, elige ×½ o ×¼ y deja fluir el tiempo otra vez.',
         on: 'fell',
+        tool: 'time:slow',
         when: (ctx) => ctx.seen('slow-set'),
         grants: ['time:slow'],
         enter: ensureG,
@@ -287,6 +328,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Ahora junta lo que tienes: una velocidad inicial y la gravedad. Apareció un blanco. Dale a una partícula la velocidad justa con Velocidad y deja fluir el tiempo.',
         on: 'target-hit',
+        tool: 'tool:velocity',
         enter: (ctx) => {
           ensureG(ctx);
           if (!ctx.world.targets.length) spawnTarget(ctx);
@@ -307,8 +349,19 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Compruébalo. Ganaste la **línea de tiempo**: arrástrala para recorrer el vuelo hacia adelante y hacia atrás, y detente en el punto más alto.',
         on: 'peak-found',
+        tool: 'time:timeline',
         grants: ['time:timeline'],
         enter: ensureG,
+      },
+      {
+        // solo se responde leyendo vₓ(t): las opciones salen del tiro del jugador, en sus ejes
+        text: 'Ahora léelo en un gráfico. Enciende el lente **Gráficos** y mira vₓ(t): ¿cuánto vale vₓ en la cima?',
+        on: 'end',
+        ask: 'vx-cima',
+        tool: 'lens:graphs',
+        choices: (ctx) => peakChoices(ctx),
+        retry: (ctx) =>
+          ctx.prediction('vx-cima') === 'vx' ? null : 'Mira de nuevo vₓ(t): busca en el gráfico el instante de la cima y lee el valor ahí.',
       },
       {
         text: reveal('cima', 'Mira la flecha cian: en el punto más alto queda perpendicular a g. La velocidad no es cero; lo que se anula es su parte a lo largo de g. La otra parte no cambió en todo el vuelo, porque nada empuja de lado.', {
@@ -338,6 +391,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Hasta ahora nada detenía una caída. Elige Superficie y arrastra para dibujar un suelo bajo las partículas.',
         on: 'surface-drawn',
+        tool: 'tool:surface',
       },
       {
         text: 'Cuando la partícula llegue al suelo, ¿por qué no lo atraviesa?',
@@ -368,6 +422,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Con Mover, arrastra un extremo de la superficie para inclinarla un poco y deja fluir el tiempo. ¿Se queda quieta en la pendiente?',
         on: 'held',
+        tool: 'tool:move',
         enter: ensureSurface,
       },
       {
@@ -406,6 +461,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Un resorte hace algo que ninguna fuerza anterior hacía: tira o empuja según cuánto lo deformes. Quitamos el suelo para que nada estorbe. Elige Resorte y arrastra desde un punto vacío, que quedará fijo, hasta una partícula.',
         on: 'spring-made',
+        tool: 'tool:spring',
       },
       {
         text: 'Antes de estirarlo: si lo estiras el doble, ¿con cuánta fuerza tira?',
@@ -422,6 +478,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Compruébalo con el tiempo detenido: con Mover, arrastra la partícula para estirar el resorte y toca el resorte para ver ΔL y |F| en el panel. Estíralo un poco, y después el doble.',
         on: 'spring-stretched',
+        tool: 'tool:move',
         when: (ctx) => ctx.count('spring-stretched') >= 2,
         enter: ensureSpring,
       },
@@ -459,6 +516,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Compruébalo: vuelve a t = 0, arrastra la partícula para estirar más el resorte y deja fluir el tiempo. Compara T.',
         on: 'oscillated',
+        tool: 'tool:move',
         when: (ctx) => ctx.seen('spring-stretched'),
         enter: ensureSpring,
       },
@@ -486,6 +544,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Compruébalo: vuelve a t = 0, toca la partícula del resorte y duplica su masa dos veces con +. Deja fluir el tiempo.',
         on: 'oscillated',
+        tool: 'time:rewind',
         when: (ctx) => ctx.seen('mass-changed'),
         enter: ensureSpring,
       },
@@ -525,6 +584,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Lejos de la Tierra no hay un «abajo»: aquí apagamos g. Quedan dos partículas, una de 64 kg y otra de 1 kg. Newton se preguntó si lo que hace caer una manzana es lo mismo que mantiene a la Luna dando vueltas. Enciende la **Atracción** entre masas en la barra.',
         on: 'gravitation-on',
+        tool: 'force:gravitation',
       },
       {
         text: 'Las dos están en reposo. Si dejas fluir el tiempo, ¿qué pasa?',
@@ -555,6 +615,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Vuelve a t = 0. Con Velocidad, dale a la de 1 kg una velocidad de lado, perpendicular a la línea que las une. ¿Logras que dé una vuelta completa sin chocar ni escaparse?',
         on: 'orbited',
+        tool: 'tool:velocity',
         enter: ensureGravitation,
       },
       {
@@ -577,6 +638,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Pruébalo: vuelve a t = 0 y dale bastante más velocidad.',
         on: 'escaped',
+        tool: 'tool:velocity',
         enter: ensureGravitation,
       },
       {
@@ -617,6 +679,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'En el capítulo 5 todo caía igual, sin importar su masa. Pero una pluma y una piedra no caen igual. ¿Qué falta? El aire. Cambia el **Medio** en la barra a aire.',
         on: 'medium-set',
+        tool: 'force:drag',
       },
       {
         text: 'Las mismas dos partículas, de 1 kg y 4 kg, ahora en aire. Si dejas fluir el tiempo, ¿cuál llega primero abajo?',
@@ -647,6 +710,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Vuelve a t = 0 y mira la flecha v de la de 1 kg mientras cae; usa la cámara lenta si quieres. ¿Sigue creciendo?',
         on: 'terminal',
+        tool: 'time:slow',
         enter: ensureAir,
       },
       {
@@ -669,6 +733,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Cambia el Medio a agua, vuelve a t = 0 y deja fluir el tiempo.',
         on: 'terminal',
+        tool: 'force:drag',
         when: (ctx) => ctx.world.medium === 'agua',
       },
       {
@@ -709,6 +774,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Ya sabes cómo se mueve todo. Ahora una pregunta distinta: mientras r, v y a cambian, ¿hay algo que **no** cambie? Activa el lente **Energía** en la barra.',
         on: 'lens-on',
+        tool: 'lens:energy',
       },
       {
         text: 'La barra K es la **energía cinética**, ½ m v²: crece con la rapidez. La barra Ug es la **energía potencial gravitatoria**, m g h: crece con la altura h sobre tu origen. Antes de soltar la partícula: ¿qué hace la suma?',
@@ -736,6 +802,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Usa la línea de tiempo: en cualquier instante, el total es el mismo. Ahora vuelve a t = 0, lánzala hacia arriba con Velocidad y deja fluir el tiempo.',
         on: 'fell',
+        tool: 'tool:velocity',
         when: (ctx) => ctx.seen('v-set'),
       },
       {
@@ -752,6 +819,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Vuelve a t = 0, mueve el origen con Mover y deja fluir el tiempo otra vez.',
         on: 'fell',
+        tool: 'tool:move',
         when: (ctx) => ctx.seen('origin-moved'),
       },
       {
@@ -765,6 +833,7 @@ export const CHAPTERS: Chapter[] = [
       {
         text: 'Ahora elige Resorte, cuelga la partícula de un punto fijo y deja fluir el tiempo. Mira K, Ug y Ue.',
         on: 'oscillated',
+        tool: 'tool:spring',
       },
       {
         text: 'Se pasan la energía de una a otra: K es máxima al cruzar el equilibrio y Ue en el punto más bajo. La suma de las tres, otra vez, no cambia. La energía no se crea ni se pierde: cambia de forma.',
