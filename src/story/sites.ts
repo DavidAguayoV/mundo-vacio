@@ -2,28 +2,28 @@ import { fmt, fmtVec } from '../core/format';
 import { dist, len, rotate, type Vec2 } from '../core/vec';
 import { IDENTITY_FRAME, ReferenceFrame } from '../world/frame';
 import type { World } from '../world/world';
+import { placeOnPivot, placeOnSurface } from '../physics/rigid';
 import { G_EARTH } from '../world/world';
 import { CHAPTERS, reveal } from './chapters';
 import type { Grant, Mastery, Page, Site, Step, StoryContext, Zone, ZoneId } from './types';
 
 // ---------- el mapa ----------
 
-/** Zonas alrededor del claro, en una elipse más ancha que alta (como la pantalla): el mapa se lee de un vistazo. */
-const ring = (deg: number, rx = 28, ry = 18): { x: number; y: number } => ({
-  x: Math.round(rx * Math.cos((deg * Math.PI) / 180) * 10) / 10,
-  y: Math.round(ry * Math.sin((deg * Math.PI) / 180) * 10) / 10,
-});
-
+/**
+ * Zonas alrededor del claro, ubicadas a mano: más anchas que altas (como la pantalla) y dejando
+ * libre la esquina de arriba a la izquierda, donde va la tarjeta del relato.
+ */
 export const ZONES: Zone[] = [
   { id: 'claro', name: 'El claro', at: { x: 0, y: 0 }, hint: 'solo espacio' },
-  { id: 'constelacion', name: 'La constelación', at: ring(20), hint: 'flechas que nadie usó' },
-  { id: 'taller', name: 'El taller', at: ring(70), hint: 'cosas que oscilan' },
-  { id: 'astro', name: 'El astro', at: ring(112), hint: 'algo muy masivo' },
-  { id: 'mar', name: 'El mar', at: ring(155), hint: 'aire y agua' },
-  { id: 'laderas', name: 'Las laderas', at: ring(205), hint: 'planos con roce' },
-  { id: 'pozo', name: 'El pozo', at: ring(248), hint: 'aquí las cosas caen' },
-  { id: 'central', name: 'La central', at: ring(292), hint: 'algo se conserva' },
-  { id: 'deriva', name: 'La deriva', at: ring(332), hint: 'sin gravedad' },
+  { id: 'constelacion', name: 'La constelación', at: { x: 27, y: 6 }, hint: 'flechas que nadie usó' },
+  { id: 'taller', name: 'El taller', at: { x: 20, y: 17 }, hint: 'cosas que oscilan' },
+  { id: 'astro', name: 'El astro', at: { x: 6, y: 19 }, hint: 'algo muy masivo' },
+  { id: 'mar', name: 'El mar', at: { x: -8, y: 15 }, hint: 'aire y agua' },
+  { id: 'laderas', name: 'Las laderas', at: { x: -28, y: -5 }, hint: 'planos con roce' },
+  { id: 'pozo', name: 'El pozo', at: { x: -17, y: -15 }, hint: 'aquí las cosas caen' },
+  { id: 'central', name: 'La central', at: { x: 0, y: -18 }, hint: 'algo se conserva' },
+  { id: 'deriva', name: 'La deriva', at: { x: 17, y: -17 }, hint: 'sin gravedad' },
+  { id: 'puente', name: 'El puente', at: { x: 31, y: -11 }, hint: 'cuerpos que giran' },
 ];
 
 const zoneAt = (z: ZoneId, dx: number, dy: number) => {
@@ -974,6 +974,234 @@ const altura: Site = {
   ],
 };
 
+
+// ---------- El puente: cuerpos rígidos ----------
+
+const rigidWorld = (w: World) => ({ bodies: w.bodies, surfaces: w.surfaces, gAt: (p: Vec2) => w.gAt(p) });
+
+/** ¿El balancín quedó derecho y quieto después de dejarlo un rato? */
+const balanced = ({ world, sim }: StoryContext) => {
+  const b = world.bodies[0];
+  return !!b && sim.hasRun && sim.t > 2.5 && Math.abs(b.angle) < 0.02 && Math.abs(b.omega) < 0.02;
+};
+
+const balanza: Site = {
+  id: 'balanza',
+  zone: 'puente',
+  title: 'La balanza',
+  at: zoneAt('puente', -4.5, 0),
+  note: 'Dejé una pesa de 2 kg en este balancín. Nunca logré que se quedara derecho.',
+  needs: ['tool:particle', 'tool:gravity', 'time:flow'],
+  seed: ({ world }) => {
+    frameAt(world, { x: -5, y: -3 });
+    world.g = { x: 0, y: -G_EARTH };
+    const rod = world.addBody({ shape: 'rod', size: 4, mass: 0.5, pos: { x: 0, y: 0 }, angle: 0, pivot: { at: { x: 0, y: 0 }, local: { x: 0, y: 0 }, limit: 0.35 }, loadable: true, locked: true });
+    world.addLoad(rod, -1, 2, true);
+  },
+  steps: [
+    {
+      text: 'Con Partícula, toca la barra para poner pesas de 1 kg; tocar la misma marca suma otro kilo, y con Mover las corres. Logra que el balancín se quede derecho cuando dejes fluir el tiempo. Toca la barra con Mover para ver cada pesa y su distancia al eje.',
+      on: 'tick',
+      when: (ctx) => balanced(ctx) && ctx.world.bodies[0].loads.length >= 2,
+    },
+    {
+      text: 'Se queda derecho cuando los dos lados hacen el mismo **torque**: τ = m g d, el peso por su distancia al eje. 2 kg a 1 m se equilibran con 1 kg a 2 m, o con 4 kg a 0,5 m.',
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Una barra con eje queda en equilibrio cuando los torques se compensan: Σ m d = 0 a cada lado del eje.',
+    measured: ({ world }) => {
+      const mine = world.bodies[0]?.loads.filter((l) => !l.locked) ?? [];
+      return mine.length ? `Pusiste ${mine.map((l) => `${fmt(l.mass, 0)} kg a ${fmt(l.s)} m`).join(' y ')}.` : null;
+    },
+    engineering: 'Una grúa torre lleva un contrapeso en el brazo corto: así el torque de la carga no la vuelca.',
+  },
+  mastery: [
+    {
+      id: 'una',
+      label: 'Equilíbrala con una sola pesa',
+      on: 'tick',
+      when: (ctx) => balanced(ctx) && ctx.world.bodies[0].loads.filter((l) => !l.locked).length === 1,
+    },
+  ],
+};
+
+const palanca: Site = {
+  id: 'palanca',
+  zone: 'puente',
+  title: 'La palanca',
+  at: zoneAt('puente', 0, 4.5),
+  note: 'Con este palo y un apoyo quise levantar 5 kg con apenas 1 kg. Me faltó saber dónde poner el apoyo.',
+  needs: ['tool:move', 'tool:gravity', 'time:flow'],
+  seed: ({ world }) => {
+    frameAt(world, { x: -5, y: -3 });
+    world.g = { x: 0, y: -G_EARTH };
+    const rod = world.addBody({ shape: 'rod', size: 6, mass: 0, pos: { x: 0, y: 0 }, angle: 0, pivot: { at: { x: 0, y: 0 }, local: { x: 0, y: 0 }, limit: 0.35, movable: true }, locked: true });
+    world.addLoad(rod, -3, 1, true);
+    world.addLoad(rod, 3, 5, true);
+  },
+  steps: [
+    {
+      text: 'Corre el apoyo (el triángulo) a lo largo de la barra con Mover. Busca dónde ponerlo para que 1 kg levante los 5 kg, y deja fluir el tiempo.',
+      on: 'tick',
+      when: ({ world, sim }) => {
+        const b = world.bodies[0];
+        return !!b?.pivot?.limit && sim.hasRun && sim.t > 0.3 && b.angle >= b.pivot.limit - 1e-9;
+      },
+    },
+    {
+      text: ({ world }) => {
+        const b = world.bodies[0];
+        const d = b?.pivot ? 3 - b.pivot.local.x : 0;
+        return `Con el apoyo a ${fmt(d)} m de la carga, el brazo del lado liviano mide ${fmt(6 - d)} m. 1 kg tan lejos hace más torque que 5 kg tan cerca. Es la **palanca**: se gana fuerza a cambio de recorrido.`;
+      },
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Con una palanca, una fuerza pequeña a mucha distancia del apoyo equilibra o vence a una grande cerca de él: m₁ d₁ = m₂ d₂.',
+    measured: ({ world }) => {
+      const b = world.bodies[0];
+      return b?.pivot ? `El apoyo quedó a ${fmt(3 - b.pivot.local.x)} m de los 5 kg.` : null;
+    },
+    engineering: 'Un alicate, una carretilla y un balancín de plaza son palancas: el diseño decide dónde va el apoyo según cuánta fuerza hay que ganar.',
+  },
+  mastery: [
+    {
+      id: 'equilibrio',
+      label: 'Encuentra el punto exacto en que queda en equilibrio',
+      on: 'tick',
+      when: (ctx) => balanced(ctx),
+    },
+  ],
+};
+
+/** Barra y péndulo simple de 2 m, colgados y soltados desde 25°. */
+const PEND_L = 2;
+
+const pendulo: Site = {
+  id: 'pendulo',
+  zone: 'puente',
+  title: 'El péndulo que no es un punto',
+  at: zoneAt('puente', 4.5, 0),
+  note: 'Colgué una barra y, al lado, una pesa de un hilo del mismo largo. No se movían al mismo ritmo.',
+  needs: ['tool:gravity', 'time:flow'],
+  seed: ({ world }) => {
+    frameAt(world, { x: -5, y: -3 });
+    world.g = { x: 0, y: -G_EARTH };
+    const th = -Math.PI / 2 + (25 * Math.PI) / 180;
+    const rod = world.addBody({ shape: 'rod', size: PEND_L, mass: 1, pos: { x: 0, y: 0 }, angle: th, pivot: { at: { x: -2, y: 2.5 }, local: { x: -PEND_L / 2, y: 0 } }, locked: true });
+    const bob = world.addBody({ shape: 'rod', size: PEND_L, mass: 0, pos: { x: 0, y: 0 }, angle: th, pivot: { at: { x: 2, y: 2.5 }, local: { x: -PEND_L / 2, y: 0 } }, locked: true, thread: true });
+    world.addLoad(bob, PEND_L / 2, 1, true);
+    for (const b of [rod, bob]) placeOnPivot(b);
+  },
+  steps: [
+    {
+      text: 'Las dos miden 2 m y parten desde el mismo ángulo. La de la izquierda es una barra; la de la derecha, una pesa colgada de un hilo sin masa. ¿Cuál oscila más rápido?',
+      on: 'end',
+      ask: 'fisico',
+      correct: 'barra',
+      choices: [
+        { id: 'barra', label: 'La barra' },
+        { id: 'pesa', label: 'La pesa' },
+        { id: 'igual', label: 'Igual: miden lo mismo' },
+      ],
+    },
+    {
+      text: 'Deja fluir el tiempo y mira cuál se adelanta.',
+      on: 'tick',
+      when: ({ sim }) => sim.hasRun && sim.t >= 6,
+    },
+    {
+      text: reveal('fisico', `La barra va más rápido. Su masa está repartida a lo largo, y la que está cerca del eje casi no cuesta moverla. Su período es T = 2π√(2L/3g) ≈ ${fmt(2 * Math.PI * Math.sqrt((2 * PEND_L) / (3 * G_EARTH)))} s; el de la pesa, 2π√(L/g) ≈ ${fmt(2 * Math.PI * Math.sqrt(PEND_L / G_EARTH))} s.`, {
+        barra: 'Lo predijiste bien.',
+        pesa: 'La pesa tiene toda su masa en la punta, lo más lejos del eje: es la más difícil de hacer girar.',
+        igual: 'Medir lo mismo no basta: importa cómo se reparte la masa.',
+      }),
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Un péndulo físico oscila con T = 2π√(I/(m g d)): una barra colgada de un extremo va más rápido que una pesa en la punta.',
+    engineering: 'El péndulo de un reloj de pared se ajusta subiendo o bajando una pesa: cambia el momento de inercia y con él el período.',
+  },
+};
+
+const RACE_DEG = 20;
+
+const carrera: Site = {
+  id: 'carrera',
+  zone: 'puente',
+  title: 'La carrera',
+  at: zoneAt('puente', 0, -4.5),
+  note: 'Solté un disco, un aro y una caja por la misma pendiente. Siempre llegaban en el mismo orden.',
+  needs: ['tool:surface', 'time:flow'],
+  seed: ({ world }) => {
+    frameAt(world, { x: -7, y: -4 });
+    world.g = { x: 0, y: -G_EARTH };
+    const th = (RACE_DEG * Math.PI) / 180;
+    const shapes: ('box' | 'disc' | 'ring')[] = ['box', 'disc', 'ring'];
+    shapes.forEach((shape, i) => {
+      const y0 = 3.2 - i * 1.7;
+      const surf = world.addSurface({ x: -6, y: y0 }, { x: -6 + 9 * Math.cos(th), y: y0 - 9 * Math.sin(th) }, 0, 0);
+      surf.locked = true;
+      const b = world.addBody({ shape, size: shape === 'box' ? 0.6 : 0.4, size2: 0.6, mass: 1, pos: { x: 0, y: 0 }, angle: 0, roll: { surface: surf.id, s: 0, v: 0, arrived: null }, locked: true });
+      placeOnSurface(b, rigidWorld(world));
+    });
+  },
+  steps: [
+    {
+      text: 'Un disco, un aro y una caja sin roce bajan pendientes iguales, de 20°. Los tres tienen 1 kg. ¿En qué orden llegan abajo?',
+      on: 'end',
+      ask: 'carrera',
+      correct: 'cda',
+      choices: [
+        { id: 'juntos', label: 'Llegan juntos' },
+        { id: 'cda', label: 'Caja, disco, aro' },
+        { id: 'acd', label: 'Aro, caja, disco' },
+        { id: 'dac', label: 'Disco, aro, caja' },
+      ],
+    },
+    {
+      text: 'Deja fluir el tiempo.',
+      on: 'tick',
+      when: ({ world }) => world.bodies.length > 0 && world.bodies.every((b) => b.roll?.arrived !== null && b.roll?.arrived !== undefined),
+    },
+    {
+      text: reveal('carrera', 'Primero la caja, después el disco y al final el aro. Al rodar, parte de la energía se va en girar: más en el aro, que tiene toda su masa en el borde, que en el disco. La caja, sin roce, no gira. Por eso **a = g sen α / (1 + I/(m R²))**, sin importar la masa ni el tamaño.', {
+        juntos: 'Si no giraran, sí; pero girar también cuesta energía.',
+        cda: 'Lo predijiste bien.',
+        acd: 'El aro es el que más energía gasta en girar: llega último.',
+        dac: 'La caja no gasta nada en girar: llega primero.',
+      }),
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Rodando, a = g sen α / (1 + I/(m R²)): la caja sin roce primero, el disco después y el aro al final, sin importar masa ni tamaño.',
+    measured: ({ world }) => {
+      const t = (shape: string) => world.bodies.find((b) => b.shape === shape)?.roll?.arrived;
+      const [c, d, a] = [t('box'), t('disc'), t('ring')];
+      return c && d && a ? `Llegaron en ${fmt(c)} s (caja), ${fmt(d)} s (disco) y ${fmt(a)} s (aro).` : null;
+    },
+    engineering: 'Los volantes de inercia guardan energía girando: se diseñan con la masa en el borde, como un aro, para que guarden más con el mismo peso.',
+  },
+  mastery: [
+    {
+      id: 'masa',
+      label: 'Cambia la masa del aro y comprueba que igual llega último',
+      on: 'tick',
+      when: ({ world }) => {
+        const ring = world.bodies.find((b) => b.shape === 'ring');
+        const all = world.bodies.every((b) => b.roll?.arrived !== null && b.roll?.arrived !== undefined);
+        if (!ring || !all || Math.abs(ring.mass - 1) < 1e-9) return false;
+        return world.bodies.every((b) => (b.roll?.arrived ?? 0) <= (ring.roll?.arrived ?? 0));
+      },
+    },
+  ],
+};
+
 // ---------- todos los rastros ----------
 
 export const SITES: Site[] = [
@@ -1166,6 +1394,10 @@ export const SITES: Site[] = [
     law: 'K, Ug y Ue se pasan la energía de una a otra; la suma no cambia.',
   }),
   altura,
+  balanza,
+  palanca,
+  pendulo,
+  carrera,
 ];
 
 export const SITE_IDS = SITES.map((s) => s.id);

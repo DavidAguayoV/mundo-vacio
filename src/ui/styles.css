@@ -673,6 +673,11 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* una pesa de una barra: el texto y sus tres botones en una sola fila */
+.mass.load > span {
+  white-space: nowrap;
+}
+
 .mass .btn {
   width: 30px;
   height: 30px;

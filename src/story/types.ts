@@ -82,7 +82,7 @@ export interface Chapter {
 
 // ---------- el mundo abierto: zonas y rastros ----------
 
-export type ZoneId = 'claro' | 'constelacion' | 'deriva' | 'pozo' | 'laderas' | 'taller' | 'astro' | 'mar' | 'central';
+export type ZoneId = 'claro' | 'constelacion' | 'deriva' | 'pozo' | 'laderas' | 'taller' | 'astro' | 'mar' | 'central' | 'puente';
 
 /** Una región del mapa. Las coordenadas del mapa son unidades propias, no metros del mundo. */
 export interface Zone {
