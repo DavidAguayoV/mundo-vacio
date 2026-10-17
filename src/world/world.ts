@@ -4,6 +4,7 @@ import type { Endpoint } from '../physics/forces/force';
 import type { MediumId } from '../physics/forces/drag';
 import type { SpringLike } from '../physics/forces/springs';
 import type { Body, ForceWorld } from '../physics/state';
+import type { Load, RigidBody } from '../physics/rigid';
 import { ReferenceFrame } from './frame';
 
 export const G_EARTH = 9.8; // m/s²
@@ -41,6 +42,19 @@ export interface ProbeChain {
   blocked: boolean;
 }
 
+/**
+ * Región con su propia gravedad (un rincón donde «abajo» es hacia el lado, la Luna junto a la Tierra).
+ * Dentro de ella manda su g (null = sin gravedad); afuera, la g del mundo.
+ */
+export interface GRegion {
+  id: string;
+  min: Vec2;
+  max: Vec2;
+  g: Vec2 | null;
+  /** nombre que se muestra en la esquina («Luna», «Tierra») */
+  name?: string;
+}
+
 /** Distancia (m) a la que la cola de una tarjeta se pega a la sonda o a la punta de otra. */
 export const SNAP_DIST = 0.4;
 
@@ -72,7 +86,8 @@ export type EntityRef =
   | { kind: 'vector'; id: string }
   | { kind: 'sum'; id: string }
   | { kind: 'surface'; id: string }
-  | { kind: 'spring'; id: string };
+  | { kind: 'spring'; id: string }
+  | { kind: 'body'; id: string };
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -96,6 +111,10 @@ export class World implements ForceWorld {
   /** sonda que salta siguiendo vectores (posición de partida); null si el rastro no la usa */
   probe: Vec2 | null = null;
   beacons: Beacon[] = [];
+  /** regiones con su propia gravedad */
+  regions: GRegion[] = [];
+  /** cuerpos rígidos: barras, discos, aros y cajas */
+  bodies: RigidBody[] = [];
   /** con qué cadenas llegó la sonda a una baliza en este rastro («A,B», «B,A»…), para los retos */
   probeLog: string[] = [];
 
@@ -127,6 +146,47 @@ export class World implements ForceWorld {
     this.probe = null;
     this.beacons = [];
     this.probeLog = [];
+    this.regions = [];
+    this.bodies = [];
+  }
+
+  // ----- cuerpos rígidos -----
+
+  addBody(b: Omit<RigidBody, 'id' | 'label' | 'loads' | 'vel' | 'omega'> & Partial<Pick<RigidBody, 'loads' | 'vel' | 'omega' | 'label'>>): RigidBody {
+    const body: RigidBody = { vel: { x: 0, y: 0 }, omega: 0, loads: [], label: String(this.bodies.length + 1), ...b, id: this.newId('c') };
+    this.bodies.push(body);
+    return body;
+  }
+
+  body(id: string): RigidBody | undefined {
+    return this.bodies.find((b) => b.id === id);
+  }
+
+  /** Agrega una carga a una barra en la posición s (desde su centro). */
+  addLoad(body: RigidBody, s: number, mass: number, locked = false): Load {
+    const l: Load = { id: this.newId('l'), s, mass, ...(locked ? { locked: true } : {}) };
+    body.loads.push(l);
+    return l;
+  }
+
+  /** La región que contiene un punto (la última, si se superponen). */
+  regionAt(p: Vec2): GRegion | undefined {
+    for (let i = this.regions.length - 1; i >= 0; i--) {
+      const r = this.regions[i];
+      if (p.x >= r.min.x && p.x <= r.max.x && p.y >= r.min.y && p.y <= r.max.y) return r;
+    }
+    return undefined;
+  }
+
+  /** g en un punto: la de su región, o la del mundo. */
+  gAt(p: Vec2): Vec2 | null {
+    const r = this.regions.length ? this.regionAt(p) : undefined;
+    return r ? r.g : this.g;
+  }
+
+  /** ¿Hay gravedad en alguna parte? */
+  get anyG(): boolean {
+    return !!this.g || this.regions.some((r) => !!r.g);
   }
 
   // ----- sonda -----
@@ -177,6 +237,8 @@ export class World implements ForceWorld {
     if (ref.kind === 'particle') return !!this.particle(ref.id)?.locked;
     if (ref.kind === 'vector') return !!this.vector(ref.id)?.fixed;
     if (ref.kind === 'surface') return !!this.surface(ref.id)?.locked;
+    if (ref.kind === 'spring') return !!this.spring(ref.id)?.locked;
+    if (ref.kind === 'body') return !!this.body(ref.id)?.locked;
     return false;
   }
 
@@ -314,6 +376,7 @@ export class World implements ForceWorld {
     if (ref.kind === 'vector') return !!this.vector(ref.id);
     if (ref.kind === 'surface') return !!this.surface(ref.id);
     if (ref.kind === 'spring') return !!this.spring(ref.id);
+    if (ref.kind === 'body') return !!this.body(ref.id);
     return !!this.sum(ref.id);
   }
 
@@ -322,6 +385,7 @@ export class World implements ForceWorld {
     else if (ref.kind === 'vector') this.removeVector(ref.id);
     else if (ref.kind === 'surface') this.removeSurface(ref.id);
     else if (ref.kind === 'spring') this.removeSpring(ref.id);
+    else if (ref.kind === 'body') this.bodies = this.bodies.filter((b) => b.id !== ref.id);
     else this.removeSum(ref.id);
   }
 }

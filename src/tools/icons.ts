@@ -17,6 +17,7 @@ export const ICONS = {
   gravitation: svg('<circle cx="7" cy="12" r="3.5" fill="currentColor"/><circle cx="18" cy="12" r="2" fill="currentColor"/><path d="M12 9.5l-1.5 2.5 1.5 2.5M13 9.5l1.5 2.5-1.5 2.5"/>'),
   drag: svg('<path d="M3 8c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 13c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/>'),
   energy: svg('<path d="M4 20h16"/><rect x="5" y="10" width="3" height="10"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="13" width="3" height="7"/><path d="M3 4h18" stroke-dasharray="2 2"/>'),
+  graphs: svg('<path d="M4 4v16h16"/><path d="M7 16l4-5 3 3 5-7"/>'),
   play: svg('<path d="M7 5l12 7-12 7z" fill="currentColor"/>'),
   pause: svg('<path d="M8 5v14M16 5v14"/>'),
   step: svg('<path d="M6 5l9 7-9 7z" fill="currentColor"/><path d="M18 5v14"/>'),

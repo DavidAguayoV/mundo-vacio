@@ -19,6 +19,8 @@ export interface LabState {
   gravitation: boolean;
   medium: 'aire' | 'agua' | null;
   prefs: LabPrefs;
+  /** desde el mapa o un rastro solo se ofrecen los laboratorios con guía */
+  free: boolean;
 }
 
 export interface LabActions {
@@ -168,9 +170,9 @@ export class LabPanel {
       h('small', { class: 'hint' }, 'También puedes arrastrar un archivo .json sobre el lienzo.'),
     );
 
-    // ---- ejemplos ----
+    // ---- laboratorios con guía ----
     const examples = this.section(
-      'Ejemplos',
+      'Laboratorios con guía',
       h(
         'div',
         { class: 'nodes' },
@@ -249,6 +251,11 @@ export class LabPanel {
     );
 
     const header = h('header', {}, h('h2', {}, 'Laboratorio'), h('div', { class: 'row' }, this.btn('Volver', () => this.hide(), 'btn primary')));
-    this.body.replaceChildren(header, thisOne, mine, examples, world, view);
+    if (!st.free) {
+      // fuera del modo libre: solo elegir un laboratorio (abrirlo pasa al modo libre)
+      this.body.replaceChildren(header, h('p', { class: 'hint' }, 'Situaciones armadas para mostrar en clase, con su guía y sus controles. Se abren con todas las herramientas.'), examples);
+      return;
+    }
+    this.body.replaceChildren(header, examples, thisOne, mine, world, view);
   }
 }

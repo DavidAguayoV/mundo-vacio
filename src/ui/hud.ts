@@ -1,5 +1,6 @@
 import { fmt, fmtDeg, fmtVec } from '../core/format';
 import type { Simulation } from '../physics/simulation';
+import type { Vec2 } from '../core/vec';
 import { IDENTITY_FRAME } from '../world/frame';
 import type { World } from '../world/world';
 import { $, h, setText } from './dom';
@@ -17,14 +18,16 @@ export class Hud {
 
   constructor(private showFps = false) {}
 
-  update(world: World, sim: Simulation, simEnabled: boolean, fps: number): void {
+  /** @param focus punto cuya g se muestra cuando el mundo tiene regiones (la partícula elegida) */
+  update(world: World, sim: Simulation, simEnabled: boolean, fps: number, focus?: Vec2): void {
+    const gHere = world.regions.length ? world.gAt(focus ?? world.frame?.origin ?? { x: 0, y: 0 }) : world.g;
     const turned = !!world.frame && Math.abs(world.frame.angle) > 0.004;
-    const key = `${simEnabled}|${!!world.g}|${!!world.frame}|${!!world.medium}|${turned}`;
+    const key = `${simEnabled}|${!!gHere}|${!!world.frame}|${!!world.medium}|${turned}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       const items: HTMLElement[] = [];
       if (simEnabled) items.push(this.t);
-      if (world.g) items.push(this.g);
+      if (gHere) items.push(this.g);
       if (world.medium) items.push(this.medium);
       if (world.frame) items.push(this.scale);
       if (turned) items.push(this.axes);
@@ -36,7 +39,10 @@ export class Hud {
     if (turned && world.frame) setText(this.axes, `ejes girados ${fmtDeg((world.frame.angle * 180) / Math.PI)}`);
     const slow = sim.timeScale === 0.5 ? '  ×½' : sim.timeScale === 0.25 ? '  ×¼' : '';
     if (simEnabled) setText(this.t, `t = ${fmt(sim.t)} s${slow}`);
-    if (world.g) setText(this.g, `g = ${fmtVec((world.frame ?? IDENTITY_FRAME).toUser(world.g), 'm/s²')}`);
+    if (gHere) {
+      const where = world.regions.length ? ` (${world.regionAt(focus ?? world.frame?.origin ?? { x: 0, y: 0 })?.name ?? 'aquí'})` : '';
+      setText(this.g, `g = ${fmtVec((world.frame ?? IDENTITY_FRAME).toUser(gHere), 'm/s²')}${where}`);
+    }
     if (this.showFps) setText(this.fps, `${fmt(fps, 0)} fps, ${world.particles.length} part.`);
   }
 }

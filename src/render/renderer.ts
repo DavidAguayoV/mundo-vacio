@@ -1,4 +1,5 @@
 import { fieldLayer } from './layers/field';
+import { regionsLayer } from './layers/regions';
 import { springsLayer } from './layers/springs';
 import { surfacesLayer } from './layers/surfaces';
 import { axesLayer, gridLayer } from './layers/frame';
@@ -6,10 +7,12 @@ import { particlesLayer, trailsLayer } from './layers/particles';
 import { targetLayer } from './layers/target';
 import { vectorsLayer } from './layers/vectors';
 import { beaconsLayer, probeLayer } from './layers/probe';
+import { bodiesLayer } from './layers/bodies';
 import type { Layer, Scene } from './scene';
 
 /** Orden de las capas, del fondo al frente. */
 const LAYERS: Layer[] = [
+  regionsLayer,
   gridLayer,
   fieldLayer,
   axesLayer,
@@ -18,6 +21,7 @@ const LAYERS: Layer[] = [
   beaconsLayer,
   trailsLayer,
   springsLayer,
+  bodiesLayer,
   vectorsLayer,
   probeLayer,
   particlesLayer,

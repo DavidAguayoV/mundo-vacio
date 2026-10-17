@@ -286,10 +286,10 @@ describe('capítulos que siguen como rastros', () => {
     expect(t.y).toBeLessThan(b.maxY);
   });
 
-  it('«Resortes»: al retomarlo quedan un resorte colgado y gravedad', () => {
-    const p = having(['vacio', 'particula', 'desde-siempre', 'abajo']);
-    p.site = 'resortes';
-    p.step = 4;
+  it('«El ritmo»: al retomarlo quedan un resorte colgado y gravedad', () => {
+    const p = having(['vacio', 'particula', 'desde-siempre', 'abajo', 'hooke']);
+    p.site = 'periodo';
+    p.step = 0;
     const { story, world } = setup(p);
     story.resume();
     expect(world.springs).toHaveLength(1);
@@ -330,7 +330,10 @@ describe('progreso guardado', () => {
     store.set('mundoVacio.progress', JSON.stringify({ version: 1, chapter: 5, step: 3, free: true }));
     const p = loadProgress(SITE_IDS);
     expect(p.free).toBe(true);
-    expect(p.site).toBe('superficies');
+    // «Superficies» se volvió tres rastros: se vuelve al mapa con lo anterior resuelto
+    expect(p.site).toBeNull();
+    expect(p.solved.blanco).toBeDefined();
+    expect(p.solved.suelo).toBeUndefined();
   });
 
   it('un progreso v3 dañado no rompe el juego', () => {

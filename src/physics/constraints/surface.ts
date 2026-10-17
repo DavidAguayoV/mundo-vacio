@@ -39,7 +39,7 @@ export class SurfaceConstraint implements Constraint {
         let sign = Math.sign(d);
         if (Math.abs(d) < ON_SURFACE && u >= 0 && u <= f.length && !this.contacts.get(s.ids[i])) {
           // apoyada desde el inicio: queda del lado contrario a g (encima, si hay gravedad)
-          const g = world.g;
+          const g = world.gAt ? world.gAt(s.pos[i]) : world.g;
           sign = g && g.x * f.n.x + g.y * f.n.y > 0 ? -1 : 1;
           const c: Contact = { surface: surf, n: { x: sign * f.n.x, y: sign * f.n.y }, slide: 0 };
           this.contacts.set(s.ids[i], c);

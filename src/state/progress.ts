@@ -52,14 +52,14 @@ export const LEGACY_CHAPTERS: { chapter: string; sites: string[]; grants: Grant[
   { chapter: 'vacio', sites: ['vacio'], grants: ['tool:origin'] },
   { chapter: 'particula', sites: ['particula'], grants: ['tool:particle', 'tool:move'] },
   { chapter: 'vectores', sites: ['dos-saltos', 'atajo', 'escalar', 'ejes-ajenos'], grants: ['tool:vector', 'tool:sum'] },
-  { chapter: 'tiempo', sites: ['desde-siempre', 'boya'], grants: ['time:flow', 'tool:velocity', 'time:rewind', 'time:step'] },
+  { chapter: 'tiempo', sites: ['desde-siempre', 'boya'], grants: ['time:flow', 'tool:velocity', 'time:rewind', 'time:step', 'lens:graphs'] },
   { chapter: 'abajo', sites: ['abajo'], grants: ['tool:gravity', 'time:slow'] },
   { chapter: 'blanco', sites: ['blanco'], grants: ['time:timeline'] },
-  { chapter: 'superficies', sites: ['superficies'], grants: ['tool:surface'] },
-  { chapter: 'resortes', sites: ['resortes'], grants: ['tool:spring'] },
-  { chapter: 'gravitacion', sites: ['gravitacion'], grants: ['force:gravitation'] },
-  { chapter: 'arrastre', sites: ['arrastre'], grants: ['force:drag'] },
-  { chapter: 'energia', sites: ['energia'], grants: ['lens:energy'] },
+  { chapter: 'superficies', sites: ['suelo', 'quedarse', 'mu'], grants: ['tool:surface'] },
+  { chapter: 'resortes', sites: ['hooke', 'periodo'], grants: ['tool:spring'] },
+  { chapter: 'gravitacion', sites: ['atraccion', 'orbita', 'escape'], grants: ['force:gravitation'] },
+  { chapter: 'arrastre', sites: ['aire', 'terminal'], grants: ['force:drag'] },
+  { chapter: 'energia', sites: ['conserva', 'cero', 'intercambio'], grants: ['lens:energy'] },
 ];
 
 /** Orden de los capítulos en la versión 1 (fases 1–3) y en el prototipo. */

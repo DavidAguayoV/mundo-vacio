@@ -70,12 +70,12 @@ export class RunMonitor {
     if (dt <= 0) return;
     this.watchOrbits();
     this.watchTerminal(dt);
-    const g = world.g;
-    const gL = g ? Math.hypot(g.x, g.y) : 0;
     for (const p of world.particles) {
       const n = sim.contactNormal(p.id);
       if (!n) continue;
       this.once('landed');
+      const g = world.gAt(p.pos);
+      const gL = g ? Math.hypot(g.x, g.y) : 0;
       if (!g || !gL) continue;
       // ángulo entre la normal y "arriba" (−g) = inclinación de la superficie
       const incline = Math.acos(Math.max(-1, Math.min(1, -(n.x * g.x + n.y * g.y) / gL)));
@@ -129,8 +129,9 @@ export class RunMonitor {
   private watchTerminal(dt: number): void {
     const { world, sim } = this;
     if (!world.medium) return;
-    const g = world.g ? Math.hypot(world.g.x, world.g.y) : 9.8;
     for (const p of world.particles) {
+      const gp = world.gAt(p.pos);
+      const g = gp ? Math.hypot(gp.x, gp.y) : 9.8;
       if (sim.contactNormal(p.id)) continue;
       const speed = Math.hypot(p.vel.x, p.vel.y);
       const a = sim.forcesOn(p.id)?.accel;

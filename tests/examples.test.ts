@@ -61,3 +61,41 @@ describe('ejemplo de resorte', () => {
     expect(Math.abs(T - 2 * Math.PI * Math.sqrt(1 / 20))).toBeLessThan(1 / 240 + 1e-9);
   });
 });
+
+describe('laboratorios con guía', () => {
+  it('cada laboratorio tiene objetivo, qué medir y preguntas', () => {
+    for (const e of EXAMPLES) {
+      expect(e.guide, e.id).toBeDefined();
+      expect(e.guide!.goal.length).toBeGreaterThan(20);
+      expect(e.guide!.measure.length).toBeGreaterThan(0);
+      expect(e.guide!.questions.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('los deslizadores leen y cambian el mundo, dentro de su rango', () => {
+    for (const e of EXAMPLES) {
+      const world = worldFromJSON(e.build().world);
+      for (const c of e.guide?.controls ?? []) {
+        const v0 = c.get(world);
+        expect(v0, `${e.id}/${c.id}`).not.toBeNull();
+        expect(v0!).toBeGreaterThanOrEqual(c.min - 1e-9);
+        expect(v0!).toBeLessThanOrEqual(c.max + 1e-9);
+        const target = c.min + (c.max - c.min) * 0.3;
+        c.set(world, target);
+        expect(c.get(world)!, `${e.id}/${c.id}`).toBeCloseTo(target, 6);
+      }
+    }
+  });
+
+  it('cambiar |g| conserva su dirección y el ángulo conserva la rapidez', () => {
+    const tiro = EXAMPLES.find((e) => e.id === 'tiro')!;
+    const world = worldFromJSON(tiro.build().world);
+    const ctl = (id: string) => tiro.guide!.controls!.find((c) => c.id === id)!;
+    ctl('g').set(world, 1.62);
+    expect(world.g).toEqual({ x: 0, y: -1.62 });
+    const speed = Math.hypot(world.particles[0].vel.x, world.particles[0].vel.y);
+    ctl('a0').set(world, 30);
+    expect(Math.hypot(world.particles[0].vel.x, world.particles[0].vel.y)).toBeCloseTo(speed, 9);
+    expect(Math.atan2(world.particles[0].vel.y, world.particles[0].vel.x)).toBeCloseTo(Math.PI / 6, 9);
+  });
+});

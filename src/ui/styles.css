@@ -559,7 +559,8 @@ button {
 
 /* paneles: las únicas cajas del juego, porque son herramientas */
 .inspector,
-.energy {
+.energy,
+.graphs {
   position: relative;
   width: 100%;
   background: var(--panel);
@@ -601,7 +602,8 @@ button {
 }
 
 .inspector h2,
-.energy h2 {
+.energy h2,
+.graphs h2 {
   margin: 0;
   font-family: var(--body);
   font-size: var(--t-md);
@@ -669,6 +671,11 @@ button {
   font-family: var(--mono);
   font-size: var(--t-sm);
   font-variant-numeric: tabular-nums;
+}
+
+/* una pesa de una barra: el texto y sus tres botones en una sola fila */
+.mass.load > span {
+  white-space: nowrap;
 }
 
 .mass .btn {
@@ -1740,5 +1747,300 @@ button {
   #app.in-map .card::before {
     inset: -20px -16px -28px;
     background: linear-gradient(to bottom, var(--bg) 0%, color-mix(in srgb, var(--bg) 92%, transparent) 75%, transparent);
+  }
+}
+
+/* ---------- lente Gráficos ---------- */
+
+.graphs {
+  padding: 12px 14px 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.graphs h2 .who {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.graphs .charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.graphs .chart {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.graphs .chart-title {
+  font: 400 15px var(--display);
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.graphs .chart-title sub {
+  font-size: 0.7em;
+  vertical-align: -0.2em;
+  line-height: 0;
+}
+
+.graphs .chart-title .unit {
+  font: 400 var(--t-xs) var(--body);
+  color: var(--muted);
+}
+
+.graphs svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.graphs .zero {
+  stroke: color-mix(in srgb, var(--muted) 45%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.graphs .line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.graphs .line.pos {
+  stroke: var(--pos);
+}
+
+.graphs .line.vel {
+  stroke: var(--vel);
+}
+
+.graphs .now,
+.graphs .hover {
+  stroke: var(--ink);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.graphs .now {
+  opacity: 0.35;
+}
+
+.graphs .hover {
+  opacity: 0.7;
+}
+
+.graphs .dot {
+  stroke: var(--panel);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.graphs .dot.pos {
+  fill: var(--pos);
+}
+
+.graphs .dot.vel {
+  fill: var(--vel);
+}
+
+.graphs .tick {
+  font: 400 8px var(--mono);
+  fill: var(--muted);
+  text-anchor: start;
+}
+
+.graphs .readout {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  font: 400 var(--t-xs) / 1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.graphs .readout span {
+  white-space: nowrap;
+}
+
+.graphs .note {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  .graphs {
+    order: 0;
+    padding: 8px 10px 6px;
+    /* reserva el alto de los gráficos desde antes del primer lanzamiento: la escena no queda debajo */
+    min-height: 92px;
+    align-content: center;
+  }
+
+  .graphs .charts {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px 8px;
+  }
+
+  .graphs h2,
+  .graphs .readout {
+    display: none;
+  }
+}
+
+/* ---------- laboratorio con guía (en la tarjeta) ---------- */
+
+.lab-lists {
+  max-width: 40em;
+}
+
+.lab-lists summary {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  width: max-content;
+}
+
+.lab-lists summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.lab-lists-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 20px;
+  margin-top: 6px;
+}
+
+.lab-lists:empty,
+.lab-controls:empty {
+  display: none;
+}
+
+.lab-lists h3 {
+  margin: 0 0 2px;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lab-lists ul {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: var(--t-sm);
+  line-height: 1.45;
+  color: var(--muted);
+  text-shadow: 0 0 10px var(--bg);
+}
+
+.lab-controls {
+  display: grid;
+  gap: 4px;
+  max-width: 26em;
+  margin-top: 2px;
+}
+
+.lab-control {
+  display: grid;
+  grid-template-columns: 3.2em 1fr 6.5em;
+  align-items: center;
+  gap: 10px;
+}
+
+.lab-control label {
+  font: 400 18px var(--display);
+}
+
+.lab-control label i {
+  font-style: italic;
+}
+
+.lab-control label sub {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: -0.2em;
+}
+
+.lab-control output {
+  font: 400 var(--t-sm) var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.lab-control input {
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.lab-control input::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.lab-control input::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.lab-control input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.lab-control input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+
+.lab-control input:focus-visible {
+  outline: none;
+}
+
+.lab-control input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ink);
+}
+
+.lab-control input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ink);
+}
+
+.card.collapsed .lab-lists,
+.card.collapsed .lab-controls {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .lab-lists-body {
+    grid-template-columns: 1fr;
   }
 }

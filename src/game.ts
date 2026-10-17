@@ -28,6 +28,7 @@ import { Inspector, K_MAX, K_MIN, L0_MAX, L0_MIN, MU_MAX, clampMass } from './ui
 import { Toast } from './ui/toast';
 import { Timeline } from './ui/timeline';
 import { EnergyMeter } from './ui/energyMeter';
+import { GraphsPanel } from './ui/graphs';
 import { LENS_NAMES, SWITCH_NAMES, TIME_NAMES, Toolbar } from './ui/toolbar';
 import { G_EARTH, World, type EntityRef } from './world/world';
 
@@ -78,6 +79,7 @@ export class Game {
   private lab: Lab;
   private timeline: Timeline;
   private energyMeter = new EnergyMeter();
+  private graphs: GraphsPanel;
   /** lentes activos (se recuerdan entre visitas) */
   private lensOn = loadLenses();
   /** cámara lenta en el relato (en el laboratorio vale la preferencia guardada) */
@@ -157,6 +159,8 @@ export class Game {
         enter: (id) => this.goToSite(id),
         toMap: () => this.toMap(),
         openJournal: (id) => this.journal.show(id),
+        setControl: (id, v) => this.setLabControl(id, v),
+        controlValue: (c) => c.get(this.world),
       },
       (g) => this.grantName(g),
     );
@@ -208,6 +212,23 @@ export class Game {
         this.select(null);
       },
       forces: (id) => this.sim.forcesOn(id)?.parts ?? null,
+      changeLoad: (bodyId, loadId, k) => {
+        const b = this.world.body(bodyId);
+        const l = b?.loads.find((x) => x.id === loadId);
+        if (!b || !l || l.locked) return;
+        if (this.sim.hasRun) this.sim.reset();
+        if (k === 0) b.loads = b.loads.filter((x) => x !== l);
+        else l.mass = clampMass(l.mass * k);
+        this.inspector.rebuild();
+        this.bus.emit({ type: 'load-moved' });
+      },
+      changeBodyMass: (bodyId, k) => {
+        const b = this.world.body(bodyId);
+        if (!b) return;
+        if (this.sim.hasRun) this.sim.reset();
+        b.mass = clampMass(b.mass * k);
+        this.bus.emit({ type: 'mass-changed' });
+      },
       flip: (id) => {
         const v = this.world.vector(id);
         if (!v?.fixed) return;
@@ -228,6 +249,11 @@ export class Game {
         afterWorldReplaced: () => {
           this.select(null);
           this.highlighted.clear();
+          // un laboratorio con guía enciende los lentes que necesita
+          for (const l of this.lab?.guide?.guide?.lenses ?? []) this.lensOn.add(l);
+          saveLenses(this.lensOn);
+          this.view.home = { center: { x: 0, y: 0 }, zoom: 1 };
+          this.view.reset();
           this.refreshUI();
         },
         toast: (m) => this.toast.show(m),
@@ -235,6 +261,12 @@ export class Game {
       stress === 0,
     );
 
+    this.graphs = new GraphsPanel(this.sim, this.world, (t) => {
+      // tocar un gráfico lleva a ese instante (si ya se tiene la línea de tiempo)
+      if (!this.has('timeline') || !this.sim.hasRun) return;
+      this.sim.seek(t);
+      this.checkPeak();
+    });
     this.timeline = new Timeline((t) => {
       if (!this.has('timeline')) return;
       this.sim.seek(t);
@@ -307,13 +339,15 @@ export class Game {
       time: inMap ? new Set() : this.story.timeSkills(),
       switches: inMap ? [] : [...this.story.forceSwitches()].map((id) => ({ id, on: this.forceOn(id), label: this.switchLabel(id) })),
       lenses: inMap ? [] : [...this.story.lenses()].map((id) => ({ id, on: this.lensOn.has(id) })),
-      labEnabled: this.story.free,
+      // los laboratorios con guía se abren desde cualquier parte
+      labEnabled: true,
       mapEnabled: !inMap,
       running: this.sim.running,
       timeScale: this.timeScale,
       fresh,
     });
-    this.card.render(this.story, this.mapSelection);
+    const guide = this.lab.guide;
+    this.card.render(this.story, this.mapSelection, guide?.guide ? { id: guide.id, name: guide.name, guide: guide.guide } : null);
     this.map.selected = this.mapSelection;
     this.map.refresh();
     this.map.visible = inMap;
@@ -419,16 +453,25 @@ export class Game {
    * con la componente de v a lo largo de g casi nula y moviéndose de lado).
    */
   private checkPeak(): void {
-    const g = this.world.g;
-    if (!g || this.sim.running || !this.sim.hasRun) return;
-    const gL = Math.hypot(g.x, g.y);
+    if (!this.world.anyG || this.sim.running || !this.sim.hasRun) return;
     const atPeak = this.world.particles.some((p) => {
+      const g = this.world.gAt(p.pos);
+      if (!g) return false;
+      const gL = Math.hypot(g.x, g.y);
       const s = this.sim.initialState(p.id);
       if (!s || dist(p.pos, s.pos) < 0.5 || this.sim.contactNormal(p.id)) return false;
       const along = (p.vel.x * g.x + p.vel.y * g.y) / gL;
       return Math.abs(along) < 0.35 && Math.hypot(p.vel.x, p.vel.y) > 0.3;
     });
     if (atPeak) this.bus.emit({ type: 'peak-found' });
+  }
+
+  /** Un deslizador del laboratorio: el lanzamiento vuelve a t = 0 con el valor nuevo. */
+  private setLabControl(id: string, v: number): void {
+    const c = this.lab.guide?.guide?.controls?.find((x) => x.id === id);
+    if (!c) return;
+    if (this.sim.hasRun) this.sim.reset();
+    c.set(this.world, v);
   }
 
   // ---------- el mapa y los rastros ----------
@@ -501,7 +544,14 @@ export class Game {
     const bar = $('bar').getBoundingClientRect();
     // en una pantalla ancha la tarjeta está al costado: la franja es casi toda la pantalla
     const top = this.view.narrow ? card.bottom + 8 : 24;
-    const bottom = (bar.top || this.view.H - 70) - 12;
+    let bottom = (bar.top || this.view.H - 70) - 12;
+    // en el celular los paneles (HUD, gráficos) van abajo: la escena queda sobre ellos
+    if (this.view.narrow) {
+      for (const el of document.querySelectorAll<HTMLElement>('#dock > *')) {
+        const r = el.getBoundingClientRect();
+        if (!el.hidden && r.height > 0) bottom = Math.min(bottom, r.top - 8);
+      }
+    }
     const v = this.view;
     const fitsNow = v.sx(b.minX) > 16 && v.sx(b.maxX) < v.W - 16 && v.sy(b.maxY) > top && v.sy(b.minY) < bottom;
     if (!fitsNow) v.fit(b, top, bottom);
@@ -667,6 +717,12 @@ export class Game {
         if (labels.length) this.toast.show(`★ ${labels.join(' · ')}`, 3400);
       }
       if (solved && site) this.toast.show(`Rastro resuelto: ${site.title}`, 3000);
+      // un lente recién ganado se enciende solo, para que se vea qué es
+      for (const g of newGrants) {
+        if (!g.startsWith('lens:')) continue;
+        this.lensOn.add(g.slice(5) as LensId);
+        saveLenses(this.lensOn);
+      }
       const tools = newGrants.filter((g) => g.startsWith('tool:')).map((g) => g.slice(5) as ToolId);
       const skills = newGrants.filter((g) => g.startsWith('time:')).map((g) => g.slice(5) as TimeSkill);
       const switches = newGrants.filter((g) => g.startsWith('force:')).map((g) => g.slice(6) as ForceSwitch);
@@ -681,6 +737,7 @@ export class Game {
       // sin área visible (página oculta o aún sin diseño) no hay «fuera de la vista»
       if (!this.view.W || !this.view.H) return false;
       const b = this.view.homeBounds(Math.max(this.view.W, this.view.H) * 0.5);
+      if (!this.world.particles.length) return false;
       return this.world.particles.every((p) => p.pos.x < b.minX || p.pos.x > b.maxX || p.pos.y < b.minY || p.pos.y > b.maxY);
     };
     this.sim.onStep.push(() => {
@@ -922,7 +979,7 @@ export class Game {
     if (this.opts.stress && this.sim.finished) this.sim.start();
 
     // el inspector agrega filas cuando aparece el origen, la primera superficie o g
-    const structure = `${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.gravitation}|${!!this.world.medium}|${!!this.world.g}`;
+    const structure = `${this.world.bodies.map((b) => b.loads.length).join(',')}|${!!this.world.frame}|${this.world.surfaces.length > 0}|${this.world.springs.length > 0}|${!!this.world.gravitation}|${!!this.world.medium}|${!!this.world.g}`;
     this.toolbar.setSwitch('gravitation', !!this.world.gravitation);
     this.toolbar.setSwitch('drag', !!this.world.medium, this.switchLabel('drag'));
     if (structure !== this.structure) {
@@ -931,10 +988,12 @@ export class Game {
     }
     if (this.selection && !this.world.exists(this.selection)) this.select(null);
     this.inspector.update();
-    this.hud.update(this.world, this.sim, this.has('flow'), this.fps);
+    const focus = this.selection?.kind === 'particle' ? this.world.particle(this.selection.id)?.pos : this.world.particles[0]?.pos;
+    this.hud.update(this.world, this.sim, this.has('flow'), this.fps, focus);
     const recenter = $('recenter');
     if (recenter.hidden === this.view.moved) recenter.hidden = !this.view.moved;
     this.energyMeter.update(this.lensOn.has('energy') && this.story.lenses().has('energy'), this.world, this.sim);
+    this.graphs.update(this.lensOn.has('graphs') && this.story.lenses().has('graphs'), this.selection?.kind === 'particle' ? this.selection.id : null);
     this.timeline.update(this.has('timeline') && this.sim.hasRun && this.sim.duration > 0, this.sim.t, this.sim.duration);
     this.updateProbe(dt);
     this.watchSite();
@@ -960,7 +1019,7 @@ export class Game {
   /** Zonas del lienzo tapadas por la interfaz: los rótulos de masa y de vectores no se dibujan debajo. */
   private uiRects(): Rect[] {
     const out: Rect[] = [];
-    const els = [$('card'), $('hud'), $('insp'), $('bar'), $('timeline'), ...document.querySelectorAll<HTMLElement>('#dock > .energy')];
+    const els = [$('card'), $('hud'), $('insp'), $('bar'), $('timeline'), ...document.querySelectorAll<HTMLElement>('#dock > .energy, #dock > .graphs')];
     for (const el of els) {
       if (el.hidden) continue;
       const r = el.getBoundingClientRect();
@@ -996,7 +1055,7 @@ const LENS_KEY = 'mundoVacio.lenses';
 function loadLenses(): Set<LensId> {
   try {
     const raw = JSON.parse(localStorage.getItem(LENS_KEY) ?? '[]') as unknown;
-    return new Set(Array.isArray(raw) ? (raw.filter((x) => x === 'energy') as LensId[]) : []);
+    return new Set(Array.isArray(raw) ? (raw.filter((x) => x === 'energy' || x === 'graphs') as LensId[]) : []);
   } catch {
     return new Set();
   }
