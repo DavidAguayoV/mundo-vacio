@@ -2,9 +2,13 @@
 
 import type { GameHost } from '../mode';
 import { h } from '../ui/dom';
+import { qrSvg } from './qr';
 import { routeState } from './policy';
 import { ROUTE_IDS } from './route';
 import { resetDemo } from './reset';
+
+/** Adónde lleva el código QR del kiosco: la demo publicada, para jugarla en el celular. */
+export const PUBLIC_DEMO_URL = 'https://davidaguayov.github.io/mundo-vacio/demo.html';
 
 /** Tras «Empezar de nuevo» en la entrada, la página se recarga y parte directo en el vacío. */
 const SKIP_KEY = 'mundoVacio.demo.skipIntro';
@@ -31,7 +35,7 @@ export function introOpen(): boolean {
   return !!current;
 }
 
-export function showIntro(host: GameHost): void {
+export function showIntro(host: GameHost, opts: { kiosk: boolean }): void {
   if (takeSkip()) return;
   current?.remove();
   const resume = hasProgress(host);
@@ -69,6 +73,12 @@ export function showIntro(host: GameHost): void {
     h('p', { class: 'intro-meta' }, '≈ 12 minutos · funciona con mouse o con el dedo'),
     actions,
   );
+  if (opts.kiosk) {
+    const qr = h('figure', { class: 'intro-qr' });
+    qr.innerHTML = qrSvg(PUBLIC_DEMO_URL);
+    qr.append(h('figcaption', {}, 'Juégalo en tu celular'));
+    body.append(qr);
+  }
   const el = h(
     'div',
     { class: 'demo-intro', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'introTitle' },

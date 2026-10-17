@@ -29,6 +29,7 @@ import type { ForceSwitch, Grant, LensId, Site, TimeSkill } from './story/types'
 import { WorldMap } from './map/worldMap';
 import { Journal } from './ui/journal';
 import { FrameDrag } from './tools/frameDrag';
+import { handlePos } from './tools/hit';
 import { TOOL_ORDER, createTools } from './tools/registry';
 import type { Tool, ToolContext, ToolId, WorldPointer } from './tools/tool';
 import { TreeView } from './tree/treeView';
@@ -373,6 +374,12 @@ export class Game {
       openJournal: (id) => this.journal.show(id),
       refresh: () => this.refreshUI(),
       toast: (m, ms) => this.toast.show(m, ms),
+      axisOnScreen: () => {
+        const f = this.world.frame;
+        const h = handlePos(this.world);
+        if (!f || !h || this.mode !== 'site') return null;
+        return { origin: { x: this.view.sx(f.origin.x), y: this.view.sy(f.origin.y) }, handle: { x: this.view.sx(h.x), y: this.view.sy(h.y) } };
+      },
     };
   }
 

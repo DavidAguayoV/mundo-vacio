@@ -1,14 +1,20 @@
 // El modo demo: la ruta de siete rastros con «Siguiente», el progreso a la vista, la pantalla de
-// entrada y el final «El mundo se abre».
+// entrada, el final «El mundo se abre» y, con ?kiosco, el reinicio por inactividad.
 
 import type { GameHost, ModeHooks } from '../mode';
 import { storageKey } from '../state/storage';
 import { ZONES } from '../story/sites';
 import type { Site } from '../story/types';
 import type { CardButton, MapCardContent } from '../ui/card';
+import { mountChrome } from './chrome';
 import { showIntro } from './intro';
 import { demoPolicy, routeIndex, routeState } from './policy';
 import { demoSites, ROUTE_IDS } from './route';
+
+export interface DemoOptions {
+  /** computador o tablet de feria: vuelve sola al comienzo tras un rato sin nadie */
+  kiosk: boolean;
+}
 
 export const FINALE_TEXT =
   'Empezaste sin un «aquí». Ahora tienes ejes, vectores, tiempo, gravedad y una órbita: una caída que nunca llega. Quien estuvo antes dejó más rastros (resortes, planos con roce, aire, energía, cuerpos que giran), y ya están todos abiertos. Tus herramientas también.';
@@ -33,7 +39,7 @@ function markFinaleSeen(): void {
 /** Zonas con nombre durante la ruta: las que tienen un rastro de la ruta. */
 const ROUTE_ZONES = new Set(['claro', ...ZONES.filter((z) => demoSites().some((s) => s.zone === z.id && ROUTE_IDS.includes(s.id))).map((z) => z.id)]);
 
-export function createDemo(): ModeHooks {
+export function createDemo(opts: DemoOptions): ModeHooks {
   let host: GameHost | null = null;
   /** la tarjeta del final está a la vista (hasta «Explorar el mapa») */
   let finale = false;
@@ -148,7 +154,8 @@ export function createDemo(): ModeHooks {
     attach(h) {
       // el mundo ya se abrió en otra visita: todo sigue ganado
       if (route().complete && finaleSeen() && story().grantAll().length) h.refresh();
-      showIntro(h);
+      mountChrome(h, opts);
+      showIntro(h, { kiosk: opts.kiosk });
     },
   };
 }

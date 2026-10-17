@@ -25,6 +25,8 @@ export interface GameHost {
   /** vuelve a dibujar la tarjeta, la barra y el mapa */
   refresh(): void;
   toast(message: string, ms?: number): void;
+  /** dónde están en la pantalla el origen y el asa de los ejes (null si no hay ejes) */
+  axisOnScreen(): { origin: { x: number; y: number }; handle: { x: number; y: number } } | null;
 }
 
 export interface ModeHooks {

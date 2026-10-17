@@ -21,5 +21,5 @@ const params = new URLSearchParams(location.search);
 
 new Game({
   debug: params.has('debug'),
-  mode: createDemo(),
+  mode: createDemo({ kiosk: params.has('kiosco') }),
 }).start();
