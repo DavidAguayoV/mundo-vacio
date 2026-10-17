@@ -61,6 +61,12 @@ html,
 body {
   height: 100%;
   margin: 0;
+  /*
+   * Desplazar sí, agrandar la página con un pellizco no: si se agrandaba sobre el árbol o una
+   * tarjeta, al volver al lienzo (que se queda con sus gestos para acercar el mundo) no había cómo
+   * achicarla. El zoom del navegador con el teclado sigue disponible.
+   */
+  touch-action: pan-x pan-y;
 }
 
 body {
