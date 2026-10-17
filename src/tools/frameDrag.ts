@@ -35,7 +35,11 @@ export class FrameDrag {
     const f = ctx.world.frame;
     if (!f) return;
     if (this.kind === 'rotate') {
-      f.angle = Math.atan2(p.y - f.origin.y, p.x - f.origin.x);
+      // cerca de un múltiplo de 5° el giro se queda ahí: así se pueden fijar 30° exactos
+      const a = Math.atan2(p.y - f.origin.y, p.x - f.origin.x);
+      const step = (5 * Math.PI) / 180;
+      const snapped = Math.round(a / step) * step;
+      f.angle = Math.abs(a - snapped) < (1.5 * Math.PI) / 180 ? snapped : a;
     } else {
       f.origin = { x: p.x + this.grab.x, y: p.y + this.grab.y };
     }

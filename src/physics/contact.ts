@@ -9,6 +9,8 @@ export interface SurfaceLike {
   muS: number;
   /** coeficiente de roce cinético μc (≤ μₛ) */
   muK: number;
+  /** parte del escenario de un rastro (un muro): no se mueve ni se borra */
+  locked?: boolean;
 }
 
 export interface SurfaceFrame {

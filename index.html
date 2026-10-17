@@ -14,6 +14,7 @@
   <body>
     <div id="app">
       <canvas id="cv" aria-label="Espacio de simulación"></canvas>
+      <div class="site-layer" id="siteLayer" role="group" aria-label="Rastros del mapa" hidden></div>
 
       <section class="card" id="card" aria-live="polite">
         <button class="min" id="minBtn" type="button" aria-label="Contraer relato" aria-expanded="true">−</button>
@@ -29,12 +30,25 @@
       </div>
 
       <div class="toast" id="toast" role="status"></div>
+      <button class="recenter" id="recenter" type="button" hidden>Centrar la vista</button>
       <div class="timeline" id="timeline" hidden>
         <label for="tl">t</label>
         <input id="tl" type="range" min="0" max="1" step="0.005" value="0" aria-label="Línea de tiempo" />
         <output id="tlOut" for="tl">0,00 s</output>
       </div>
       <nav class="bar" id="bar" aria-label="Caja de herramientas"></nav>
+
+      <div class="overlay" id="journalOv" hidden>
+        <div class="tree journal" role="dialog" aria-modal="true" aria-labelledby="journalTitle">
+          <header>
+            <h2 id="journalTitle">Bitácora</h2>
+            <div class="row">
+              <button class="btn primary" id="closeJournal" type="button">Volver</button>
+            </div>
+          </header>
+          <div id="journalBody" class="journal-body"></div>
+        </div>
+      </div>
 
       <div class="overlay" id="treeOv" hidden>
         <div class="tree" role="dialog" aria-modal="true" aria-labelledby="treeTitle">

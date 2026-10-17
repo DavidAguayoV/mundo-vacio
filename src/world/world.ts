@@ -1,4 +1,4 @@
-import type { Vec2 } from '../core/vec';
+import { dist, segmentsIntersect, type Vec2 } from '../core/vec';
 import type { SurfaceLike } from '../physics/contact';
 import type { Endpoint } from '../physics/forces/force';
 import type { MediumId } from '../physics/forces/drag';
@@ -10,6 +10,8 @@ export const G_EARTH = 9.8; // m/s²
 
 export interface Particle extends Body {
   label: string; // "1", "2", …
+  /** su velocidad no se puede cambiar (la boya de un rastro) */
+  locked?: boolean;
 }
 
 /** Vector libre dibujado por el jugador (cola y punta en coordenadas globales). */
@@ -18,7 +20,29 @@ export interface FreeVector {
   label: string; // "A", "B", …
   tail: Vec2;
   tip: Vec2;
+  /** tarjeta de la sonda: se traslada y se puede invertir, pero no estirar */
+  fixed?: boolean;
 }
+
+/** Baliza: el lugar al que tiene que llegar la sonda (o que hay que encontrar, si está oculta). */
+export interface Beacon {
+  id: string;
+  pos: Vec2;
+  radius: number; // m
+  hidden?: boolean;
+}
+
+/** Cadena de vectores que parte de la sonda, cola con punta. */
+export interface ProbeChain {
+  vectors: FreeVector[];
+  /** sonda, punta del primero, punta del segundo… */
+  points: Vec2[];
+  /** algún tramo atraviesa un muro */
+  blocked: boolean;
+}
+
+/** Distancia (m) a la que la cola de una tarjeta se pega a la sonda o a la punta de otra. */
+export const SNAP_DIST = 0.4;
 
 /** Suma A + B: B se traslada a la punta de A. Guarda referencias, no copias: si A o B cambian, la suma también. */
 export interface VectorSum {
@@ -69,6 +93,11 @@ export class World implements ForceWorld {
   gravitation: { G: number } | null = null;
   /** fluido que llena el espacio (null = vacío): produce arrastre */
   medium: MediumId | null = null;
+  /** sonda que salta siguiendo vectores (posición de partida); null si el rastro no la usa */
+  probe: Vec2 | null = null;
+  beacons: Beacon[] = [];
+  /** con qué cadenas llegó la sonda a una baliza en este rastro («A,B», «B,A»…), para los retos */
+  probeLog: string[] = [];
 
   private nextId = 1;
 
@@ -95,6 +124,66 @@ export class World implements ForceWorld {
     this.springs = [];
     this.gravitation = null;
     this.medium = null;
+    this.probe = null;
+    this.beacons = [];
+    this.probeLog = [];
+  }
+
+  // ----- sonda -----
+
+  /** Sigue la cadena desde la sonda: cada tarjeta cuya cola está en la punta de la anterior. */
+  probeChain(): ProbeChain {
+    const chain: ProbeChain = { vectors: [], points: [], blocked: false };
+    if (!this.probe) return chain;
+    let cur = this.probe;
+    chain.points.push(cur);
+    const used = new Set<string>();
+    for (;;) {
+      // solo las tarjetas cuentan: una flecha dibujada a mano no es una instrucción de la sonda
+      const next = this.vectors.find((v) => v.fixed && !used.has(v.id) && dist(v.tail, cur) < 0.02);
+      if (!next) break;
+      used.add(next.id);
+      chain.vectors.push(next);
+      if (this.surfaces.some((s) => segmentsIntersect(next.tail, next.tip, s.a, s.b))) chain.blocked = true;
+      cur = next.tip;
+      chain.points.push(cur);
+    }
+    return chain;
+  }
+
+  /** Pega la cola de un vector a la sonda o a la punta de otro vector, si quedó cerca. */
+  snapVector(v: FreeVector, tol = SNAP_DIST): boolean {
+    if (!this.probe) return false;
+    const spots = [this.probe, ...this.vectors.filter((o) => o !== v).map((o) => o.tip)];
+    let best: Vec2 | null = null;
+    let bestD = tol;
+    for (const s of spots) {
+      const d = dist(s, v.tail);
+      if (d < bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    if (!best) return false;
+    const dx = best.x - v.tail.x;
+    const dy = best.y - v.tail.y;
+    v.tail = { x: best.x, y: best.y };
+    v.tip = { x: v.tip.x + dx, y: v.tip.y + dy };
+    return true;
+  }
+
+  /** Lo que es parte del escenario de un rastro no se borra (la boya, las tarjetas, los muros). */
+  isProtected(ref: EntityRef): boolean {
+    if (ref.kind === 'particle') return !!this.particle(ref.id)?.locked;
+    if (ref.kind === 'vector') return !!this.vector(ref.id)?.fixed;
+    if (ref.kind === 'surface') return !!this.surface(ref.id)?.locked;
+    return false;
+  }
+
+  /** Invierte una tarjeta: A → −A (misma cola, punta del otro lado). */
+  flipVector(v: FreeVector): void {
+    v.tip = { x: 2 * v.tail.x - v.tip.x, y: 2 * v.tail.y - v.tip.y };
+    v.label = v.label.startsWith('−') ? v.label.slice(1) : `−${v.label}`;
   }
 
   // ----- partículas -----

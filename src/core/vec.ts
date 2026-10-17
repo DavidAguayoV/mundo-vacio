@@ -40,6 +40,33 @@ export function segmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
 }
 
 /** Diferencia angular mínima |a − b| en rad, en [0, π]. */
+/** Punto donde se cruzan las rectas ab y cd (null si son paralelas). */
+export function lineIntersection(a: Vec2, b: Vec2, c: Vec2, d: Vec2): Vec2 | null {
+  const r = sub(b, a);
+  const s = sub(d, c);
+  const den = cross(r, s);
+  if (Math.abs(den) < 1e-12) return null;
+  const t = cross(sub(c, a), s) / den;
+  return { x: a.x + t * r.x, y: a.y + t * r.y };
+}
+
+/** ¿Se cortan (o se tocan) los segmentos ab y cd? */
+export function segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
+  const o = (p: Vec2, q: Vec2, r: Vec2) => cross(sub(q, p), sub(r, p));
+  const d1 = o(c, d, a);
+  const d2 = o(c, d, b);
+  const d3 = o(a, b, c);
+  const d4 = o(a, b, d);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  const eps = 1e-9;
+  return (
+    (Math.abs(d1) < eps && segmentDistance(a, c, d) < 1e-6) ||
+    (Math.abs(d2) < eps && segmentDistance(b, c, d) < 1e-6) ||
+    (Math.abs(d3) < eps && segmentDistance(c, a, b) < 1e-6) ||
+    (Math.abs(d4) < eps && segmentDistance(d, a, b) < 1e-6)
+  );
+}
+
 export function angleDiff(a: number, b: number): number {
   let d = Math.abs(a - b) % (2 * Math.PI);
   if (d > Math.PI) d = 2 * Math.PI - d;

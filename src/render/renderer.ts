@@ -5,6 +5,7 @@ import { axesLayer, gridLayer } from './layers/frame';
 import { particlesLayer, trailsLayer } from './layers/particles';
 import { targetLayer } from './layers/target';
 import { vectorsLayer } from './layers/vectors';
+import { beaconsLayer, probeLayer } from './layers/probe';
 import type { Layer, Scene } from './scene';
 
 /** Orden de las capas, del fondo al frente. */
@@ -14,9 +15,11 @@ const LAYERS: Layer[] = [
   axesLayer,
   surfacesLayer,
   targetLayer,
+  beaconsLayer,
   trailsLayer,
   springsLayer,
   vectorsLayer,
+  probeLayer,
   particlesLayer,
   (s) => s.draft?.(s.painter),
 ];

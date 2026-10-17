@@ -1,5 +1,6 @@
 import type { Simulation } from '../physics/simulation';
 import type { EntityRef, World } from '../world/world';
+import type { Vec2 } from '../core/vec';
 import type { Painter, Rect } from './painter';
 import type { View } from './view';
 
@@ -20,6 +21,8 @@ export interface Scene {
   display: { positions: boolean; trails: boolean };
   /** zonas del lienzo tapadas por la interfaz (tarjeta del relato, paneles, barra), en px CSS: los rótulos las evitan */
   avoid: readonly Rect[];
+  /** dónde se dibuja la sonda (en su partida o en pleno salto); null si el rastro no tiene sonda */
+  probe?: Vec2 | null;
 }
 
 export type Layer = (scene: Scene) => void;

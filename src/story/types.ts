@@ -31,6 +31,10 @@ export interface StoryContext {
   count(type: GameEventType): number;
   /** la opción que eligió el jugador en una predicción (undefined si no respondió) */
   prediction(key: string): string | undefined;
+  /** cuántas veces ocurrió desde que se entró al rastro (para los retos de maestría) */
+  total(type: GameEventType): number;
+  /** cuántos lanzamientos distintos hubo desde que se entró al rastro */
+  runs(): number;
 }
 
 export interface Choice {
@@ -41,8 +45,11 @@ export interface Choice {
 export interface Step {
   /** texto de la tarjeta; **así** va en negrita. Puede depender de las predicciones. */
   text: string | ((ctx: StoryContext) => string);
-  /** evento que completa el paso; 'end' marca el cierre (no se completa solo) */
-  on: GameEventType | 'end';
+  /**
+   * evento que completa el paso; 'end' marca el cierre (no se completa solo);
+   * 'tick' se revisa en cada cuadro con `when` (para objetivos que son una condición del mundo)
+   */
+  on: GameEventType | 'end' | 'tick';
   /** condición adicional que debe cumplirse cuando llega el evento */
   when?(ctx: StoryContext): boolean;
   /** se llama al entrar al paso, y también al retomarlo tras recargar la página */
@@ -53,6 +60,8 @@ export interface Step {
   choices?: Choice[];
   /** clave con que se guarda la predicción */
   ask?: string;
+  /** la opción que acierta (da la estrella de predicción) */
+  correct?: string;
   /** texto del botón cuando on === 'next' (por defecto, «Siguiente») */
   button?: string;
   /** tarjeta de cierre «Mirada de ingeniería» */
@@ -70,3 +79,63 @@ export interface Chapter {
   seed?(ctx: StoryContext): void;
   steps: Step[];
 }
+
+// ---------- el mundo abierto: zonas y rastros ----------
+
+export type ZoneId = 'claro' | 'constelacion' | 'deriva' | 'pozo' | 'laderas' | 'taller' | 'astro' | 'mar' | 'central';
+
+/** Una región del mapa. Las coordenadas del mapa son unidades propias, no metros del mundo. */
+export interface Zone {
+  id: ZoneId;
+  name: string;
+  /** centro en el mapa */
+  at: { x: number; y: number };
+  /** qué física hay allí, en pocas palabras (se muestra en el mapa) */
+  hint: string;
+}
+
+/** Página de la bitácora que se escribe al resolver un rastro. */
+export interface Page {
+  /** la idea, en una línea */
+  law: string;
+  /** lo que midió el estudiante, si el rastro lo permite (se calcula al resolver) */
+  measured?(ctx: StoryContext): string | null;
+  /** mirada de ingeniería */
+  engineering: string;
+}
+
+/** Reto de maestría: una estrella extra, opcional. */
+export interface Mastery {
+  id: string;
+  label: string;
+  /** evento que se revisa ('tick' = cada cuadro) */
+  on: GameEventType | 'tick';
+  when?(ctx: StoryContext): boolean;
+}
+
+/**
+ * Un rastro: una situación en un lugar del mapa, con un objetivo. Se juega como un capítulo
+ * (pasos que avanzan con eventos), pero se elige desde el mapa y se puede repetir.
+ */
+export interface Site {
+  id: string;
+  zone: ZoneId;
+  title: string;
+  /** posición en el mapa */
+  at: { x: number; y: number };
+  /** la nota que dejó quien estuvo antes: lo primero que se lee del rastro */
+  note: string;
+  /** lo que hace falta para resolverlo (puertas suaves: se ve, pero no se entra sin esto) */
+  needs?: Grant[];
+  /** lo que se gana al entrar */
+  grants?: Grant[];
+  /** arma el mundo del rastro desde cero */
+  seed?(ctx: StoryContext): void;
+  steps: Step[];
+  page: Page;
+  mastery?: Mastery[];
+}
+
+/** Estrellas: resolver, predecir bien y los retos de maestría. */
+export const STAR_SOLVED = 'resuelto';
+export const STAR_PREDICTION = 'prediccion';
