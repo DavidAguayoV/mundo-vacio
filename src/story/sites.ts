@@ -658,7 +658,8 @@ const quedarse: Site = {
     {
       text: (ctx) => {
         const ok = ctx.prediction('rampa20') === 'queda' && ctx.prediction('rampa40') === 'desliza';
-        return `En la de 20° se queda y en la de 40° desliza. El **roce estático** se ajusta a lo que haga falta, hasta un máximo μₛN: la partícula se queda mientras tan α ≤ μₛ. Aquí tan 20° = 0,36 y tan 40° = 0,84. ${ok ? 'Predijiste las dos.' : 'La clave no es el ángulo solo, sino compararlo con el roce.'}`;
+        const verdict = ok ? 'Predijiste las dos.' : 'No predijiste las dos: la clave no es el ángulo solo, sino compararlo con el roce.';
+        return `${verdict} En la de 20° se queda y en la de 40° desliza. El **roce estático** se ajusta a lo que haga falta, hasta un máximo μₛN: la partícula se queda mientras tan α ≤ μₛ. Aquí tan 20° = 0,36 y tan 40° = 0,84.`;
       },
       on: 'next',
     },

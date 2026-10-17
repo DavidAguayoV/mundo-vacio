@@ -53,6 +53,16 @@ export class SiteEngine {
       seen: (t) => (this.seenSinceStep.get(t) ?? 0) > 0,
       count: (t) => this.seenSinceStep.get(t) ?? 0,
       prediction: (k) => this.progress.predictions[k],
+      predictionLabel: (k) => {
+        const id = this.progress.predictions[k];
+        if (id === undefined) return undefined;
+        for (const site of this.sites) {
+          const step = site.steps.find((st) => st.ask === k);
+          const choice = step?.choices?.find((c) => c.id === id);
+          if (choice) return choice.label;
+        }
+        return undefined;
+      },
       total: (t) => this.seenSinceEnter.get(t) ?? 0,
       runs: () => this.runIds.size,
     };
