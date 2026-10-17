@@ -424,6 +424,7 @@ export class Game {
       timeScale: this.timeScale,
       fresh,
       wanted: this.story.step?.tool ?? null,
+      grouped: this.opts.mode?.groupedBar?.() ?? false,
     });
     $('timeline').classList.toggle('wanted', this.story.step?.tool === 'time:timeline');
     const guide = this.lab.guide;

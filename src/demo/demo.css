@@ -1,0 +1,100 @@
+/* La demo: pantalla de entrada. Con los tokens del juego (styles.css), así sirve en el tema oscuro
+   y en el claro. */
+
+/* ---------- pantalla de entrada ---------- */
+
+.demo-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  padding: max(32px, env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  background-image: radial-gradient(ellipse 75% 70% at 50% 45%, var(--bg-center) 0%, var(--bg) 55%, var(--bg-edge) 100%);
+  overflow-y: auto;
+  animation: intro-in 0.5s ease-out both;
+}
+
+.demo-intro.leaving {
+  animation: intro-out 0.3s ease-in both;
+  pointer-events: none;
+}
+
+@keyframes intro-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.intro-body {
+  align-self: center;
+  max-width: 34rem;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  text-align: center;
+}
+
+.intro-body h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(48px, 13vw, 84px);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+}
+
+.intro-lead {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.intro-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-md);
+}
+
+.intro-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  margin-top: 10px;
+}
+
+.btn.big {
+  font-size: 17px;
+  padding: 13px 32px;
+  border-radius: 999px;
+  min-width: 13rem;
+}
+
+.intro-where {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-sm);
+}
+
+.intro-credit {
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: var(--t-sm);
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-intro,
+  .demo-intro.leaving {
+    animation: none;
+  }
+}

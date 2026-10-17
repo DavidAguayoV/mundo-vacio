@@ -3,11 +3,12 @@ import demoHtml from '../demo.html?raw';
 import viteConfig from '../vite.config.ts?raw';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { demoPolicy, routeState } from '../src/demo/policy';
+import { clearDemo, demoKeys } from '../src/demo/reset';
 import { demoSites, DEMO_ROUTE, ROUTE_IDS } from '../src/demo/route';
 import { Simulation } from '../src/physics/simulation';
 import { View } from '../src/render/view';
 import { freshProgress, loadProgress, saveProgress, type Progress } from '../src/state/progress';
-import { DEMO_NAMESPACE, FULL_NAMESPACE, useNamespace } from '../src/state/storage';
+import { DEMO_NAMESPACE, FULL_NAMESPACE, storageKey, useNamespace } from '../src/state/storage';
 import { SiteEngine } from '../src/story/siteEngine';
 import { SITES, SITE_IDS, ZONES } from '../src/story/sites';
 import type { Grant, Step, StoryContext } from '../src/story/types';
@@ -201,6 +202,20 @@ describe('el avance de la demo y el del juego completo no se mezclan', () => {
     expect(loadProgress(SITE_IDS)).toEqual(freshProgress());
     useNamespace(FULL_NAMESPACE);
     expect(Object.keys(loadProgress(SITE_IDS).solved).length).toBeGreaterThan(0);
+  });
+
+  it('«Empezar de nuevo» en la demo borra solo lo de la demo', () => {
+    mem.setItem('mundoVacio.progress', '{}');
+    mem.setItem('mundoVacio.world.story', '{}');
+    mem.setItem('mundoVacio.theme', 'light');
+    useNamespace(DEMO_NAMESPACE);
+    for (const k of ['progress', 'world.story', 'world.lab', 'lenses', 'finale', 'hint.axes']) mem.setItem(storageKey(k), '1');
+    expect(demoKeys(mem)).toHaveLength(6);
+    clearDemo(mem);
+    expect(demoKeys(mem)).toEqual([]);
+    expect(mem.getItem('mundoVacio.progress')).toBe('{}');
+    expect(mem.getItem('mundoVacio.world.story')).toBe('{}');
+    expect(mem.getItem('mundoVacio.theme')).toBe('light');
   });
 });
 

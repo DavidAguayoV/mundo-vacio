@@ -36,6 +36,8 @@ export interface ModeHooks {
   map?: MapHooks;
   /** qué rastro queda elegido al llegar al mapa; `left` es el rastro del que se sale */
   mapSelection?(left: string | null): string | null;
+  /** la barra en grupos con rótulo (herramientas · fuerzas y lentes · tiempo · navegación) */
+  groupedBar?(): boolean;
   /** el juego ya existe (al final de su constructor, antes de dibujar nada): el modo lo recibe */
   bind?(host: GameHost): void;
   /** el juego arrancó: el modo agrega su interfaz */

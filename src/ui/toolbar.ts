@@ -22,7 +22,15 @@ export interface ToolbarState {
   fresh?: readonly string[];
   /** lo que pide la tarjeta (Step.tool): queda a la vista, fuera de «Más», y destacado */
   wanted?: Grant | null;
+  /**
+   * barra en grupos con rótulo (herramientas · fuerzas y lentes · tiempo · navegación), para quien
+   * llega con todo ganado (el mundo abierto de la demo). Solo en pantallas anchas.
+   */
+  grouped?: boolean;
 }
+
+/** Desde este ancho la barra agrupada tiene sitio para sus rótulos. */
+const GROUPED_MIN_WIDTH = 700;
 
 /** El botón de la barra que corresponde a algo que se gana («tool:velocity» → [data-tool="velocity"]). */
 function selectorOf(g: Grant): string | null {
@@ -79,13 +87,18 @@ const LABELED_MAX = 3;
  */
 export class Toolbar {
   private bar = $('bar');
-  private toolsZone = h('div', { class: 'zone tools' });
-  private timeZone = h('div', { class: 'zone time', role: 'group', 'aria-label': 'Tiempo' });
-  private metaZone = h('div', { class: 'zone meta' });
+  private toolsZone = h('div', { class: 'zone tools', 'data-label': 'Herramientas' });
+  /** fuerzas y lentes aparte (solo en la barra agrupada) */
+  private forceZone = h('div', { class: 'zone forces', role: 'group', 'aria-label': 'Fuerzas y lentes', 'data-label': 'Fuerzas y lentes' });
+  private timeZone = h('div', { class: 'zone time', role: 'group', 'aria-label': 'Tiempo', 'data-label': 'Tiempo' });
+  private metaZone = h('div', { class: 'zone meta', 'data-label': 'Navegación' });
   private more: HTMLButtonElement;
   private menu = h('div', { class: 'menu', id: 'toolMenu', role: 'group', 'aria-label': 'Más herramientas', hidden: '' });
   private toolItems: HTMLButtonElement[] = [];
+  private forceItems: HTMLButtonElement[] = [];
   private metaItems: HTMLButtonElement[] = [];
+  private grouped = false;
+  private last: ToolbarState | null = null;
   private flowBtn: HTMLButtonElement | null = null;
   private slowBtn: HTMLButtonElement | null = null;
 
@@ -113,7 +126,12 @@ export class Toolbar {
         this.more.focus();
       }
     });
-    new ResizeObserver(() => this.layout()).observe(this.bar);
+    new ResizeObserver(() => {
+      // al cruzar el ancho de la barra agrupada, se rearma
+      const s = this.last;
+      if (s?.grouped && window.innerWidth > GROUPED_MIN_WIDTH !== this.grouped) this.render(s);
+      else this.layout();
+    }).observe(this.bar);
   }
 
   private button(icon: string, label: string, fn: () => void, extra: Record<string, string> = {}): HTMLButtonElement {
@@ -141,8 +159,13 @@ export class Toolbar {
   }
 
   render(s: ToolbarState): void {
+    this.last = s;
+    this.grouped = !!s.grouped && window.innerWidth > GROUPED_MIN_WIDTH;
     const fresh = new Set(s.fresh ?? []);
     this.toolItems = [];
+    this.forceItems = [];
+    // en la barra agrupada, fuerzas y lentes van en su propia zona
+    const forces = this.grouped ? this.forceItems : this.toolItems;
     for (const t of s.tools) {
       const b = this.button(t.icon, t.name, () => this.actions.selectTool(t.id), {
         'data-tool': t.id,
@@ -158,7 +181,7 @@ export class Toolbar {
       });
       b.classList.add('switch');
       if (fresh.has(`force:${sw.id}`)) b.classList.add('new');
-      this.toolItems.push(b);
+      forces.push(b);
     }
     for (const l of s.lenses ?? []) {
       const b = this.button(ICONS[l.id], `Lente ${LENS_NAMES[l.id]}`, () => this.actions.toggleLens(l.id), {
@@ -167,7 +190,7 @@ export class Toolbar {
       });
       b.classList.add('switch');
       if (fresh.has(`lens:${l.id}`)) b.classList.add('new');
-      this.toolItems.push(b);
+      forces.push(b);
     }
 
     this.flowBtn = null;
@@ -201,11 +224,15 @@ export class Toolbar {
 
     const labeled = s.tools.length <= LABELED_MAX && !s.switches?.length && !s.lenses?.length;
     this.bar.classList.toggle('labeled', labeled);
+    const grouped = this.grouped && s.tools.length > 0;
+    this.bar.classList.toggle('grouped', grouped);
+    this.bar.replaceChildren(...(grouped && this.forceItems.length ? [this.toolsZone, this.forceZone, this.timeZone, this.metaZone] : [this.toolsZone, this.timeZone, this.metaZone]));
+    this.bar.classList.toggle('with-forces', grouped && this.forceItems.length > 0);
     // dentro de un rastro (con herramientas y tiempo), a la derecha basta un botón: el resto va a «Más»
     this.bar.classList.toggle('working', s.tools.length > 0 && s.time.size > 0);
     // lo que pide la tarjeta se destaca (y layout() no lo manda a «Más»)
     const sel = s.wanted ? selectorOf(s.wanted) : null;
-    for (const b of [...this.toolItems, ...time]) {
+    for (const b of [...this.toolItems, ...this.forceItems, ...time]) {
       const want = !!sel && b.matches(sel);
       b.classList.toggle('wanted', want);
       if (want) b.setAttribute('aria-description', 'La tarjeta pide usar esto');
@@ -219,6 +246,7 @@ export class Toolbar {
   private layout(): void {
     const tools = this.toolsZone;
     tools.replaceChildren(...this.toolItems, this.menu);
+    this.forceZone.replaceChildren(...this.forceItems);
     this.metaZone.replaceChildren(...this.metaItems);
     const overflow: HTMLButtonElement[] = [];
     const fits = (z: HTMLElement) => {
