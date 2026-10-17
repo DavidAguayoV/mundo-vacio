@@ -14,6 +14,8 @@ export interface ToolbarState {
   time: ReadonlySet<TimeSkill>;
   /** botón Laboratorio (solo en modo libre) */
   labEnabled?: boolean;
+  /** botón Mapa (dentro de un rastro o en modo libre) */
+  mapEnabled?: boolean;
   running: boolean;
   timeScale: number;
   /** herramientas o habilidades recién ganadas: brillan un momento */
@@ -30,6 +32,8 @@ export interface ToolbarActions {
   toggleLens(id: LensId): void;
   openTree(): void;
   openLab(): void;
+  openMap(): void;
+  openJournal(): void;
 }
 
 export const TIME_NAMES: Record<TimeSkill, string> = {
@@ -77,6 +81,8 @@ export class Toolbar {
       'aria-controls': 'toolMenu',
       'data-cmd': 'more',
     });
+    // con los nombres a la vista basta «Más»; el nombre completo queda para los lectores de pantalla
+    this.more.querySelector('.tip')!.textContent = 'Más';
     this.toolsZone.append(this.menu);
     this.bar.replaceChildren(this.toolsZone, this.timeZone, this.metaZone);
     // elegir algo en el menú lo cierra
@@ -175,6 +181,8 @@ export class Toolbar {
 
     this.metaItems = [];
     if (s.labEnabled) this.metaItems.push(this.button(ICONS.lab, 'Lab', this.actions.openLab, { 'data-cmd': 'lab' }));
+    if (s.mapEnabled) this.metaItems.push(this.button(ICONS.map, 'Mapa', this.actions.openMap, { 'data-cmd': 'map' }));
+    this.metaItems.push(this.button(ICONS.journal, 'Bitácora', this.actions.openJournal, { 'data-cmd': 'journal' }));
     this.metaItems.push(this.button(ICONS.tree, 'Árbol', this.actions.openTree, { 'data-cmd': 'tree' }));
 
     const labeled = s.tools.length <= LABELED_MAX && !s.switches?.length && !s.lenses?.length;
@@ -196,8 +204,15 @@ export class Toolbar {
       const last = items[items.length - 1];
       return first.offsetLeft >= -0.5 && last.offsetLeft + last.offsetWidth <= z.clientWidth + 0.5;
     };
-    // a la derecha, el laboratorio es lo primero que cede su lugar (el árbol siempre se ve)
-    if (!fits(this.metaZone) && this.metaItems.length > 1) overflow.push(this.metaItems[0]);
+    // a la derecha ceden su lugar, en este orden, el laboratorio, el árbol y la bitácora (el mapa siempre se ve)
+    for (const cmd of ['lab', 'tree', 'journal']) {
+      if (fits(this.metaZone) || this.metaZone.children.length <= 1) break;
+      const b = this.metaItems.find((m) => m.dataset.cmd === cmd);
+      if (b?.isConnected) {
+        overflow.push(b);
+        b.remove();
+      }
+    }
     if (!fits(tools) || overflow.length) {
       tools.insertBefore(this.more, this.menu);
       while (!fits(tools)) {

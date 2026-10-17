@@ -2,6 +2,18 @@
 
 Juego e historia sobre física para primer año: se parte en un espacio vacío y se van desbloqueando herramientas (sistema de referencia, partículas, vectores, gravedad, velocidad…).
 
+## El mundo abierto
+
+Después del primer rastro («El vacío») se revela el **mapa**: zonas alrededor del claro, cada una con su física, y en ellas **rastros** que dejó alguien que estuvo antes. Cada rastro es un desafío con objetivo; al resolverlo se gana una herramienta o habilidad y se escribe una página en la **bitácora** (la idea, lo que midió el estudiante y una mirada de ingeniería). Hay estrellas por resolver, por predecir bien y por retos de maestría.
+
+- **Puertas suaves**: todo se ve desde el comienzo; la tarjeta dice qué falta para entrar y en qué rastro se gana.
+- **La constelación** enseña vectores con una sonda que salta siguiendo tarjetas (cola con punta, el orden, −B, ejes ajenos).
+- **La deriva** enseña inercia y velocidad sin gravedad (la apuesta a t = 4 s, alcanzar la boya).
+- Los capítulos de antes (caída, tiro, superficies, resortes, gravitación, arrastre, energía) siguen jugables como rastros de sus zonas, a la espera de rehacerse (fases F2 y F3 de `PROPUESTA_MUNDO_ABIERTO.md`).
+- **Cámara**: rueda o pellizco para acercar; arrastrar el espacio vacío con Mover (o con el botón del medio o el derecho) para recorrer; «Centrar la vista» o la tecla 0 para volver. Teclas + y − también acercan y alejan.
+
+El avance guardado del relato lineal se migra solo: lo de los capítulos terminados queda resuelto.
+
 ## Uso
 
 ```bash
@@ -44,11 +56,12 @@ El workflow `.github/workflows/deploy.yml` corre los tests, construye y publica 
 | `src/world` | entidades serializables, sistema de referencia del usuario (`toUser` / `toGlobal`) |
 | `src/render` | cámara, paleta desde los tokens CSS, capas del lienzo |
 | `src/tools` | herramientas como plugins (`Tool`), una por archivo |
-| `src/story` | capítulos como datos (`Chapter`, `Step`), el motor que avanza con los eventos del juego y `RunMonitor`, que traduce cada lanzamiento en eventos (cayó, se apoyó, la sostiene el roce, desliza) |
+| `src/story` | rastros y zonas como datos (`sites.ts`), el motor del mundo abierto (`siteEngine.ts`), los capítulos de antes que siguen como rastros (`chapters.ts`) y `RunMonitor`, que traduce cada lanzamiento en eventos (cayó, se apoyó, la sostiene el roce, desliza) |
+| `src/map` | el mapa: zonas, caminos, marcadores accesibles y su cámara |
 | `src/lab` | experimentos (formato, enlaces, biblioteca local, ejemplos) y el panel del laboratorio |
 | `src/tree` | árbol de habilidades |
-| `src/ui` | tarjeta de relato, caja de herramientas, inspector, HUD |
+| `src/ui` | tarjeta de relato, caja de herramientas, inspector, HUD, bitácora |
 
-Agregar un capítulo: un objeto más en `src/story/chapters.ts`. Agregar una herramienta: un archivo en `src/tools/` y una línea en `registry.ts`. Agregar una fuerza: una clase que implemente `Force` en `src/physics/forces/`.
+Agregar un rastro: un objeto `Site` más en `src/story/sites.ts` (zona, posición en el mapa, nota, lo que pide, cómo se arma, sus pasos y su página). Agregar una herramienta: un archivo en `src/tools/` y una línea en `registry.ts`. Agregar una fuerza: una clase que implemente `Force` en `src/physics/forces/`.
 
 El prototipo original de un archivo está en `mundo-vacio.html`.

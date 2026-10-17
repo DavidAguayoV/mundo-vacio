@@ -17,6 +17,11 @@ export class VelocityTool implements Tool {
     const { world, view, sim } = ctx;
     const q = hitVelocityTip(world, p, tol) ?? hitParticle(world, view, p, tol);
     if (!q) return;
+    if (q.locked) {
+      ctx.select({ kind: 'particle', id: q.id });
+      ctx.toast('Esa no se deja empujar: su velocidad es la que es');
+      return;
+    }
     // la velocidad que se da es la inicial: se vuelve al comienzo del lanzamiento
     if (sim.hasRun) sim.reset();
     this.q = q;

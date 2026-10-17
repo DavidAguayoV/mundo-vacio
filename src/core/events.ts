@@ -30,6 +30,13 @@ export type GameEvent =
   | { type: 'medium-set' }
   | { type: 'terminal' }
   | { type: 'lens-on' }
+  // mundo abierto: la sonda, las balizas y la boya
+  | { type: 'vector-snapped' }
+  | { type: 'vector-flipped' }
+  | { type: 'probe-arrived' }
+  | { type: 'probe-blocked' }
+  | { type: 'beacon-found' }
+  | { type: 'caught' }
   | { type: 'next' };
 
 export type GameEventType = GameEvent['type'];

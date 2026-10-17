@@ -1,4 +1,4 @@
-import { fmt, fmtVec } from '../core/format';
+import { fmt, fmtDeg, fmtVec } from '../core/format';
 import type { Simulation } from '../physics/simulation';
 import { IDENTITY_FRAME } from '../world/frame';
 import type { World } from '../world/world';
@@ -10,6 +10,7 @@ export class Hud {
   private t = h('div', { class: 't' });
   private g = h('div', { class: 'g' });
   private scale = h('div', { class: 'quiet' }, 'malla de 1 m');
+  private axes = h('div', { class: 'quiet' });
   private medium = h('div');
   private fps = h('div', { class: 'quiet' });
   private lastKey = '';
@@ -17,7 +18,8 @@ export class Hud {
   constructor(private showFps = false) {}
 
   update(world: World, sim: Simulation, simEnabled: boolean, fps: number): void {
-    const key = `${simEnabled}|${!!world.g}|${!!world.frame}|${!!world.medium}`;
+    const turned = !!world.frame && Math.abs(world.frame.angle) > 0.004;
+    const key = `${simEnabled}|${!!world.g}|${!!world.frame}|${!!world.medium}|${turned}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       const items: HTMLElement[] = [];
@@ -25,10 +27,13 @@ export class Hud {
       if (world.g) items.push(this.g);
       if (world.medium) items.push(this.medium);
       if (world.frame) items.push(this.scale);
+      if (turned) items.push(this.axes);
       if (this.showFps) items.push(this.fps);
       this.el.replaceChildren(...items);
     }
     if (world.medium) setText(this.medium, `medio: ${world.medium}`);
+    // cuánto giraste los ejes (respecto de la horizontal de la pantalla)
+    if (turned && world.frame) setText(this.axes, `ejes girados ${fmtDeg((world.frame.angle * 180) / Math.PI)}`);
     const slow = sim.timeScale === 0.5 ? '  ×½' : sim.timeScale === 0.25 ? '  ×¼' : '';
     if (simEnabled) setText(this.t, `t = ${fmt(sim.t)} s${slow}`);
     if (world.g) setText(this.g, `g = ${fmtVec((world.frame ?? IDENTITY_FRAME).toUser(world.g), 'm/s²')}`);

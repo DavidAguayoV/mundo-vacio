@@ -118,7 +118,9 @@ type Drag =
   | { kind: 'surface'; d: SurfaceDrag }
   | { kind: 'anchor'; d: AnchorDrag }
   | { kind: 'tip'; v: FreeVector }
-  | { kind: 'body'; v: FreeVector; last: Vec2 };
+  | { kind: 'body'; v: FreeVector; last: Vec2 }
+  /** arrastrar el espacio vacío recorre el mundo */
+  | { kind: 'pan'; grab: Vec2 };
 
 export class MoveTool implements Tool {
   readonly id = 'move' as const;
@@ -136,10 +138,17 @@ export class MoveTool implements Tool {
     const q = hitParticle(world, view, p, tol);
     if (q) {
       ctx.select({ kind: 'particle', id: q.id });
-      this.drag = { kind: 'particle', d: new ParticleDrag(q, p, view.m(4)) };
+      // la que se mueve sola no se puede arrastrar: solo mirar
+      if (!q.locked) this.drag = { kind: 'particle', d: new ParticleDrag(q, p, view.m(4)) };
       return;
     }
     const tip = hitVectorTip(world, p, tol);
+    if (tip?.fixed) {
+      // una tarjeta de la sonda no se estira: tomarla por la punta la traslada entera
+      ctx.select({ kind: 'vector', id: tip.id });
+      this.drag = { kind: 'body', v: tip, last: p };
+      return;
+    }
     if (tip) {
       ctx.select({ kind: 'vector', id: tip.id });
       this.drag = { kind: 'tip', v: tip };
@@ -152,7 +161,7 @@ export class MoveTool implements Tool {
       return;
     }
     const end = hitSurfaceEnd(world, p, tol);
-    if (end) {
+    if (end && !end.s.locked) {
       ctx.select({ kind: 'surface', id: end.s.id });
       this.drag = { kind: 'surface', d: new SurfaceDrag(end.s, end.end, p) };
       return;
@@ -181,17 +190,21 @@ export class MoveTool implements Tool {
     const surf = hitSurfaceBody(world, p, tol);
     if (surf) {
       ctx.select({ kind: 'surface', id: surf.id });
-      this.drag = { kind: 'surface', d: new SurfaceDrag(surf, null, p) };
+      if (!surf.locked) this.drag = { kind: 'surface', d: new SurfaceDrag(surf, null, p) };
       return;
     }
     ctx.select(null);
+    this.drag = { kind: 'pan', grab: { ...p } };
   }
 
   onPointerMove({ p }: WorldPointer, ctx: ToolContext): void {
     const d = this.drag;
     if (!d) return;
     if (d.kind === 'frame' || d.kind === 'particle' || d.kind === 'surface' || d.kind === 'anchor') d.d.move(p, ctx);
-    else if (d.kind === 'tip') d.v.tip = { ...p };
+    else if (d.kind === 'pan') {
+      // el punto tomado queda bajo el puntero
+      ctx.view.center = { x: ctx.view.center.x + d.grab.x - p.x, y: ctx.view.center.y + d.grab.y - p.y };
+    } else if (d.kind === 'tip') d.v.tip = { ...p };
     else {
       const dx = p.x - d.last.x;
       const dy = p.y - d.last.y;
@@ -204,6 +217,8 @@ export class MoveTool implements Tool {
   onPointerUp(_e: WorldPointer, ctx: ToolContext): void {
     if (this.drag?.kind === 'frame') this.drag.d.end(ctx);
     if (this.drag?.kind === 'particle') this.drag.d.finish(ctx);
+    // una tarjeta soltada cerca de la sonda o de la punta de otra queda pegada: cola con punta
+    if (this.drag?.kind === 'body' && this.drag.v.fixed && ctx.world.snapVector(this.drag.v)) ctx.emit({ type: 'vector-snapped' });
     this.drag = null;
   }
 }

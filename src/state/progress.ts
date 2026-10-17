@@ -1,55 +1,133 @@
-// Progreso del relato en localStorage. Si el almacenamiento no está disponible, el juego funciona igual sin recordar.
+// Progreso en localStorage. Si el almacenamiento no está disponible, el juego funciona igual sin recordar.
+
+import type { Grant } from '../story/types';
+
+/** Un rastro resuelto: sus estrellas, lo que midió el estudiante y cuándo. */
+export interface SolvedSite {
+  stars: string[];
+  measured?: string;
+  at: number;
+}
 
 export interface Progress {
-  version: 2;
-  /** id del capítulo (no su número: así se pueden reordenar sin romper el avance guardado) */
-  chapter: string;
+  version: 3;
+  /** rastro en curso (null = en el mapa) */
+  site: string | null;
+  /** paso dentro del rastro; igual al número de pasos cuando ya se resolvió y se mira su página */
   step: number;
   /** modo libre: todas las herramientas, sin relato (laboratorio para clase) */
   free: boolean;
   /** respuestas a las predicciones, por clave */
   predictions: Record<string, string>;
+  /** herramientas y habilidades ganadas (no se pierden al salir de un rastro) */
+  have: Grant[];
+  /** rastros resueltos, por id */
+  solved: Record<string, SolvedSite>;
+  /** estrellas de maestría ganadas en el intento en curso, por rastro */
+  earned: Record<string, string[]>;
 }
 
 const KEY = 'mundoVacio.progress';
 const LEGACY_KEY = 'mundoVacio'; // prototipo de un archivo: { ch, st, free }
 
-/** Orden de los capítulos en las versiones 1 (fases 1–3) y en el prototipo, y adónde corresponde cada uno ahora. */
+/** El primer rastro: quien abre el juego por primera vez empieza ahí, sin mapa. */
+export const FIRST_SITE = 'vacio';
+
+export const freshProgress = (): Progress => ({
+  version: 3,
+  site: FIRST_SITE,
+  step: 0,
+  free: false,
+  predictions: {},
+  have: [],
+  solved: {},
+  earned: {},
+});
+
+/**
+ * Cómo se traduce el relato lineal (versión 2) al mapa: cada capítulo corresponde a uno o más rastros.
+ * Los capítulos que siguen siendo un rastro conservan su id; «Vectores» y «El tiempo» se rehicieron.
+ */
+export const LEGACY_CHAPTERS: { chapter: string; sites: string[]; grants: Grant[] }[] = [
+  { chapter: 'vacio', sites: ['vacio'], grants: ['tool:origin'] },
+  { chapter: 'particula', sites: ['particula'], grants: ['tool:particle', 'tool:move'] },
+  { chapter: 'vectores', sites: ['dos-saltos', 'atajo', 'escalar', 'ejes-ajenos'], grants: ['tool:vector', 'tool:sum'] },
+  { chapter: 'tiempo', sites: ['desde-siempre', 'boya'], grants: ['time:flow', 'tool:velocity', 'time:rewind', 'time:step'] },
+  { chapter: 'abajo', sites: ['abajo'], grants: ['tool:gravity', 'time:slow'] },
+  { chapter: 'blanco', sites: ['blanco'], grants: ['time:timeline'] },
+  { chapter: 'superficies', sites: ['superficies'], grants: ['tool:surface'] },
+  { chapter: 'resortes', sites: ['resortes'], grants: ['tool:spring'] },
+  { chapter: 'gravitacion', sites: ['gravitacion'], grants: ['force:gravitation'] },
+  { chapter: 'arrastre', sites: ['arrastre'], grants: ['force:drag'] },
+  { chapter: 'energia', sites: ['energia'], grants: ['lens:energy'] },
+];
+
+/** Orden de los capítulos en la versión 1 (fases 1–3) y en el prototipo. */
 const V1_CHAPTERS = ['vacio', 'particula', 'vectores', 'abajo', 'blanco', 'superficies'];
 
-export const freshProgress = (first = 'vacio'): Progress => ({ version: 2, chapter: first, step: 0, free: false, predictions: {} });
+/**
+ * Avance de la versión 2 (o anterior) → mapa: lo de los capítulos ya terminados queda resuelto
+ * y ganado; si el capítulo en curso sigue existiendo como rastro, se retoma ahí desde el comienzo.
+ */
+export function migrateChapter(chapter: string, free: boolean, predictions: Record<string, string>, siteIds: readonly string[]): Progress {
+  const p: Progress = { ...freshProgress(), free, predictions, site: null };
+  const idx = Math.max(0, LEGACY_CHAPTERS.findIndex((c) => c.chapter === chapter));
+  const have = new Set<Grant>();
+  for (let i = 0; i < idx; i++) {
+    const c = LEGACY_CHAPTERS[i];
+    c.grants.forEach((g) => have.add(g));
+    for (const s of c.sites) if (siteIds.includes(s)) p.solved[s] = { stars: ['resuelto'], at: 0 };
+  }
+  const current = LEGACY_CHAPTERS[idx];
+  // en el capítulo en curso solo se conserva lo que se gana al entrar a su rastro
+  if (current && current.sites.length === 1 && current.sites[0] === current.chapter && siteIds.includes(current.chapter)) {
+    p.site = current.chapter;
+  }
+  if (idx === 0) p.site = FIRST_SITE;
+  p.have = [...have];
+  return p;
+}
 
-export function loadProgress(chapterIds: readonly string[]): Progress {
-  const first = chapterIds[0];
-  const valid = (id: unknown): id is string => typeof id === 'string' && chapterIds.includes(id);
+export function loadProgress(siteIds: readonly string[]): Progress {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const p = JSON.parse(raw) as Record<string, unknown>;
-      if (p?.version === 2 && valid(p.chapter) && Number.isInteger(p.step)) {
-        return {
-          version: 2,
-          chapter: p.chapter,
-          step: Math.max(0, p.step as number),
-          free: !!p.free,
-          predictions: p.predictions && typeof p.predictions === 'object' ? (p.predictions as Record<string, string>) : {},
-        };
+      if (p?.version === 3) return sanitize(p, siteIds);
+      if (p?.version === 2 && typeof p.chapter === 'string') {
+        const preds = p.predictions && typeof p.predictions === 'object' ? (p.predictions as Record<string, string>) : {};
+        return migrateChapter(p.chapter, !!p.free, preds, siteIds);
       }
-      // versión 1: capítulo por número. Se retoma desde el comienzo del mismo capítulo.
+      // versión 1: capítulo por número
       if (p?.version === 1 && Number.isInteger(p.chapter)) {
-        const id = V1_CHAPTERS[p.chapter as number];
-        return { ...freshProgress(first), chapter: valid(id) ? id : first, free: !!p.free };
+        return migrateChapter(V1_CHAPTERS[p.chapter as number] ?? FIRST_SITE, !!p.free, {}, siteIds);
       }
     }
     const old = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? 'null') as { ch?: number; free?: boolean } | null;
-    if (old && typeof old.ch === 'number') {
-      const id = V1_CHAPTERS[old.ch];
-      return { ...freshProgress(first), chapter: valid(id) ? id : first, free: !!old.free };
-    }
+    if (old && typeof old.ch === 'number') return migrateChapter(V1_CHAPTERS[old.ch] ?? FIRST_SITE, !!old.free, {}, siteIds);
   } catch {
     /* almacenamiento bloqueado o JSON dañado: se parte de cero */
   }
-  return freshProgress(first);
+  return freshProgress();
+}
+
+/** Revisa un progreso v3 leído del almacenamiento: lo que no calza se descarta en vez de romper el juego. */
+function sanitize(p: Record<string, unknown>, siteIds: readonly string[]): Progress {
+  const out = freshProgress();
+  out.site = typeof p.site === 'string' && siteIds.includes(p.site) ? p.site : null;
+  out.step = Number.isInteger(p.step) ? Math.max(0, p.step as number) : 0;
+  out.free = !!p.free;
+  if (p.predictions && typeof p.predictions === 'object') out.predictions = p.predictions as Record<string, string>;
+  if (Array.isArray(p.have)) out.have = p.have.filter((g): g is Grant => typeof g === 'string' && g.includes(':'));
+  if (p.solved && typeof p.solved === 'object') {
+    for (const [id, v] of Object.entries(p.solved as Record<string, SolvedSite>)) {
+      if (siteIds.includes(id) && v && Array.isArray(v.stars)) out.solved[id] = { stars: v.stars.filter((x) => typeof x === 'string'), measured: typeof v.measured === 'string' ? v.measured : undefined, at: Number(v.at) || 0 };
+    }
+  }
+  if (p.earned && typeof p.earned === 'object') {
+    for (const [id, v] of Object.entries(p.earned as Record<string, string[]>)) if (Array.isArray(v)) out.earned[id] = v.filter((x) => typeof x === 'string');
+  }
+  return out;
 }
 
 export function saveProgress(p: Progress): void {

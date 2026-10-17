@@ -12,6 +12,8 @@ export interface InspectorActions {
   /** período medido de un resorte (null si todavía no completa una oscilación) */
   period(springId: string): number | null;
   remove(ref: EntityRef): void;
+  /** invierte una tarjeta de la sonda (A → −A) */
+  flip(id: string): void;
   close(): void;
   /** fuerzas sobre una partícula en el estado actual (null si no hay simulación que consultar) */
   forces(id: string): ForcePart[] | null;
@@ -53,6 +55,8 @@ export class Inspector {
   private ref: EntityRef | null = null;
   private rows: Row[] = [];
   private steppers: Stepper[] = [];
+  /** al invertir una tarjeta cambia su nombre (A ↔ −A) */
+  private flipTitle: (() => void) | null = null;
 
   constructor(
     private world: World,
@@ -110,6 +114,7 @@ export class Inspector {
   private build(): void {
     this.rows = [];
     this.steppers = [];
+    this.flipTitle = null;
     const ref = this.ref;
     if (!ref) {
       this.el.hidden = true;
@@ -122,6 +127,8 @@ export class Inspector {
     close.addEventListener('click', () => this.actions.close());
     const del = h('button', { class: 'btn del', type: 'button' }, 'Eliminar');
     del.addEventListener('click', () => this.actions.remove(ref));
+    // lo que es parte del escenario de un rastro (la boya, las tarjetas, los muros) no se borra
+    if (this.world.isProtected(ref)) del.hidden = true;
 
     if (ref.kind === 'particle') this.buildParticle(ref.id, dl, del, close);
     else if (ref.kind === 'surface') this.buildSurface(ref.id, dl, del, close);
@@ -133,7 +140,15 @@ export class Inspector {
         const q = v();
         return q ? { x: q.tip.x - q.tail.x, y: q.tip.y - q.tail.y } : null;
       });
-      this.el.replaceChildren(close, h('h2', {}, `Vector ${label}`), dl, del);
+      if (v()?.fixed) {
+        const flip = h('button', { class: 'btn', type: 'button' }, 'Invertir');
+        flip.addEventListener('click', () => this.actions.flip(ref.id));
+        const title = h('h2', {}, `Vector ${label}`);
+        this.flipTitle = () => setText(title, `Vector ${v()?.label ?? ''}`);
+        this.el.replaceChildren(close, title, dl, h('div', { class: 'row' }, flip), del);
+      } else {
+        this.el.replaceChildren(close, h('h2', {}, `Vector ${label}`), dl, del);
+      }
     } else {
       const s = this.world.sum(ref.id);
       const geo = s ? this.world.sumGeometry(s) : null;
@@ -304,6 +319,7 @@ export class Inspector {
       return;
     }
     for (const r of this.rows) setText(r.dd, r.value());
+    this.flipTitle?.();
     for (const st of this.steppers) {
       setText(st.text, st.value());
       st.minus.disabled = !st.canDec();

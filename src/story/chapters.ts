@@ -5,36 +5,23 @@ import type { Chapter, Step, StoryContext } from './types';
 
 // ---------- preparación del mundo al retomar un capítulo ----------
 
-function ensureFrame({ world }: StoryContext): void {
+export function ensureFrame({ world }: StoryContext): void {
   if (!world.frame) world.frame = new ReferenceFrame({ x: 0, y: 0 }, 0);
 }
 
-function ensureParticles({ world }: StoryContext): void {
+export function ensureParticles({ world }: StoryContext): void {
   if (world.particles.length) return;
   world.addParticle({ x: -3, y: 1.5 }, 1);
   world.addParticle({ x: -1.5, y: 3 }, 4);
 }
 
-function ensureVectors({ world }: StoryContext): void {
-  if (world.vectors.length >= 2) return;
-  // abajo a la derecha, lejos de las partículas sembradas
-  if (world.vectors.length === 0) world.addVector({ x: 1.5, y: -2.5 }, { x: 4, y: -1.2 });
-  world.addVector({ x: 5.5, y: 0.5 }, { x: 6.5, y: -1.5 });
-}
-
-function ensureSum(ctx: StoryContext): void {
-  ensureVectors(ctx);
-  const { world } = ctx;
-  if (!world.sums.length) world.addSum(world.vectors[0].id, world.vectors[1].id);
-}
-
 /** Un suelo bajo las partículas sembradas. */
-function ensureSurface({ world }: StoryContext): void {
+export function ensureSurface({ world }: StoryContext): void {
   if (!world.surfaces.length) world.addSurface({ x: -5, y: -1 }, { x: 5, y: -1 });
 }
 
 /** Un resorte colgando de un punto fijo, con la primera partícula en reposo en su extremo. */
-function ensureSpring(ctx: StoryContext): void {
+export function ensureSpring(ctx: StoryContext): void {
   const { world } = ctx;
   ensureParticles(ctx);
   if (world.springs.length) return;
@@ -44,7 +31,7 @@ function ensureSpring(ctx: StoryContext): void {
 }
 
 /** Dos cuerpos en el espacio: uno de 64 kg en el centro y otro de 1 kg a 3 m, en reposo. */
-function twoBodies(ctx: StoryContext): void {
+export function twoBodies(ctx: StoryContext): void {
   const { world } = ctx;
   stopAll(ctx);
   ensureParticles(ctx);
@@ -57,12 +44,12 @@ function twoBodies(ctx: StoryContext): void {
   small.mass = 1;
 }
 
-function ensureGravitation({ world }: StoryContext): void {
+export function ensureGravitation({ world }: StoryContext): void {
   if (!world.gravitation) world.gravitation = { G: G_GAME };
 }
 
 /** Una sola partícula de 1 kg en reposo, a 4 m de altura sobre el centro. */
-function oneParticle(ctx: StoryContext): void {
+export function oneParticle(ctx: StoryContext): void {
   const { world } = ctx;
   stopAll(ctx);
   ensureParticles(ctx);
@@ -72,23 +59,23 @@ function oneParticle(ctx: StoryContext): void {
   p.mass = 1;
 }
 
-function ensureAir(ctx: StoryContext): void {
+export function ensureAir(ctx: StoryContext): void {
   ensureG(ctx);
   if (!ctx.world.medium) ctx.world.medium = 'aire';
 }
 
-function ensureG({ world }: StoryContext): void {
+export function ensureG({ world }: StoryContext): void {
   if (!world.g) world.g = { x: 0, y: -G_EARTH };
 }
 
 /** Todas las partículas en reposo y sin lanzamiento pendiente. */
-function stopAll({ world, sim }: StoryContext): void {
+export function stopAll({ world, sim }: StoryContext): void {
   sim.reset();
   for (const p of world.particles) p.vel = { x: 0, y: 0 };
 }
 
 /** Dos partículas a la misma altura, de 1 kg y 4 kg, en reposo. */
-function twoMasses(ctx: StoryContext, height = 3): void {
+export function twoMasses(ctx: StoryContext, height = 3): void {
   const { world } = ctx;
   stopAll(ctx);
   while (world.particles.length < 2) world.addParticle({ x: 0, y: 0 }, 1);
@@ -125,7 +112,7 @@ export function spawnTarget(ctx: StoryContext): void {
 // ---------- ayudas para escribir los pasos ----------
 
 /** Tarjeta que retoma una predicción: texto común y una línea según lo que eligió el jugador. */
-const reveal = (key: string, base: string, byChoice: Record<string, string>): Step['text'] => (ctx) => {
+export const reveal = (key: string, base: string, byChoice: Record<string, string>): Step['text'] => (ctx) => {
   const extra = byChoice[ctx.prediction(key) ?? ''];
   return extra ? `${base} ${extra}` : base;
 };
@@ -139,6 +126,7 @@ const IV = 'IV · Qué se conserva';
 
 // ---------- capítulos ----------
 
+/** Capítulos del relato lineal. En el mundo abierto cada uno se juega como un rastro del mapa (ver sites.ts). */
 export const CHAPTERS: Chapter[] = [
   // ===== Acto I · Dónde =====
   {
@@ -182,6 +170,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Una pregunta antes de seguir: si mueves el origen a otro lugar, ¿qué cambia?',
         on: 'end',
         ask: 'origen',
+        correct: 'r',
         choices: [
           { id: 'particulas', label: 'Las partículas se mueven' },
           { id: 'r', label: 'Cambian los vectores r' },
@@ -203,118 +192,8 @@ export const CHAPTERS: Chapter[] = [
       engineering('Para planificar la ruta de un camión, el camión es un punto. Elegir el modelo más simple que sirve es la primera decisión de ingeniería.'),
     ],
   },
-  {
-    id: 'vectores',
-    act: I,
-    title: 'Vectores',
-    grants: ['tool:vector', 'tool:sum'],
-    seed: (ctx) => {
-      ensureFrame(ctx);
-      ensureParticles(ctx);
-    },
-    steps: [
-      {
-        text: 'Un **vector** es una flecha: tiene magnitud y dirección, y puedes trasladarlo sin cambiarlo. Elige Vector y arrastra para dibujar uno.',
-        on: 'vector-drawn',
-      },
-      {
-        text: 'El panel muestra sus **componentes** en tus ejes (las líneas punteadas), su magnitud y su ángulo. Dibuja un segundo vector.',
-        on: 'vector-drawn',
-        when: ({ world }) => world.vectors.length >= 2,
-      },
-      {
-        text: 'Elige Sumar y toca un vector y después el otro. El segundo se traslada a la punta del primero: cola con punta.',
-        on: 'sum-done',
-        enter: ensureVectors,
-      },
-      {
-        text: 'Si ahora giras los ejes, ¿qué le pasa a la flecha suma?',
-        on: 'end',
-        ask: 'giro',
-        enter: ensureSum,
-        choices: [
-          { id: 'gira', label: 'Gira con los ejes' },
-          { id: 'componentes', label: 'No cambia; cambian sus componentes' },
-          { id: 'magnitud', label: 'Cambia su magnitud' },
-        ],
-      },
-      {
-        text: 'Gira los ejes desde el círculo en la punta del eje x y mira el panel.',
-        on: 'frame-rotated',
-        enter: ensureSum,
-      },
-      {
-        text: reveal('giro', 'La flecha no se movió y su magnitud tampoco; sus componentes sí. El vector existe antes que las coordenadas con que lo describes.', {
-          gira: 'Los ejes giraron, pero la flecha es la misma: lo que gira es tu forma de describirla.',
-          componentes: 'Lo predijiste bien.',
-          magnitud: 'Fíjate en |A+B| en el panel: no cambió. La magnitud no depende de los ejes.',
-        }),
-        on: 'next',
-      },
-      engineering('Un avión con viento cruzado: su velocidad respecto al suelo es la suma de dos vectores, y el piloto apunta la nariz para que esa suma vaya hacia la pista.'),
-    ],
-  },
 
   // ===== Acto II · Cuándo =====
-  {
-    id: 'tiempo',
-    act: II,
-    title: 'El tiempo',
-    seed: (ctx) => {
-      ensureFrame(ctx);
-      ensureParticles(ctx);
-      // todavía no hay gravedad: lo que se mueve, sigue
-      ctx.world.g = null;
-      ctx.world.targets = [];
-    },
-    steps: [
-      {
-        text: 'Mira lo que armaste: un origen, partículas, flechas. Nada cambia. ¿Pasa el tiempo aquí? No hay forma de saberlo: el tiempo solo se nota cuando algo cambia.',
-        on: 'next',
-        button: 'Desbloquear el tiempo',
-      },
-      {
-        text: 'Ahora tienes el **tiempo**. Toca Tiempo en la barra para que fluya: el reloj t avanza… y todo sigue igual. Detenlo cuando quieras.',
-        on: 'time-paused',
-        grants: ['time:flow'],
-      },
-      {
-        text: 'Elige Velocidad y arrastra desde una partícula. La flecha cian es su **velocidad**.',
-        on: 'v-set',
-        grants: ['tool:velocity'],
-        enter: stopAll,
-      },
-      {
-        text: 'Antes de dejar fluir el tiempo: ¿qué hará esa partícula?',
-        on: 'end',
-        ask: 'inercia',
-        choices: [
-          { id: 'frena', label: 'Se frena hasta detenerse' },
-          { id: 'recto', label: 'Sigue recto, igual de rápido' },
-          { id: 'curva', label: 'Se curva' },
-        ],
-      },
-      {
-        text: 'Deja fluir el tiempo y mira las marcas: cada punto es su posición cada 0,1 s.',
-        on: 'coasted',
-      },
-      {
-        text: reveal('inercia', 'Sigue recto, y las marcas quedan igual de separadas: recorre lo mismo cada 0,1 s. Eso es su **velocidad**, v = Δr/Δt. Nada la frena porque nada la toca: es la **inercia**.', {
-          frena: 'Dijiste que se frenaba. Es la intuición más común: en la vida diaria todo se frena por el roce. Aquí no hay roce… todavía.',
-          recto: 'Lo predijiste bien: es la primera ley de Newton.',
-          curva: 'Dijiste que se curvaba. Para curvarse, algo tendría que empujarla de lado, y aquí no hay nada.',
-        }),
-        on: 'next',
-      },
-      {
-        text: 'Toca t = 0 para volver al inicio y luego +0,1 s para avanzar paso a paso: cada toque es una marca nueva. Mira en el panel cuánto cambia r en cada paso.',
-        on: 'time-step',
-        when: (ctx) => ctx.count('time-step') >= 3,
-        grants: ['time:rewind', 'time:step'],
-      },
-      engineering('Algunos países controlan la velocidad por tramo: dos cámaras registran tu auto y se divide la distancia por el tiempo. Lo que miden es tu velocidad media en ese tramo.'),
-    ],
-  },
   {
     id: 'abajo',
     act: II,
@@ -335,6 +214,7 @@ export const CHAPTERS: Chapter[] = [
         text: '**Abajo** es la dirección de g, no el borde de tu pantalla. Aquí hay dos partículas a la misma altura: una de 1 kg y otra de 4 kg. Si dejas fluir el tiempo, ¿cuál cae más rápido?',
         on: 'end',
         ask: 'caida',
+        correct: 'juntas',
         enter: (ctx) => {
           ensureG(ctx);
           twoMasses(ctx);
@@ -403,6 +283,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Estás en el punto más alto. ¿Cuánto vale ahí la velocidad?',
         on: 'end',
         ask: 'cima',
+        correct: 'horizontal',
         choices: [
           { id: 'cero', label: 'Cero: se detiene un instante' },
           { id: 'horizontal', label: 'No es cero: solo deja de subir' },
@@ -441,6 +322,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Cuando la partícula llegue al suelo, ¿por qué no lo atraviesa?',
         on: 'end',
         ask: 'suelo',
+        correct: 'empuja',
         enter: ensureSurface,
         choices: [
           { id: 'apaga', label: 'La gravedad deja de actuar' },
@@ -508,6 +390,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Antes de estirarlo: si lo estiras el doble, ¿con cuánta fuerza tira?',
         on: 'end',
         ask: 'hooke',
+        correct: 'doble',
         enter: ensureSpring,
         choices: [
           { id: 'doble', label: 'El doble' },
@@ -544,6 +427,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Si la estiras el doble antes de soltarla, ¿cuánto tarda una oscilación?',
         on: 'end',
         ask: 'amplitud',
+        correct: 'mismo',
         enter: ensureSpring,
         choices: [
           { id: 'doble', label: 'El doble de tiempo' },
@@ -570,6 +454,7 @@ export const CHAPTERS: Chapter[] = [
         text: '¿Y si la partícula tiene cuatro veces más masa?',
         on: 'end',
         ask: 'masa',
+        correct: 'lento',
         enter: ensureSpring,
         choices: [
           { id: 'rapido', label: 'Oscila más rápido' },
@@ -624,6 +509,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Las dos están en reposo. Si dejas fluir el tiempo, ¿qué pasa?',
         on: 'end',
         ask: 'atraccion',
+        correct: 'juntas',
         enter: ensureGravitation,
         choices: [
           { id: 'nada', label: 'Nada, porque no hay g' },
@@ -659,6 +545,7 @@ export const CHAPTERS: Chapter[] = [
         text: '¿Qué pasa si le das mucha más velocidad?',
         on: 'end',
         ask: 'escape',
+        correct: 'escapa',
         enter: ensureGravitation,
         choices: [
           { id: 'grande', label: 'Da una vuelta más grande' },
@@ -714,6 +601,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Las mismas dos partículas, de 1 kg y 4 kg, ahora en aire. Si dejas fluir el tiempo, ¿cuál llega primero abajo?',
         on: 'end',
         ask: 'masa_aire',
+        correct: 'pesada',
         enter: ensureAir,
         choices: [
           { id: 'juntas', label: 'Caen juntas, como antes' },
@@ -749,6 +637,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Si cambias el medio a agua, ¿cómo será la velocidad terminal?',
         on: 'end',
         ask: 'agua',
+        correct: 'menor',
         enter: ensureAir,
         choices: [
           { id: 'mayor', label: 'Mayor' },
@@ -804,6 +693,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'La barra K es la **energía cinética**, ½ m v²: crece con la rapidez. La barra Ug es la **energía potencial gravitatoria**, m g h: crece con la altura h sobre tu origen. Antes de soltar la partícula: ¿qué hace la suma?',
         on: 'end',
         ask: 'suma',
+        correct: 'mantiene',
         choices: [
           { id: 'crece', label: 'Crece' },
           { id: 'mantiene', label: 'Se mantiene' },
@@ -831,6 +721,7 @@ export const CHAPTERS: Chapter[] = [
         text: 'Subiendo, K se convierte en Ug; bajando, Ug vuelve a ser K. Si mueves el origen más abajo, ¿qué pasa con Ug?',
         on: 'end',
         ask: 'cero',
+        correct: 'todo',
         choices: [
           { id: 'todo', label: 'Cambia en todo el vuelo' },
           { id: 'nada', label: 'No cambia' },
