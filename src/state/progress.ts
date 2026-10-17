@@ -169,7 +169,16 @@ function sanitize(p: Record<string, unknown>, siteIds: readonly string[]): Progr
   if (p.earned && typeof p.earned === 'object') {
     for (const [id, v] of Object.entries(p.earned as Record<string, string[]>)) if (Array.isArray(v)) out.earned[id] = v.filter((x) => typeof x === 'string');
   }
-  return splitDrift(out, siteIds);
+  return giveRewind(splitDrift(out, siteIds));
+}
+
+/**
+ * t = 0 se gana ahora al final de «Desde siempre» (antes, solo en «Cuadro a cuadro»): quien ya lo
+ * había resuelto lo recibe al cargar, porque la boya, el pozo y el astro lo piden.
+ */
+export function giveRewind(p: Progress): Progress {
+  if (p.solved['desde-siempre'] && !p.have.includes('time:rewind')) p.have = [...p.have, 'time:rewind'];
+  return p;
 }
 
 /**

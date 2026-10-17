@@ -9,7 +9,7 @@ function midway(): Progress {
   const p = freshProgress();
   p.site = 'boya';
   p.step = 1;
-  p.have = ['tool:origin', 'tool:particle', 'tool:move', 'time:flow'];
+  p.have = ['tool:origin', 'tool:particle', 'tool:move', 'time:flow', 'time:rewind'];
   p.solved = { vacio: { stars: ['resuelto'], at: 1 }, particula: { stars: ['resuelto', 'prediccion'], at: 2 }, 'desde-siempre': { stars: ['resuelto'], at: 3 } };
   p.predictions = { inercia: 'recto' };
   return p;
@@ -67,7 +67,8 @@ describe('el avance como archivo .json', () => {
     p.have = ['tool:origin', 42, 'cualquier-cosa'];
     const back = readProgressFile(JSON.stringify(p), SITE_IDS)!;
     expect(back.solved['no-existe']).toBeUndefined();
-    expect(back.have).toEqual(['tool:origin']);
+    // «Desde siempre» está resuelto: t = 0 se entrega al cargar (ver giveRewind)
+    expect(back.have).toEqual(['tool:origin', 'time:rewind']);
   });
 
   it('un avance de antes de dividir «Desde siempre» se migra al leerlo', () => {
