@@ -1,5 +1,6 @@
 import type { WorldJSON } from '../world/serialize';
 import { parseExperiment, type Experiment } from './experiment';
+import { storageKey } from '../state/storage';
 
 export interface SavedExperiment extends Experiment {
   id: string;
@@ -7,8 +8,8 @@ export interface SavedExperiment extends Experiment {
 
 export type WorldSlot = 'story' | 'lab';
 
-const LIST_KEY = 'mundoVacio.experiments';
-const AUTOSAVE_KEY: Record<WorldSlot, string> = { story: 'mundoVacio.world.story', lab: 'mundoVacio.world.lab' };
+const LIST_KEY = () => storageKey('experiments');
+const AUTOSAVE_KEY = (slot: WorldSlot) => storageKey(`world.${slot}`);
 
 /** localStorage puede no existir o lanzar (modo privado, almacenamiento bloqueado). */
 function defaultStorage(): Storage | null {
@@ -49,7 +50,7 @@ export class ExperimentLibrary {
 
   /** Experimentos guardados, del más reciente al más antiguo. Los dañados se omiten. */
   list(): SavedExperiment[] {
-    const raw = this.read(LIST_KEY);
+    const raw = this.read(LIST_KEY());
     if (!Array.isArray(raw)) return [];
     const out: SavedExperiment[] = [];
     for (const item of raw) {
@@ -69,7 +70,7 @@ export class ExperimentLibrary {
     const same = list.find((e) => e.name.trim().toLowerCase() === exp.name.trim().toLowerCase());
     const saved: SavedExperiment = { ...exp, id: same?.id ?? `e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` };
     const next = [saved, ...list.filter((e) => e.id !== saved.id)];
-    return this.write(LIST_KEY, next) ? saved : null;
+    return this.write(LIST_KEY(), next) ? saved : null;
   }
 
   get(id: string): SavedExperiment | undefined {
@@ -78,7 +79,7 @@ export class ExperimentLibrary {
 
   remove(id: string): void {
     this.write(
-      LIST_KEY,
+      LIST_KEY(),
       this.list().filter((e) => e.id !== id),
     );
   }
@@ -86,11 +87,11 @@ export class ExperimentLibrary {
   // ---------- autoguardado ----------
 
   autosave(slot: WorldSlot, world: WorldJSON): void {
-    this.write(AUTOSAVE_KEY[slot], world);
+    this.write(AUTOSAVE_KEY(slot), world);
   }
 
   loadAutosave(slot: WorldSlot): WorldJSON | null {
-    const raw = this.read(AUTOSAVE_KEY[slot]);
+    const raw = this.read(AUTOSAVE_KEY(slot));
     if (!raw) return null;
     try {
       return parseExperiment(raw).world;
@@ -101,7 +102,7 @@ export class ExperimentLibrary {
 
   clearAutosave(slot: WorldSlot): void {
     try {
-      this.storage?.removeItem(AUTOSAVE_KEY[slot]);
+      this.storage?.removeItem(AUTOSAVE_KEY(slot));
     } catch {
       /* sin almacenamiento */
     }

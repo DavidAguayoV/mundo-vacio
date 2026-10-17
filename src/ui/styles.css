@@ -1654,6 +1654,12 @@ button {
 }
 
 /* un nombre que no cabe (pisaría otro o quedaría cortado en el borde) espera al mouse o al foco */
+/* la demo: rastros fuera de la ruta, solo un punto que insinúa que hay más mundo */
+.site-marker.faint {
+  pointer-events: none;
+  opacity: 0.32;
+}
+
 .site-marker.nameless .name,
 .site-marker.nameless .stars {
   visibility: hidden;

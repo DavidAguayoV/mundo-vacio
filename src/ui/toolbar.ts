@@ -90,7 +90,7 @@ export class Toolbar {
   private slowBtn: HTMLButtonElement | null = null;
 
   constructor(private actions: ToolbarActions) {
-    this.more = this.button(ICONS.more, 'Más herramientas', () => this.setMenu(this.menu.hidden), {
+    this.more = this.button(ICONS.more, 'Más herramientas', () => this.setMenu(!!this.menu.hidden), {
       'aria-expanded': 'false',
       'aria-controls': 'toolMenu',
       'data-cmd': 'more',

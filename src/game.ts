@@ -24,8 +24,8 @@ import { seedFree } from './story/chapters';
 import { MissMonitor } from './story/missMonitor';
 import { RunMonitor } from './story/runMonitor';
 import { SiteEngine } from './story/siteEngine';
-import { CATCH_DIST, SITES, SITE_IDS, ZONES } from './story/sites';
-import type { ForceSwitch, Grant, LensId, TimeSkill } from './story/types';
+import { CATCH_DIST, SITES, ZONES } from './story/sites';
+import type { ForceSwitch, Grant, LensId, Site, TimeSkill } from './story/types';
 import { WorldMap } from './map/worldMap';
 import { Journal } from './ui/journal';
 import { FrameDrag } from './tools/frameDrag';
@@ -44,6 +44,8 @@ import { LENS_NAMES, SWITCH_NAMES, TIME_NAMES, Toolbar } from './ui/toolbar';
 import { IDENTITY_FRAME, ReferenceFrame } from './world/frame';
 import { MAX_SPEED } from './render/scales';
 import { G_EARTH, World, type EntityRef } from './world/world';
+import { storageKey } from './state/storage';
+import type { GameHost, ModeHooks } from './mode';
 
 /** Ancho de los paneles de la derecha (como en styles.css) y lo mínimo a que se pueden angostar, px. */
 const DOCK_WIDTH = 252;
@@ -60,6 +62,8 @@ export interface GameOptions {
   debug?: boolean;
   /** prueba de rendimiento: N partículas oscilando en resortes, sin tocar el progreso guardado */
   stress?: number;
+  /** un modo aparte (la demo); sin él, el juego completo */
+  mode?: ModeHooks;
 }
 
 /** Conecta mundo, simulación, render, herramientas, relato e interfaz. */
@@ -72,6 +76,9 @@ export class Game {
   private painter: Painter;
   private story: SiteEngine;
   private map: WorldMap;
+  /** los rastros del juego (los de la demo, si es la demo) */
+  private sites: Site[];
+  private siteIds: string[];
   private journal: Journal;
   /** rastro elegido en el mapa (su nota se lee en la tarjeta) */
   private mapSelection: string | null = null;
@@ -122,6 +129,8 @@ export class Game {
   private restartArmed = 0;
 
   constructor(private opts: GameOptions = {}) {
+    this.sites = opts.mode?.sites ?? SITES;
+    this.siteIds = this.sites.map((s) => s.id);
     const ctx2d = this.canvas.getContext('2d');
     if (!ctx2d) throw new Error('Este navegador no tiene Canvas 2D.');
     applyTheme(loadTheme());
@@ -147,8 +156,8 @@ export class Game {
 
     const stress = opts.stress ?? 0;
     // con avance guardado se entra al mapa; sin avance, al comienzo
-    const progress: Progress = stress ? { ...freshProgress(), free: true } : openingProgress(loadProgress(SITE_IDS));
-    this.story = new SiteEngine(SITES, ZONES, progress, { world: this.world, view: this.view, sim: this.sim }, stress ? () => {} : saveProgress);
+    const progress: Progress = stress ? { ...freshProgress(), free: true } : openingProgress(loadProgress(this.siteIds));
+    this.story = new SiteEngine(this.sites, ZONES, progress, { world: this.world, view: this.view, sim: this.sim }, stress ? () => {} : saveProgress, opts.mode?.policy);
     // un tiro que no llega dice a qué distancia pasó, mientras acertar todavía cuente en el rastro
     this.misses = new MissMonitor(this.world, this.sim, (m) => this.toast.show(m, 3600), () => ({
       targets: this.story.listensFor('target-hit'),
@@ -159,6 +168,7 @@ export class Game {
       select: (id) => this.selectSite(id),
       enter: (id) => this.goToSite(id),
     });
+    this.map.hooks = opts.mode?.map ?? {};
     this.journal = new Journal(this.story, () => this.journal.hide());
 
     // contexto que reciben las herramientas
@@ -191,6 +201,7 @@ export class Game {
       },
       (g) => this.grantName(g),
     );
+    this.card.hooks = opts.mode?.card ?? {};
     this.toolbar = new Toolbar({
       selectTool: (id) => this.setTool(id),
       flow: () => this.flow(),
@@ -324,6 +335,7 @@ export class Game {
     this.wireEvents();
     this.wireTreeButtons();
     this.wireProgressFile();
+    opts.mode?.bind?.(this.host());
   }
 
   start(): void {
@@ -336,13 +348,32 @@ export class Game {
       const restored = this.lab.restoreSlot('story');
       this.story.resume(!restored);
     }
-    this.map.riseFrom(null, 0);
+    if (this.mode === 'map') this.mapSelection = this.opts.mode?.mapSelection?.(null) ?? null;
     this.refreshUI();
+    this.map.riseFrom(null, 0);
     if (this.mode !== 'map') this.fitScene(this.mode === 'free');
     void this.lab.loadFromHash();
     this.activeTool.onActivate?.(this.ctx);
     this.last = performance.now();
+    this.opts.mode?.attach?.(this.host());
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /** Lo que un modo aparte (la demo) puede manejar del juego. */
+  private host(): GameHost {
+    return {
+      story: this.story,
+      map: this.map,
+      goToSite: (id) => this.goToSite(id),
+      travelTo: (id) => this.toMap(() => this.goToSite(id)),
+      toMap: (done) => this.toMap(done),
+      selectSite: (id) => this.selectSite(id),
+      restart: () => this.restart(),
+      openLab: () => this.lab.show(),
+      openJournal: (id) => this.journal.show(id),
+      refresh: () => this.refreshUI(),
+      toast: (m, ms) => this.toast.show(m, ms),
+    };
   }
 
   // ---------- estado ----------
@@ -664,8 +695,8 @@ export class Game {
     if (best && best.z >= 0.45) v.fit(b, best.t, best.d, PAD, best.l, best.r);
   }
 
-  /** Volver al mapa (desde un rastro o desde el laboratorio libre). */
-  private toMap(): void {
+  /** Volver al mapa (desde un rastro o desde el laboratorio libre); done, cuando la cámara llegó. */
+  private toMap(done?: () => void): void {
     if (this.story.free) {
       this.setFree(false);
       if (this.story.site) this.story.leave();
@@ -679,13 +710,15 @@ export class Game {
     this.resetProbe();
     this.lab.forget('story');
     this.story.leave();
-    this.mapSelection = site?.id ?? null;
+    const left = site?.id ?? null;
+    this.mapSelection = this.opts.mode?.mapSelection ? this.opts.mode.mapSelection(left) : left;
     // la primera vez, el mapa se revela desde el claro con calma
     const first = site?.id === 'vacio' && Object.keys(this.story.progress.solved).length === 1;
-    this.map.riseFrom(site, first ? 1400 : 650);
     this.journal.hide();
     this.tree.hide();
     this.refreshUI();
+    // después de dibujar la tarjeta del mapa: la cámara encuadra lo que ella deja libre
+    this.map.riseFrom(site, first ? 1400 : 650, done);
   }
 
   private resetProbe(): void {
@@ -807,7 +840,7 @@ export class Game {
     this.highlighted.clear();
     this.story.restart(progress ? openingProgress(progress) : undefined);
     this.resetProbe();
-    this.mapSelection = null;
+    this.mapSelection = this.story.inMap ? (this.opts.mode?.mapSelection?.(null) ?? null) : null;
     this.story.resume();
     if (this.story.inMap) this.map.riseFrom(null, 0);
     this.setTool(this.initialTool(), false);
@@ -837,13 +870,13 @@ export class Game {
       const file = input.files?.[0];
       input.value = '';
       if (!file) return;
-      const p = readProgressFile(await file.text(), SITE_IDS);
+      const p = readProgressFile(await file.text(), this.siteIds);
       if (!p) {
         this.toast.show('Ese archivo no es un avance de Mundo Vacío', 3600);
         return;
       }
       this.restart(p);
-      this.toast.show(`Avance cargado: ${Object.keys(p.solved).length} de ${SITES.length} rastros resueltos`, 3600);
+      this.toast.show(`Avance cargado: ${Object.keys(p.solved).length} de ${this.sites.length} rastros resueltos`, 3600);
     });
   }
 
@@ -1236,11 +1269,11 @@ export class Game {
   }
 }
 
-const LENS_KEY = 'mundoVacio.lenses';
+const LENS_KEY = () => storageKey('lenses');
 
 function loadLenses(): Set<LensId> {
   try {
-    const raw = JSON.parse(localStorage.getItem(LENS_KEY) ?? '[]') as unknown;
+    const raw = JSON.parse(localStorage.getItem(LENS_KEY()) ?? '[]') as unknown;
     return new Set(Array.isArray(raw) ? (raw.filter((x) => x === 'energy' || x === 'graphs') as LensId[]) : []);
   } catch {
     return new Set();
@@ -1249,7 +1282,7 @@ function loadLenses(): Set<LensId> {
 
 function saveLenses(on: ReadonlySet<LensId>): void {
   try {
-    localStorage.setItem(LENS_KEY, JSON.stringify([...on]));
+    localStorage.setItem(LENS_KEY(), JSON.stringify([...on]));
   } catch {
     /* sin almacenamiento */
   }

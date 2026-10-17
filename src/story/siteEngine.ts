@@ -41,6 +41,17 @@ export interface StarPart {
 export type SiteStatus = 'resuelto' | 'disponible' | 'cerrado';
 
 /**
+ * Reglas de un modo de juego sobre las puertas del mapa (la demo abre solo el siguiente rastro de su
+ * ruta). Sin reglas, un rastro está disponible cuando el jugador tiene lo que pide.
+ */
+export interface SitePolicy {
+  /** cómo se ve el rastro; `base` es lo que diría el juego completo */
+  status?(site: Site, base: SiteStatus, engine: SiteEngine): SiteStatus;
+  /** por qué está cerrado, cuando no es por herramientas que falten (null: lo de siempre) */
+  lockReason?(site: Site, engine: SiteEngine): string | null;
+}
+
+/**
  * Motor del mundo abierto. Lleva el rastro en curso (o el mapa, si no hay ninguno), avanza sus pasos
  * con los eventos del juego, reparte herramientas y estrellas, y escribe la página de la bitácora
  * al resolver. Conserva la forma del antiguo motor de capítulos para que el resto del juego no cambie.
@@ -60,6 +71,7 @@ export class SiteEngine {
     public progress: Progress,
     ctx: Omit<StoryContext, 'seen' | 'count' | 'prediction' | 'total' | 'runs'>,
     private save: (p: Progress) => void,
+    private policy: SitePolicy = {},
   ) {
     this.ctx = {
       ...ctx,
@@ -138,8 +150,13 @@ export class SiteEngine {
   }
 
   status(site: Site): SiteStatus {
-    if (this.isSolved(site.id)) return 'resuelto';
-    return this.missing(site).length ? 'cerrado' : 'disponible';
+    const base: SiteStatus = this.isSolved(site.id) ? 'resuelto' : this.missing(site).length ? 'cerrado' : 'disponible';
+    return this.policy.status ? this.policy.status(site, base, this) : base;
+  }
+
+  /** Por qué un rastro cerrado no se abre, si no es por lo que le falta al jugador (ver SitePolicy). */
+  lockReason(site: Site): string | null {
+    return this.policy.lockReason?.(site, this) ?? null;
   }
 
   /** Estrellas de un rastro: las del mejor intento resuelto más las ganadas en el intento en curso. */
@@ -278,6 +295,21 @@ export class SiteEngine {
     const have = this.grants();
     const fresh = [...grants].filter((g) => !have.has(g));
     fresh.forEach((g) => this.lent.add(g));
+    return fresh;
+  }
+
+  /**
+   * Entrega todo lo que se puede ganar en el mundo, más todos los controles del tiempo, fuerzas y
+   * lentes (el final de la demo: el mundo se abre). Devuelve lo nuevo. No avisa con onChange: quien
+   * lo llama refresca la interfaz (veinte avisos de «Nueva herramienta» serían ruido).
+   */
+  grantAll(): Grant[] {
+    const all = this.allGrants();
+    TIME_SKILLS.forEach((t) => all.add(`time:${t}`));
+    FORCE_SWITCHES.forEach((f) => all.add(`force:${f}`));
+    LENSES.forEach((l) => all.add(`lens:${l}`));
+    const fresh = this.give(all);
+    if (fresh.length) this.save(this.progress);
     return fresh;
   }
 

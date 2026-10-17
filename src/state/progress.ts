@@ -2,6 +2,7 @@
 // está disponible, el juego funciona igual sin recordar.
 
 import type { Grant } from '../story/types';
+import { FULL_NAMESPACE, storageKey, storageNamespace } from './storage';
 
 /** Un rastro resuelto: sus estrellas, lo que midió el estudiante y cuándo. */
 export interface SolvedSite {
@@ -28,8 +29,9 @@ export interface Progress {
   earned: Record<string, string[]>;
 }
 
-const KEY = 'mundoVacio.progress';
-const LEGACY_KEY = 'mundoVacio'; // prototipo de un archivo: { ch, st, free }
+const key = () => storageKey('progress');
+/** prototipo de un archivo: { ch, st, free } (solo en el juego completo) */
+const legacyKey = () => (storageNamespace() === FULL_NAMESPACE ? 'mundoVacio' : null);
 
 /** El primer rastro: quien abre el juego por primera vez empieza ahí, sin mapa. */
 export const FIRST_SITE = 'vacio';
@@ -91,7 +93,7 @@ export function migrateChapter(chapter: string, free: boolean, predictions: Reco
 
 export function loadProgress(siteIds: readonly string[]): Progress {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(key());
     if (raw) {
       const p = JSON.parse(raw) as Record<string, unknown>;
       if (p?.version === 3) return sanitize(p, siteIds);
@@ -104,7 +106,8 @@ export function loadProgress(siteIds: readonly string[]): Progress {
         return migrateChapter(V1_CHAPTERS[p.chapter as number] ?? FIRST_SITE, !!p.free, {}, siteIds);
       }
     }
-    const old = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? 'null') as { ch?: number; free?: boolean } | null;
+    const legacy = legacyKey();
+    const old = JSON.parse((legacy && localStorage.getItem(legacy)) || 'null') as { ch?: number; free?: boolean } | null;
     if (old && typeof old.ch === 'number') return migrateChapter(V1_CHAPTERS[old.ch] ?? FIRST_SITE, !!old.free, {}, siteIds);
   } catch {
     /* almacenamiento bloqueado o JSON dañado: se parte de cero */
@@ -211,7 +214,7 @@ export function splitDrift(p: Progress, siteIds: readonly string[]): Progress {
 
 export function saveProgress(p: Progress): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    localStorage.setItem(key(), JSON.stringify(p));
   } catch {
     /* sin almacenamiento */
   }
