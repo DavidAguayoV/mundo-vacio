@@ -412,9 +412,13 @@ const desdeSiempre: Site = {
       text: () => {
         const miss = driftBet.miss ?? 0;
         const verdict = miss < 0.5 ? 'Le achuntaste: a t = 4 s pasó por tu marca.' : `A t = 4 s pasó a ${fmt(miss)} m de tu marca.`;
-        return `${verdict} Con velocidad constante, la posición cambia lo mismo cada segundo: r = r₀ + v t. Si sabes v, sabes dónde estará.`;
+        return `${verdict} Con velocidad constante, la posición cambia lo mismo cada segundo: r = r₀ + v t. Si sabes v, sabes dónde estará. Ganaste **t = 0**: vuelve al instante inicial para repetir un movimiento (también con la tecla R).`;
       },
       on: 'next',
+      // t = 0 se gana aquí, después de la apuesta: así no se puede volver atrás a mirar antes de marcar.
+      // Los rastros que se abren con el tiempo (la boya, el pozo, el astro) piden «vuelve a t = 0».
+      grants: ['time:rewind'],
+      tool: 'time:rewind',
     },
   ],
   page: {
@@ -450,7 +454,7 @@ const cuadro: Site = {
   },
   steps: [
     {
-      text: 'Ganaste dos controles del tiempo: **t = 0** vuelve al inicio y **+0,1 s** avanza un paso. Toca la partícula y avanza de a un paso: mira en el panel cuánto cambia r en cada uno.',
+      text: 'Ganaste **+0,1 s**: el tiempo avanza de a un paso. Toca la partícula y avanza de a un paso (con t = 0 vuelves al inicio): mira en el panel cuánto cambia r en cada uno.',
       on: 'time-step',
       when: (ctx) => ctx.count('time-step') >= 3,
       grants: ['time:rewind', 'time:step'],

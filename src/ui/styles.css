@@ -314,6 +314,38 @@ button {
   justify-content: flex-end;
 }
 
+/* Barra agrupada (el mundo abierto de la demo): cuatro grupos con un rótulo chico y una línea entre ellos */
+.bar.grouped.with-forces {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.bar.grouped .zone + .zone {
+  padding-left: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+}
+
+.bar.grouped .zone::before {
+  content: attr(data-label);
+  position: absolute;
+  /* a la misma altura en los cuatro grupos (el de tiempo es más alto por ▶): sobre la fila de 44 px */
+  top: calc(50% - 38px);
+  left: 10px;
+  font-size: var(--t-xs);
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.bar.grouped .zone + .zone::before {
+  left: 22px;
+}
+
+.bar.grouped .zone.meta::before {
+  left: auto;
+  right: 10px;
+}
+
 .tool {
   position: relative;
   flex: none;
@@ -1654,6 +1686,12 @@ button {
 }
 
 /* un nombre que no cabe (pisaría otro o quedaría cortado en el borde) espera al mouse o al foco */
+/* la demo: rastros fuera de la ruta, solo un punto que insinúa que hay más mundo */
+.site-marker.faint {
+  pointer-events: none;
+  opacity: 0.32;
+}
+
 .site-marker.nameless .name,
 .site-marker.nameless .stars {
   visibility: hidden;

@@ -27,6 +27,36 @@ export interface OpenLab {
   guide: LabGuide;
 }
 
+/** Un botón que agrega un modo de juego (la demo). */
+export interface CardButton {
+  label: string;
+  primary?: boolean;
+  run(): void;
+}
+
+/** Una tarjeta del mapa armada por un modo de juego (el final de la demo). */
+export interface MapCardContent {
+  /** para el fundido: cambia cuando cambia la tarjeta */
+  key: string;
+  eyebrow: string;
+  title: string;
+  text: string;
+  extra?: string;
+  buttons: CardButton[];
+}
+
+/** Lo que un modo de juego cambia en la tarjeta. Sin ganchos, es la tarjeta de siempre. */
+export interface CardHooks {
+  /** eyebrow de un rastro («Rastro 3 de 7 · La constelación»); null: el nombre de la zona */
+  eyebrow?(site: Site): string | null;
+  /** botones de la página recién escrita; null: los de siempre */
+  pageButtons?(site: Site): CardButton[] | null;
+  /** botones de un rastro ya resuelto, visto desde el mapa; null: los de siempre */
+  solvedButtons?(site: Site): CardButton[] | null;
+  /** la tarjeta del mapa cuando no hay un rastro elegido; null: la de siempre */
+  mapCard?(): MapCardContent | null;
+}
+
 /** «una **idea** clave» → texto con <strong>, sin innerHTML. */
 function rich(text: string): Node[] {
   return text.split('**').map((part, i) => (i % 2 ? h('strong', {}, part) : document.createTextNode(part)));
@@ -99,6 +129,8 @@ export class StoryCard {
   private controlsFor = '';
   /** paso que se está mostrando: al cambiar, el texto entra con un fundido */
   private shown = '';
+  /** ganchos de un modo de juego (la demo) */
+  hooks: CardHooks = {};
 
   constructor(
     private actions: CardActions,
@@ -156,8 +188,7 @@ export class StoryCard {
     if (story.done) return this.renderPage(story);
 
     const step = story.step!;
-    const zone = story.zone(site.zone)?.name ?? '';
-    this.eyebrow.textContent = zone;
+    this.eyebrow.textContent = this.siteEyebrow(story, site);
     this.dots.replaceChildren(
       ...site.steps.map((_, i) => h('i', { class: i < story.progress.step ? 'done' : i === story.progress.step ? 'now' : '' })),
     );
@@ -178,6 +209,14 @@ export class StoryCard {
     // un paso nuevo siempre se muestra completo
     this.setCollapsed(false);
     this.enter(`${site.id}:${story.progress.step}`);
+  }
+
+  private siteEyebrow(story: SiteEngine, site: Site): string {
+    return this.hooks.eyebrow?.(site) ?? story.zone(site.zone)?.name ?? '';
+  }
+
+  private hookButtons(buttons: CardButton[]): HTMLButtonElement[] {
+    return buttons.map((b) => this.button(b.label, !!b.primary, b.run));
   }
 
   private showDares(story: SiteEngine, site: Site): void {
@@ -256,6 +295,17 @@ export class StoryCard {
 
   private renderMap(story: SiteEngine, selection: string | null): void {
     const site = selection ? story.siteById(selection) : undefined;
+    const custom = site ? null : this.hooks.mapCard?.();
+    if (custom) {
+      this.eyebrow.textContent = custom.eyebrow;
+      this.title.textContent = custom.title;
+      this.text.replaceChildren(...rich(custom.text));
+      if (custom.extra) this.extra.textContent = custom.extra;
+      this.row.append(...this.hookButtons(custom.buttons));
+      this.setCollapsed(false);
+      this.enter(`mapa:${custom.key}`);
+      return;
+    }
     if (!site) {
       const solved = story.sites.filter((s) => story.isSolved(s.id)).length;
       this.eyebrow.textContent = 'El mapa';
@@ -267,10 +317,14 @@ export class StoryCard {
       return;
     }
     const st = story.status(site);
-    this.eyebrow.textContent = story.zone(site.zone)?.name ?? '';
+    this.eyebrow.textContent = this.siteEyebrow(story, site);
     this.title.textContent = site.title;
     this.quote.textContent = `«${site.note}»`;
-    if (st === 'cerrado') {
+    const reason = st === 'cerrado' ? story.lockReason(site) : null;
+    if (reason) {
+      this.text.textContent = reason;
+      this.row.append(this.button('Entrar', true, () => {}, true));
+    } else if (st === 'cerrado') {
       const missing = story.missing(site).map((g) => {
         const src = story.sourceOf(g);
         const where = src ? ` (se gana en «${src.title}», ${story.zone(src.zone)?.name ?? ''})` : '';
@@ -281,7 +335,9 @@ export class StoryCard {
     } else if (st === 'resuelto') {
       this.text.replaceChildren(document.createTextNode('Ya lo resolviste. '), starLine(story, site));
       this.showDares(story, site);
-      this.row.append(this.button('Repetir', true, () => this.actions.enter(site.id)), this.button('Ver su página', false, () => this.actions.openJournal(site.id)));
+      const custom = this.hooks.solvedButtons?.(site);
+      if (custom) this.row.append(...this.hookButtons(custom));
+      else this.row.append(this.button('Repetir', true, () => this.actions.enter(site.id)), this.button('Ver su página', false, () => this.actions.openJournal(site.id)));
     } else {
       this.text.textContent = 'Todavía no lo resuelves.';
       this.showDares(story, site);
@@ -295,7 +351,7 @@ export class StoryCard {
   private renderPage(story: SiteEngine): void {
     const site = story.site!;
     const done = story.solved(site.id);
-    this.eyebrow.textContent = story.zone(site.zone)?.name ?? '';
+    this.eyebrow.textContent = this.siteEyebrow(story, site);
     this.kind.textContent = 'Nueva página en la bitácora';
     this.title.textContent = site.title;
     this.text.replaceChildren(...rich(site.page.law));
@@ -303,10 +359,13 @@ export class StoryCard {
     this.showDares(story, site);
     // la primera vez que se resuelve el vacío, el mapa se revela
     const first = site.id === 'vacio' && Object.keys(story.progress.solved).length === 1;
-    this.row.append(
-      this.button(first ? 'Mirar alrededor' : 'Volver al mapa', true, this.actions.toMap),
-      this.button('Seguir aquí', false, () => this.setCollapsed(true)),
-    );
+    const custom = this.hooks.pageButtons?.(site);
+    if (custom) this.row.append(...this.hookButtons(custom));
+    else
+      this.row.append(
+        this.button(first ? 'Mirar alrededor' : 'Volver al mapa', true, this.actions.toMap),
+        this.button('Seguir aquí', false, () => this.setCollapsed(true)),
+      );
     this.setCollapsed(false);
     this.enter(`pagina:${site.id}`);
   }

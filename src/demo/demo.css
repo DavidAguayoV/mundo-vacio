@@ -1,0 +1,264 @@
+/* La demo: pantalla de entrada, «Empezar de nuevo», la ayuda del primer gesto y el kiosco.
+   Todo con los tokens del juego (styles.css), así sirve en el tema oscuro y en el claro. */
+
+/* ---------- pantalla de entrada ---------- */
+
+.demo-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  padding: max(32px, env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  background-image: radial-gradient(ellipse 75% 70% at 50% 45%, var(--bg-center) 0%, var(--bg) 55%, var(--bg-edge) 100%);
+  overflow-y: auto;
+  animation: intro-in 0.5s ease-out both;
+}
+
+.demo-intro.leaving {
+  animation: intro-out 0.3s ease-in both;
+  pointer-events: none;
+}
+
+@keyframes intro-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.intro-body {
+  align-self: center;
+  max-width: 34rem;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  text-align: center;
+}
+
+.intro-body h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(48px, 13vw, 84px);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+}
+
+.intro-lead {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.intro-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-md);
+}
+
+.intro-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  margin-top: 10px;
+}
+
+.btn.big {
+  font-size: 17px;
+  padding: 13px 32px;
+  border-radius: 999px;
+  min-width: 13rem;
+}
+
+.intro-where {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-sm);
+}
+
+.intro-qr {
+  margin: 14px 0 0;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  color: var(--muted);
+  font-size: var(--t-sm);
+}
+
+.intro-qr svg {
+  width: 132px;
+  height: 132px;
+  border-radius: 6px;
+}
+
+.intro-credit {
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: var(--t-sm);
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-intro,
+  .demo-intro.leaving {
+    animation: none;
+  }
+}
+
+/* ---------- «Empezar de nuevo», siempre a la vista ---------- */
+
+.demo-restart {
+  position: absolute;
+  z-index: 5;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--muted);
+  font: 500 var(--t-sm) var(--body);
+  cursor: pointer;
+}
+
+.demo-restart:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.demo-restart.warn {
+  color: var(--acc);
+  border-color: var(--acc);
+}
+
+.demo-restart:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* en una pantalla ancha, los paneles de la derecha bajan para dejarle sitio */
+.demo-mode .dock {
+  top: calc(max(16px, env(safe-area-inset-top, 0px)) + 40px);
+}
+
+.demo-restart .short {
+  display: none;
+}
+
+/* en el celular la tarjeta va arriba a todo el ancho: el botón queda en su renglón de arriba, junto a «−» */
+@media (max-width: 700px) {
+  .demo-restart {
+    top: max(11px, env(safe-area-inset-top, 0px));
+    right: max(44px, calc(env(safe-area-inset-right, 0px) + 28px));
+    padding: 4px 10px;
+    font-size: var(--t-xs);
+  }
+
+  .demo-restart:not(.warn) .long {
+    display: none;
+  }
+
+  .demo-restart:not(.warn) .short {
+    display: inline;
+  }
+
+  .demo-mode .dock {
+    top: auto;
+  }
+}
+
+/* ---------- el primer gesto: girar los ejes ---------- */
+
+.axis-pulse,
+.ghost-hand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.axis-pulse::before {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  left: -14px;
+  top: -14px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  animation: axis-pulse 1.4s ease-out infinite;
+}
+
+@keyframes axis-pulse {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.ghost-hand {
+  color: var(--ink);
+  opacity: 0.9;
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--bg-edge) 70%, transparent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axis-pulse::before {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+/* ---------- kiosco: «¿Sigues ahí?» ---------- */
+
+.demo-idle {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.idle-body {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  text-align: center;
+  max-width: 26rem;
+}
+
+.idle-body h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: var(--t-2xl);
+}
+
+.idle-body p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.idle-body .count {
+  color: var(--ink);
+  font-family: var(--mono);
+}

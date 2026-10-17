@@ -27,6 +27,19 @@ export interface MapActions {
   enter(id: string): void;
 }
 
+/** Lo que un modo de juego cambia en el mapa (la demo). Sin ganchos, es el mapa de siempre. */
+export interface MapHooks {
+  /** zonas con nombre; null: las de namedZones */
+  named?(): Set<string> | null;
+  /** rastros que se ven solo como un punto muy atenuado, sin nombre, y no se pueden elegir */
+  faint?(site: Site): boolean;
+  /** lo que la cámara encuadra al volver al mapa; null: el mapa entero */
+  focus?(): Vec2[] | null;
+}
+
+/** Zoom máximo con que el mapa encuadra lo que pide un modo de juego. */
+const FOCUS_ZOOM_MAX = 2.6;
+
 /** Distancia (unidades del mapa) hasta la que una zona cuenta como vecina de una abierta. */
 const NEIGHBOR = 20;
 
@@ -92,6 +105,11 @@ export class WorldMap {
   private zoneBoxes: Box[] = [];
   /** vista y avance con que se repartieron los nombres por última vez */
   private labelKey = '';
+  /** zonas que van apareciendo con nombre, una tras otra (ver reveal) */
+  private revealing: { t0: number; order: string[]; every: number } | null = null;
+  private revealShown = -1;
+  /** ganchos de un modo de juego (la demo) */
+  hooks: MapHooks = {};
 
   constructor(
     private story: SiteEngine,
@@ -112,6 +130,62 @@ export class WorldMap {
     return this.view.W < 700 ? { x: 0, y: 0 } : { x: -5, y: 0 };
   }
 
+  /** Adónde vuelve la cámara: el mapa entero o, si un modo de juego lo pide, lo que hay que mirar. */
+  private homeTarget(): { center: Vec2; zoom: number } {
+    const pts = this.hooks.focus?.();
+    return pts?.length ? this.frameOf(pts) : { center: this.home, zoom: 1 };
+  }
+
+  /**
+   * Cámara que encuadra unos puntos del mapa en lo que dejan libre la tarjeta (a la izquierda en una
+   * pantalla ancha, arriba en el celular) y la barra; nunca más lejos que el mapa entero.
+   */
+  frameOf(points: Vec2[], pad = 6): { center: Vec2; zoom: number } {
+    const v = this.view;
+    const minX = Math.min(...points.map((p) => p.x)) - pad;
+    const maxX = Math.max(...points.map((p) => p.x)) + pad;
+    const minY = Math.min(...points.map((p) => p.y)) - pad;
+    const maxY = Math.max(...points.map((p) => p.y)) + pad;
+    const card = document.getElementById('card')?.getBoundingClientRect();
+    const bar = document.getElementById('bar')?.getBoundingClientRect();
+    const narrow = v.W < 700;
+    const left = !narrow && card?.width ? card.right + 12 : 0;
+    const top = narrow && card?.height ? card.bottom + 8 : 0;
+    const bottom = bar?.height ? bar.top - 8 : v.H;
+    const zoom = Math.max(1, Math.min(FOCUS_ZOOM_MAX, (v.W - left) / ((maxX - minX) * v.base), (bottom - top) / ((maxY - minY) * v.base)));
+    const S = v.base * zoom;
+    const px = (left + v.W) / 2;
+    const py = (top + bottom) / 2;
+    const cy = v.H * (v.cyRatio ?? 0.5);
+    return { center: { x: (minX + maxX) / 2 - (px - v.W / 2) / S, y: (minY + maxY) / 2 - (cy - py) / S }, zoom };
+  }
+
+  /**
+   * Las zonas aparecen con nombre una tras otra (el final de la demo). Con menos movimiento,
+   * todas a la vez.
+   */
+  reveal(order: string[], every = 260): void {
+    this.revealing = reducedMotion() ? null : { t0: performance.now(), order, every };
+    this.revealShown = -1;
+    this.refresh();
+  }
+
+  /** Cuánto se ve el nombre de una zona: 1 si ya apareció, 0 si todavía no le toca (ver reveal). */
+  private nameAlpha(id: string, now: number): number {
+    if (!this.named.has(id)) return 0;
+    const r = this.revealing;
+    const i = r ? r.order.indexOf(id) : -1;
+    if (!r || i < 0) return 1;
+    return Math.min(1, Math.max(0, (now - r.t0 - i * r.every) / r.every));
+  }
+
+  /** ¿La zona todavía no aparece en el final de la demo? */
+  private unrevealed(zone: string): boolean {
+    const r = this.revealing;
+    if (!r || !r.order.includes(zone)) return false;
+    return performance.now() < r.t0 + r.order.indexOf(zone) * r.every;
+  }
+
   resize(W: number, H: number, dpr: number): void {
     // el mapa se centra en la pantalla (en el celular, algo más abajo para dejar ver la tarjeta)
     this.view.cyRatio = W < 700 ? 0.56 : 0.5;
@@ -125,16 +199,21 @@ export class WorldMap {
 
   /** Estado de cada marcador (llamar cuando cambia el avance o la selección). */
   refresh(): void {
-    this.named = namedZones(this.story);
+    this.named = this.hooks.named?.() ?? namedZones(this.story);
     this.labelKey = '';
     for (const s of this.story.sites) {
       const b = this.markers.get(s.id)!;
       const st = this.story.status(s);
       const stars = this.story.stars(s.id).length;
       const max = this.story.maxStars(s);
+      const faint = !!this.hooks.faint?.(s);
       // en una zona sin nombre, el rastro es solo un punto atenuado (el nombre aparece al enfocarlo)
-      const quiet = !this.named.has(s.zone) && this.selected !== s.id;
-      b.className = `site-marker ${st}${this.selected === s.id ? ' selected' : ''}${quiet ? ' quiet' : ''}`;
+      const quiet = faint || (!this.named.has(s.zone) && this.selected !== s.id) || this.unrevealed(s.zone);
+      b.className = `site-marker ${st}${this.selected === s.id ? ' selected' : ''}${quiet ? ' quiet' : ''}${faint ? ' faint' : ''}`;
+      // un punto de fondo no se elige ni se lee: solo insinúa que hay más mundo
+      b.tabIndex = faint ? -1 : 0;
+      if (faint) b.setAttribute('aria-hidden', 'true');
+      else b.removeAttribute('aria-hidden');
       b.setAttribute('aria-pressed', String(this.selected === s.id));
       const zone = this.story.zone(s.zone)?.name ?? '';
       const what = st === 'resuelto' ? `resuelto, ${stars} de ${max} estrellas` : st === 'disponible' ? 'disponible' : 'todavía cerrado';
@@ -162,10 +241,16 @@ export class WorldMap {
     this.flyTo(site.at, ENTER_ZOOM, 420, done);
   }
 
-  /** Salir de un rastro: el mapa parte acercado sobre él y se aleja. */
-  riseFrom(site: Site | null, dur = 650): void {
+  /** Salir de un rastro: el mapa parte acercado sobre él y se aleja (y después, si se pide, done). */
+  riseFrom(site: Site | null, dur = 650, done?: () => void): void {
     if (site) this.view.reset(site.at, ENTER_ZOOM);
-    this.flyTo(this.home, 1, dur);
+    const to = this.homeTarget();
+    this.flyTo(to.center, to.zoom, dur, done);
+  }
+
+  /** Aleja la cámara hasta el mapa entero (el final de la demo). */
+  showAll(dur = 1600, done?: () => void): void {
+    this.flyTo(this.home, 1, dur, done);
   }
 
   get flying(): boolean {
@@ -191,6 +276,18 @@ export class WorldMap {
 
   draw(ctx: CanvasRenderingContext2D, pal: Palette, now: number): void {
     this.tickFlight(now);
+    const r = this.revealing;
+    if (r) {
+      // cada zona que aparece destapa los nombres de sus rastros
+      const shown = r.order.filter((_, i) => now >= r.t0 + i * r.every).length;
+      if (now >= r.t0 + (r.order.length + 1) * r.every) {
+        this.revealing = null;
+        this.refresh();
+      } else if (shown !== this.revealShown) {
+        this.revealShown = shown;
+        this.refresh();
+      }
+    }
     const v = this.view;
     ctx.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     ctx.clearRect(0, 0, v.W, v.H);
@@ -247,7 +344,7 @@ export class WorldMap {
         ctx.globalAlpha = 1;
       }
       // una zona sin nombre es un punto atenuado
-      if (!this.named.has(z.id)) {
+      if (this.nameAlpha(z.id, now) < 1) {
         ctx.fillStyle = pal.muted;
         ctx.globalAlpha = 0.35;
         ctx.beginPath();
@@ -256,7 +353,7 @@ export class WorldMap {
         ctx.globalAlpha = 1;
       }
     }
-    this.drawZoneLabels(ctx, pal);
+    this.drawZoneLabels(ctx, pal, now);
     this.placeMarkers();
   }
 
@@ -291,13 +388,13 @@ export class WorldMap {
    * Nombre de cada zona con nombre y qué física hay allí, sobre su rastro más alto. Se corren hacia
    * adentro si quedarían cortados en el borde, y si dos se pisan queda el de la zona abierta.
    */
-  private drawZoneLabels(ctx: CanvasRenderingContext2D, pal: Palette): void {
+  private drawZoneLabels(ctx: CanvasRenderingContext2D, pal: Palette, now: number): void {
     const v = this.view;
     const nameFont = `italic 400 ${Math.round(Math.min(30, Math.max(17, v.S * 0.75)))}px ${pal.serif}`;
     const hintFont = `400 11.5px ${pal.sans}`;
     const nameSize = Math.round(Math.min(30, Math.max(17, v.S * 0.75)));
     const items = this.story.zones
-      .filter((z) => this.named.has(z.id))
+      .filter((z) => this.nameAlpha(z.id, now) > 0)
       .map((z) => {
         const sites = this.story.sites.filter((s) => s.zone === z.id);
         const lit = sites.some((s) => this.story.status(s) !== 'cerrado');
@@ -328,7 +425,7 @@ export class WorldMap {
       it.yName -= lift;
       it.yHint -= lift;
       this.zoneBoxes.push(it.box);
-      ctx.globalAlpha = it.lit ? 0.95 : 0.5;
+      ctx.globalAlpha = (it.lit ? 0.95 : 0.5) * this.nameAlpha(it.z.id, now);
       ctx.fillStyle = pal.ink;
       ctx.font = nameFont;
       ctx.fillText(it.z.name, it.x, it.yName);

@@ -7,6 +7,7 @@ import { EXAMPLES, type Example } from './examples';
 import { SHARE_PREFIX, decodeShare, fileName, makeExperiment, parseExperimentText, setupState, shareUrl, type Experiment } from './experiment';
 import { LabPanel } from './labPanel';
 import { ExperimentLibrary, type WorldSlot } from './library';
+import { storageKey } from '../state/storage';
 
 /** Lo que el laboratorio necesita del juego. */
 export interface LabHost {
@@ -22,7 +23,7 @@ export interface LabHost {
 
 const AUTOSAVE_EVERY = 1000; // ms
 /** Laboratorio con guía abierto (se recuerda al recargar la página). */
-const GUIDE_KEY = 'mundoVacio.labGuide';
+const GUIDE_KEY = () => storageKey('labGuide');
 
 /**
  * Laboratorio: guarda y abre experimentos (en este navegador, como archivo .json o como enlace),
@@ -156,7 +157,7 @@ export class Lab {
     if (!this.host.isFree()) return null;
     if (this.guideId === null) {
       try {
-        this.guideId = localStorage.getItem(GUIDE_KEY) ?? '';
+        this.guideId = localStorage.getItem(GUIDE_KEY()) ?? '';
       } catch {
         this.guideId = '';
       }
@@ -167,8 +168,8 @@ export class Lab {
   private setGuide(id: string): void {
     this.guideId = id;
     try {
-      if (id) localStorage.setItem(GUIDE_KEY, id);
-      else localStorage.removeItem(GUIDE_KEY);
+      if (id) localStorage.setItem(GUIDE_KEY(), id);
+      else localStorage.removeItem(GUIDE_KEY());
     } catch {
       /* sin almacenamiento */
     }

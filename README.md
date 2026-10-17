@@ -21,6 +21,15 @@ El avance se guarda solo en el navegador. Al abrir la página, sin avance se par
 
 El avance guardado del relato lineal se migra solo: lo de los capítulos terminados queda resuelto.
 
+## Demo para mostrar
+
+`demo.html` (publicada en https://davidaguayov.github.io/mundo-vacio/demo.html) es el mismo juego armado para alguien que lo ve por primera vez y tiene 10 a 15 minutos: una pantalla de entrada, una ruta guiada de siete rastros («El vacío», «Una partícula», «Dos saltos», «Desde siempre», «¿Dónde es abajo?», «La boya» y «En órbita») con «Siguiente» y el progreso a la vista («Rastro 3 de 7»), y al final **el mundo se abre**: todo ganado y los 36 rastros disponibles.
+
+- El avance de la demo se guarda aparte (claves `mundoVacio.demo.*`): no toca el del juego completo.
+- «Empezar de nuevo» está siempre a la vista (dos toques) y vuelve a la pantalla de entrada.
+- `demo.html?kiosco`, para un computador o tablet de feria: tras 90 s sin nadie pregunta «¿Sigues ahí?» y, si nadie toca en 30 s, vuelve al comienzo con el avance borrado. La entrada muestra un código QR para jugarla en el celular.
+- La ruta está en `src/demo/route.ts` (como datos: cada parada es un rastro del juego, con sus ajustes solo para la demo) y sus reglas en `src/demo/policy.ts`.
+
 ## Uso
 
 ```bash
@@ -72,6 +81,7 @@ El workflow `.github/workflows/deploy.yml` corre los tests, construye y publica 
 | `src/lab` | experimentos (formato, enlaces, biblioteca local, ejemplos) y el panel del laboratorio |
 | `src/tree` | árbol de habilidades |
 | `src/ui` | tarjeta de relato, caja de herramientas, inspector, HUD, bitácora |
+| `src/demo` | la demo (`demo.html`): ruta, puertas, pantalla de entrada, final, kiosco y el código QR; se engancha al juego por `src/mode.ts` |
 
 Agregar un rastro: un objeto `Site` más en `src/story/sites.ts` (zona, posición en el mapa, nota, lo que pide, cómo se arma, sus pasos y su página). Agregar una herramienta: un archivo en `src/tools/` y una línea en `registry.ts`. Agregar una fuerza: una clase que implemente `Force` en `src/physics/forces/`.
 

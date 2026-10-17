@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#070a12" />
+    <meta name="description" content="Un juego sobre física: parte en un espacio vacío y construye las herramientas para describir el movimiento." />
+    <title>Mundo Vacío · demo</title>
+    <script>
+      // aplica el tema guardado antes de pintar, para evitar un destello
+      try { if (localStorage.getItem('mundoVacio.theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="cv" aria-label="Espacio de simulación"></canvas>
+      <div class="site-layer" id="siteLayer" role="group" aria-label="Rastros del mapa" hidden></div>
+
+      <section class="card" id="card" aria-live="polite">
+        <button class="min" id="minBtn" type="button" aria-label="Contraer relato" aria-expanded="true">−</button>
+        <div class="eyebrow"><span id="eyebrow"></span><span class="dots" id="dots"></span></div>
+        <h1 id="ctitle"></h1>
+        <p id="ctext"></p>
+        <div class="row" id="crow"></div>
+      </section>
+
+      <div class="dock" id="dock">
+        <div class="hud" id="hud"></div>
+        <aside class="inspector" id="insp" hidden></aside>
+      </div>
+
+      <div class="toast" id="toast" role="status"></div>
+      <button class="recenter" id="recenter" type="button" hidden>Centrar la vista</button>
+      <div class="timeline" id="timeline" hidden>
+        <label for="tl">t</label>
+        <input id="tl" type="range" min="0" max="1" step="0.005" value="0" aria-label="Línea de tiempo" />
+        <output id="tlOut" for="tl">0,00 s</output>
+      </div>
+      <nav class="bar" id="bar" aria-label="Caja de herramientas"></nav>
+
+      <div class="overlay" id="journalOv" hidden>
+        <div class="tree journal" role="dialog" aria-modal="true" aria-labelledby="journalTitle">
+          <header>
+            <h2 id="journalTitle">Bitácora</h2>
+            <div class="row">
+              <button class="btn" id="saveProgress" type="button">Guardar avance</button>
+              <button class="btn" id="loadProgress" type="button">Cargar avance</button>
+              <input id="progressFile" type="file" accept=".json,application/json" hidden />
+              <button class="btn primary" id="closeJournal" type="button">Volver</button>
+            </div>
+          </header>
+          <div id="journalBody" class="journal-body"></div>
+        </div>
+      </div>
+
+      <div class="overlay" id="treeOv" hidden>
+        <div class="tree" role="dialog" aria-modal="true" aria-labelledby="treeTitle">
+          <header>
+            <h2 id="treeTitle">Árbol de herramientas</h2>
+            <div class="row">
+              <button class="btn" id="freeBtn" type="button"></button>
+              <button class="btn" id="restartBtn" type="button">Empezar de nuevo</button>
+              <button class="btn" id="themeBtn" type="button"></button>
+              <button class="btn primary" id="closeTree" type="button">Volver</button>
+            </div>
+          </header>
+          <div id="tiers" class="tiers skilltree"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/demo/main.ts"></script>
+  </body>
+</html>
