@@ -42,6 +42,11 @@ export class Simulation {
   constraints: Constraint[] = [];
 
   t = 0;
+  /**
+   * Calor del lanzamiento hasta el instante actual (J): el trabajo del roce y del arrastre más lo que
+   * se pierde en los choques con superficies y al detenerse. Se mide paso a paso, no por diferencia.
+   */
+  heat = 0;
   /** true mientras seek() recalcula el pasado: los observadores de onStep deben ignorar esos pasos */
   replaying = false;
   /** Cambia cada vez que empieza un lanzamiento nuevo (no al reanudar una pausa). */
@@ -128,8 +133,11 @@ export class Simulation {
     this.t = 0;
     this.steps = 0;
     this.acc = 0;
+    this.heat = 0;
     const s = stateFromBodies(this.world.particles, 0);
     for (const c of this.constraints) c.begin?.(s, this.world);
+    // acomodar las partículas apoyadas al empezar no es calor del lanzamiento
+    for (const c of this.constraints) c.takeHeat?.();
     if (!this.replaying) for (const fn of this.onRestart) fn(this);
   }
 
@@ -179,6 +187,7 @@ export class Simulation {
     this.t = 0;
     this.steps = 0;
     this.acc = 0;
+    this.heat = 0;
     this.running = false;
     this.finished = false;
     if (changed) this.onStateChange?.();
@@ -269,7 +278,11 @@ export class Simulation {
     const rigid = this.rigid;
     if (rigid) stepBodies(rigid, this.dt, this.t);
     this.integrator.step(s, this.dt, accel);
-    for (const c of this.constraints) c.apply(s, this.world, this.dt);
+    this.heat -= this.integrator.lastWork;
+    for (const c of this.constraints) {
+      c.apply(s, this.world, this.dt);
+      this.heat += c.takeHeat?.() ?? 0;
+    }
     this.steps++;
     // el tiempo se cuenta en pasos: así t no acumula error de redondeo y seek() cae en el mismo instante
     this.t = s.t = this.steps * this.dt;

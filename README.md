@@ -12,7 +12,7 @@ Después del primer rastro («El vacío») se revela el **mapa**: zonas alrededo
 - **El pozo** tiene regiones con su propia gravedad: un rincón donde «abajo» es hacia el lado y la Luna junto a la Tierra, para comparar el mismo tiro.
 - **Las laderas** separan la normal («El suelo empuja»), el roce estático («¿Se queda o desliza?») y la medición de μₛ con una pendiente cuyo roce no se muestra («La pendiente justa»).
 - El lente **Gráficos** (se gana en «Desde siempre») muestra x(t), y(t), vₓ(t) y v_y(t) de la partícula elegida, en tus ejes; la línea de tiempo es su cursor, al pasar el puntero se lee el valor y al tocar se va a ese instante.
-- **El taller** (la ley del resorte, el ritmo y «Al mismo compás»: afinar un resorte al de otro), **el astro** (atracción, órbita y escape), **el mar** (la pluma y la piedra, velocidad terminal y «El paracaídas»: aterrizar a menos de 2,5 m/s) y **la central** (lo que no cambia, dónde está el cero, resorte y energía, y «Justo hasta arriba»: detenerla en la baliza).
+- **El taller** (la ley del resorte, el ritmo y «Al mismo compás»: afinar un resorte al de otro), **el astro** (atracción, órbita y escape), **el mar** (la pluma y la piedra, velocidad terminal y «El paracaídas»: aterrizar a menos de 2,5 m/s) y **la central** (lo que no cambia, dónde está el cero, resorte y energía, y «Justo hasta arriba»: detenerla en la baliza). En la central también está el calor: «¿Adónde se fue?» (una caja que frena por roce: K pasa a Q), «El golpe» (un choque sin rebote) y «Justo en la marca» (elegir la rapidez para que se detenga en la baliza: d = v²/(2 μc g)).
 - **El puente** trae los cuerpos rígidos: «La balanza» (poner pesas en una barra con eje hasta que quede derecha: torque), «La palanca» (correr el apoyo para que 1 kg levante 5 kg), «El péndulo que no es un punto» (una barra contra una pesa colgada del mismo largo) y «La carrera» (caja, disco y aro por pendientes iguales: a = g sen α / (1 + I/(m R²))). Con Partícula se ponen pesas tocando la barra; con Mover se corren las pesas y el apoyo.
 - Cada zona tiene al menos un reto de maestría (una estrella extra): poner el origen sobre una partícula, una órbita casi circular, escapar con lo justo, aterrizar suave en el aire…
 - **Cámara**: rueda o pellizco para acercar; arrastrar el espacio vacío con Mover (o con el botón del medio o el derecho) para recorrer; «Centrar la vista» o la tecla 0 para volver. Teclas + y − también acercan y alejan.
@@ -44,7 +44,7 @@ Desde el árbol → «Modo libre», o al abrir un laboratorio. En modo libre el 
 - **Guardar aquí**: guarda el experimento en este navegador (se reemplaza si ya existe uno con el mismo nombre).
 - **Descargar .json** y **Abrir archivo .json** (o arrastrar el archivo al lienzo): para llevarlo a otro equipo.
 - **Copiar enlace**: el experimento va comprimido dentro del enlace (`#exp=…`); quien lo abre lo ve en su modo libre sin perder su avance en el relato.
-- **Ejemplos**: caída de dos masas, tiro parabólico al blanco, el mismo tiro en la Luna, planos con roce, medir μₛ, masa colgada de un resorte, órbita circular, caída con aire, suma en ejes girados, el balancín y la carrera de cuerpos que ruedan.
+- **Ejemplos**: caída de dos masas, tiro parabólico al blanco, el mismo tiro en la Luna, planos con roce, medir μₛ, masa colgada de un resorte, órbita circular, caída con aire, suma en ejes girados, frenado por roce, el balancín y la carrera de cuerpos que ruedan.
 - **Mundo**: |g| de la Tierra, la Luna o Marte, o sin gravedad; atracción entre masas; medio (vacío, aire o agua); vaciar el mundo.
 - **Vista**: cámara lenta (×½, ×¼) y ocultar los vectores r o la trayectoria cuando hay muchas partículas.
 
@@ -59,6 +59,7 @@ El workflow `.github/workflows/deploy.yml` corre los tests, construye y publica 
 | Carpeta | Qué hay |
 | --- | --- |
 | `src/physics` | RK4 de sistema con paso fijo (1/240 s), fuerzas (`Force`), simulación con acumulador y estroboscopio |
+| `src/physics/energy.ts` | energía del sistema (K, Ug, Ue, UG) y el calor Q, que la simulación mide aparte: potencia del roce y del arrastre en cada etapa de RK4, más lo que se pierde en choques y al detenerse |
 | `src/physics/rigid.ts` | cuerpos rígidos 2D (barra, disco, aro, caja): giro en torno a un eje con RK4 y tope, rodar sin deslizar por una superficie, momento de inercia, torque y energía |
 | `src/physics/constraints` | superficies rígidas: choque plástico, contacto, separación; la normal y el roce (`forces/normal.ts`, `forces/friction.ts`) leen esos contactos |
 | `src/world` | entidades serializables, sistema de referencia del usuario (`toUser` / `toGlobal`) |

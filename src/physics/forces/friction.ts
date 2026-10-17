@@ -15,6 +15,7 @@ type Regime = { kind: 'estático' | 'cinético'; f: number } | null;
 export class FrictionForce implements Force {
   readonly kind = 'friction' as const;
   readonly reaction = true;
+  readonly dissipative = true;
 
   constructor(private contacts: ContactSet) {}
 

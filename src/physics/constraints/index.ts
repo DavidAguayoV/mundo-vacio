@@ -14,6 +14,8 @@ export interface Constraint {
   apply(s: SystemState, world: ForceWorld, dt: number): void;
   /** normal de contacto si la partícula está apoyada */
   contactNormal?(id: string): Vec2 | null;
+  /** energía mecánica (J) que se llevó desde la última llamada (choques plásticos, detenerse), y vuelve a cero */
+  takeHeat?(): number;
 }
 
 export { SurfaceConstraint } from './surface';

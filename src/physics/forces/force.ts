@@ -23,6 +23,8 @@ export type ForceJSON =
 export interface Force {
   readonly kind: ForceKind;
   readonly reaction?: boolean;
+  /** no conservativa (roce, arrastre): su potencia F · v se cuenta como calor */
+  readonly dissipative?: boolean;
   force(i: number, s: SystemState, world: ForceWorld, applied?: Vec2): Vec2;
   /** nota breve para el inspector (por ejemplo, "estático" o "cinético" en el roce) */
   describe?(i: number, s: SystemState, applied: Vec2): string | undefined;
@@ -33,19 +35,25 @@ export interface Force {
 /** Fuerza nula compartida: evita crear un objeto cada vez que una fuerza no actúa sobre una partícula. */
 export const ZERO: Readonly<Vec2> = Object.freeze({ x: 0, y: 0 });
 
-/** Construye a_i = ΣF_i / m_i a partir de la lista de fuerzas activas. */
+/**
+ * Construye a_i = ΣF_i / m_i a partir de la lista de fuerzas activas. Devuelve además la potencia
+ * de las fuerzas disipativas, Σ F · v (≤ 0), que el integrador convierte en calor.
+ */
 export function makeAccel(forces: readonly Force[], world: ForceWorld): AccelFn {
   const applied = forces.filter((f) => !f.reaction);
   const reactions = forces.filter((f) => f.reaction);
   const sum = { x: 0, y: 0 };
   return (s, out) => {
+    let power = 0;
     for (let i = 0; i < s.pos.length; i++) {
       sum.x = 0;
       sum.y = 0;
+      const v = s.vel[i];
       for (const f of applied) {
         const F = f.force(i, s, world);
         sum.x += F.x;
         sum.y += F.y;
+        if (f.dissipative) power += F.x * v.x + F.y * v.y;
       }
       let fx = sum.x;
       let fy = sum.y;
@@ -53,11 +61,13 @@ export function makeAccel(forces: readonly Force[], world: ForceWorld): AccelFn 
         const F = f.force(i, s, world, sum);
         fx += F.x;
         fy += F.y;
+        if (f.dissipative) power += F.x * v.x + F.y * v.y;
       }
       const m = s.mass[i];
       out[i].x = fx / m;
       out[i].y = fy / m;
     }
+    return power;
   };
 }
 

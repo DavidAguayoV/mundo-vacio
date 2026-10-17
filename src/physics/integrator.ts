@@ -1,8 +1,11 @@
 import type { Vec2 } from '../core/vec';
 import type { SystemState } from './state';
 
-/** Escribe en out[i] la aceleración de la partícula i para el estado s. */
-export type AccelFn = (s: SystemState, out: Vec2[]) => void;
+/**
+ * Escribe en out[i] la aceleración de la partícula i para el estado s. Puede devolver la potencia
+ * (W, ≤ 0) que disipan las fuerzas no conservativas en ese estado: el integrador la acumula.
+ */
+export type AccelFn = (s: SystemState, out: Vec2[]) => number | void;
 
 const grow = (arr: Vec2[], n: number) => {
   while (arr.length < n) arr.push({ x: 0, y: 0 });
@@ -16,6 +19,11 @@ export class RK4Integrator {
   private tmp: SystemState = { ids: [], pos: [], vel: [], mass: [], t: 0, index: new Map() };
   private kx: Vec2[][] = [[], [], [], []]; // derivada de la posición (= velocidad) en cada etapa
   private kv: Vec2[][] = [[], [], [], []]; // derivada de la velocidad (= aceleración) en cada etapa
+  /**
+   * Trabajo (J, ≤ 0) de las fuerzas disipativas en el último paso: la potencia de cada etapa con los
+   * mismos pesos que RK4 (1, 2, 2, 1)/6. Así el calor tiene la misma precisión que el movimiento.
+   */
+  lastWork = 0;
 
   private ensure(n: number) {
     grow(this.tmp.pos, n);
@@ -31,10 +39,12 @@ export class RK4Integrator {
   /** Avanza s en dt, modificando s.pos[i] y s.vel[i] en el lugar. */
   step(s: SystemState, dt: number, accel: AccelFn): void {
     const n = s.pos.length;
+    this.lastWork = 0;
     if (n === 0) {
       s.t += dt;
       return;
     }
+    const P = [0, 0, 0, 0];
     this.ensure(n);
     const { tmp, kx, kv } = this;
     tmp.ids = s.ids;
@@ -46,7 +56,7 @@ export class RK4Integrator {
       kx[0][i].x = s.vel[i].x;
       kx[0][i].y = s.vel[i].y;
     }
-    accel(s, kv[0]);
+    P[0] = accel(s, kv[0]) ?? 0;
 
     // k2, k3, k4
     const h = [dt / 2, dt / 2, dt];
@@ -63,10 +73,11 @@ export class RK4Integrator {
         kx[k][i].x = tmp.vel[i].x;
         kx[k][i].y = tmp.vel[i].y;
       }
-      accel(tmp, kv[k]);
+      P[k] = accel(tmp, kv[k]) ?? 0;
     }
 
     const c = dt / 6;
+    this.lastWork = c * (P[0] + 2 * P[1] + 2 * P[2] + P[3]);
     for (let i = 0; i < n; i++) {
       s.pos[i].x += c * (kx[0][i].x + 2 * kx[1][i].x + 2 * kx[2][i].x + kx[3][i].x);
       s.pos[i].y += c * (kx[0][i].y + 2 * kx[1][i].y + 2 * kx[2][i].y + kx[3][i].y);

@@ -5,14 +5,15 @@ import type { Simulation } from '../physics/simulation';
 import type { World } from '../world/world';
 import { $, h, setText } from './dom';
 
-type BarKey = 'K' | 'Ug' | 'Ue' | 'UG' | 'total';
+type BarKey = 'K' | 'Ug' | 'Ue' | 'UG' | 'Q' | 'total';
 
 const BARS: { key: BarKey; label: string; cls: string; title: string }[] = [
   { key: 'K', label: 'K', cls: 'k', title: 'Energía cinética, ½ m v²' },
   { key: 'Ug', label: 'Ug', cls: 'ug', title: 'Energía potencial gravitatoria, m g h (h desde tu origen)' },
   { key: 'Ue', label: 'Ue', cls: 'ue', title: 'Energía elástica de los resortes, ½ k ΔL²' },
   { key: 'UG', label: 'UG', cls: 'uG', title: 'Energía potencial de la atracción entre masas' },
-  { key: 'total', label: 'Total', cls: 'tot', title: 'Suma de todas' },
+  { key: 'Q', label: 'Q', cls: 'q', title: 'Calor: lo que se llevaron el roce, el arrastre y los choques' },
+  { key: 'total', label: 'Total', cls: 'tot', title: 'Suma de todas: la parte gris de arriba es el calor' },
 ];
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -28,12 +29,16 @@ interface BarEls {
 /**
  * Medidor de energía del sistema completo (el lente «Energía»). Usa una escala fija durante
  * cada lanzamiento —la mayor energía vista—, así las barras no saltan al mover la línea de tiempo.
+ * Si en el mundo algo puede disipar (superficies, un medio), aparece Q, y la barra Total se apila:
+ * la mecánica abajo y el calor, en gris, encima. Al frenar, la parte gris crece y el contorno no se mueve.
  */
 export class EnergyMeter {
   private el: HTMLElement;
   private svg: SVGSVGElement;
   private zero: SVGLineElement;
   private bars = new Map<BarKey, BarEls>();
+  /** el tramo de calor dentro de la barra Total */
+  private qseg: SVGRectElement | null = null;
   private shown = '';
   private runKey = '';
   private posMax = 0;
@@ -55,7 +60,8 @@ export class EnergyMeter {
     if (this.el.hidden === visible) this.el.hidden = !visible;
     if (!visible) return;
     const origin: Vec2 = world.frame?.origin ?? { x: 0, y: 0 };
-    const e = systemEnergy(world, origin);
+    const e = systemEnergy(world, origin, sim.heat);
+    const dissipates = world.surfaces.length > 0 || !!world.medium || sim.heat > 1e-9;
 
     const keys = BARS.filter(
       (b) =>
@@ -63,7 +69,8 @@ export class EnergyMeter {
         b.key === 'total' ||
         (b.key === 'Ug' && !!world.g) ||
         (b.key === 'Ue' && world.springs.length > 0) ||
-        (b.key === 'UG' && !!world.gravitation && world.particles.length > 1),
+        (b.key === 'UG' && !!world.gravitation && world.particles.length > 1) ||
+        (b.key === 'Q' && dissipates),
     );
     const shown = keys.map((b) => b.key).join(',');
     if (shown !== this.shown) this.build(keys);
@@ -96,11 +103,20 @@ export class EnergyMeter {
       els.value.setAttribute('y', String(v >= 0 ? y0 - len - 3 : y0 + len + 10));
       setText(els.value, fmt(v, 1));
     }
+    // dentro de Total, el tramo entre la mecánica y el total es el calor
+    if (this.qseg) {
+      const yOf = (v: number) => y0 - (H * v) / span;
+      const a = yOf(e.mech);
+      const b = yOf(e.total);
+      this.qseg.setAttribute('y', String(Math.min(a, b)));
+      this.qseg.setAttribute('height', String(Math.abs(a - b)));
+    }
   }
 
   private build(keys: typeof BARS): void {
     this.svg.replaceChildren();
     this.bars.clear();
+    this.qseg = null;
     const n = keys.length;
     const slot = W / n;
     const bw = Math.min(30, slot * 0.6);
@@ -134,6 +150,14 @@ export class EnergyMeter {
         label.append('U', sub);
       } else {
         label.textContent = b.label;
+      }
+      if (b.key === 'total' && keys.some((k) => k.key === 'Q')) {
+        const seg = document.createElementNS(NS, 'rect');
+        seg.setAttribute('x', String(cx - bw / 2));
+        seg.setAttribute('width', String(bw));
+        seg.setAttribute('class', 'bar qseg');
+        this.svg.append(seg);
+        this.qseg = seg;
       }
       this.svg.append(rect, value, label);
       this.bars.set(b.key, { rect, value });
