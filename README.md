@@ -9,7 +9,10 @@ Después del primer rastro («El vacío») se revela el **mapa**: zonas alrededo
 - **Puertas suaves**: todo se ve desde el comienzo; la tarjeta dice qué falta para entrar y en qué rastro se gana.
 - **La constelación** enseña vectores con una sonda que salta siguiendo tarjetas (cola con punta, el orden, −B, ejes ajenos).
 - **La deriva** enseña inercia y velocidad sin gravedad (la apuesta a t = 4 s, alcanzar la boya).
-- Los capítulos de antes (caída, tiro, superficies, resortes, gravitación, arrastre, energía) siguen jugables como rastros de sus zonas, a la espera de rehacerse (fases F2 y F3 de `PROPUESTA_MUNDO_ABIERTO.md`).
+- **El pozo** tiene regiones con su propia gravedad: un rincón donde «abajo» es hacia el lado y la Luna junto a la Tierra, para comparar el mismo tiro.
+- **Las laderas** separan la normal («El suelo empuja»), el roce estático («¿Se queda o desliza?») y la medición de μₛ con una pendiente cuyo roce no se muestra («La pendiente justa»).
+- El lente **Gráficos** (se gana en «Desde siempre») muestra x(t), y(t), vₓ(t) y v_y(t) de la partícula elegida, en tus ejes; la línea de tiempo es su cursor, al pasar el puntero se lee el valor y al tocar se va a ese instante.
+- Los capítulos de resortes, gravitación, arrastre y energía siguen jugables como rastros de sus zonas, a la espera de rehacerse (fase F3 de `PROPUESTA_MUNDO_ABIERTO.md`).
 - **Cámara**: rueda o pellizco para acercar; arrastrar el espacio vacío con Mover (o con el botón del medio o el derecho) para recorrer; «Centrar la vista» o la tecla 0 para volver. Teclas + y − también acercan y alejan.
 
 El avance guardado del relato lineal se migra solo: lo de los capítulos terminados queda resuelto.
@@ -32,7 +35,9 @@ Atajos (cuando ya se ganó la habilidad): espacio = el tiempo fluye o se detiene
 
 ## Laboratorio (modo libre)
 
-Desde el árbol → «Modo libre», o al terminar el relato. El botón **Lab** de la caja de herramientas abre el panel:
+Los **laboratorios con guía** se abren desde cualquier parte (botón Lab, o «Laboratorios» en el mapa): cada uno trae su objetivo, qué medir, preguntas, los lentes que necesita y deslizadores para el profesor (|g|, masa, v₀, ángulo, μₛ, k). Mover un deslizador vuelve el lanzamiento a t = 0 con el valor nuevo.
+
+Desde el árbol → «Modo libre», o al abrir un laboratorio. En modo libre el botón **Lab** abre el panel completo:
 
 - **Guardar aquí**: guarda el experimento en este navegador (se reemplaza si ya existe uno con el mismo nombre).
 - **Descargar .json** y **Abrir archivo .json** (o arrastrar el archivo al lienzo): para llevarlo a otro equipo.

@@ -2,6 +2,7 @@ import { fmt, fmtVec } from '../core/format';
 import { dist, len, rotate, type Vec2 } from '../core/vec';
 import { IDENTITY_FRAME, ReferenceFrame } from '../world/frame';
 import type { World } from '../world/world';
+import { G_EARTH } from '../world/world';
 import { CHAPTERS, reveal } from './chapters';
 import type { Grant, Mastery, Page, Site, Step, StoryContext, Zone, ZoneId } from './types';
 
@@ -55,22 +56,36 @@ const deg = (rad: number) => (rad * 180) / Math.PI;
 /** Convierte un capítulo del relato lineal en un rastro: su cierre de ingeniería pasa a la bitácora. */
 function fromChapter(
   id: string,
-  opts: { zone: ZoneId; at: { x: number; y: number }; note: string; needs?: Grant[]; law: string; measured?: Page['measured']; mastery?: Mastery[] },
+  opts: {
+    zone: ZoneId;
+    at: { x: number; y: number };
+    note: string;
+    needs?: Grant[];
+    law: string;
+    measured?: Page['measured'];
+    mastery?: Mastery[];
+    /** para usar solo una parte del capítulo como rastro propio */
+    id?: string;
+    title?: string;
+    steps?: [number, number];
+    engineering?: string;
+  },
 ): Site {
   const ch = CHAPTERS.find((c) => c.id === id);
   if (!ch) throw new Error(`Falta el capítulo ${id}`);
   const eng = ch.steps.find((s) => s.kind === 'engineering');
+  const steps = ch.steps.filter((s) => s.kind !== 'engineering');
   return {
-    id,
+    id: opts.id ?? id,
     zone: opts.zone,
-    title: ch.title,
+    title: opts.title ?? ch.title,
     at: opts.at,
     note: opts.note,
     needs: opts.needs,
     grants: ch.grants,
     seed: ch.seed,
-    steps: ch.steps.filter((s) => s.kind !== 'engineering'),
-    page: { law: opts.law, measured: opts.measured, engineering: typeof eng?.text === 'string' ? eng.text : '' },
+    steps: opts.steps ? steps.slice(opts.steps[0], opts.steps[1]) : steps,
+    page: { law: opts.law, measured: opts.measured, engineering: opts.engineering ?? (typeof eng?.text === 'string' ? eng.text : '') },
     mastery: opts.mastery,
   };
 }
@@ -364,6 +379,11 @@ const desdeSiempre: Site = {
       },
       on: 'next',
     },
+    {
+      text: 'Ganaste los **gráficos**: abajo a la derecha están x(t), y(t), vₓ(t) y v_y(t) de la partícula elegida. Con velocidad constante, x(t) es una recta y vₓ(t) es plana. Vuelve a t = 0 y míralos crecer mientras fluye el tiempo.',
+      on: 'next',
+      grants: ['lens:graphs'],
+    },
   ],
   page: {
     law: 'Sin nada que la empuje, una partícula sigue recto con la misma velocidad: r = r₀ + v t.',
@@ -435,6 +455,278 @@ const boya: Site = {
   ],
 };
 
+
+// ---------- El pozo: regiones con su propia gravedad ----------
+
+/** Inclinación de una superficie respecto de la horizontal de su g, en grados. */
+function inclineDeg(world: World, a: Vec2, b: Vec2): number | null {
+  const g = world.gAt({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const d = { x: b.x - a.x, y: b.y - a.y };
+  if (!g || !len(g) || !len(d)) return null;
+  const sin = Math.abs(d.x * g.x + d.y * g.y) / (len(d) * len(g));
+  return deg(Math.asin(Math.min(1, sin)));
+}
+
+const rincon: Site = {
+  id: 'rincon',
+  zone: 'pozo',
+  title: 'El rincón torcido',
+  at: zoneAt('pozo', -0.5, -4.2),
+  note: 'En este rincón las cosas no caen hacia donde uno espera. Tardé en entender por qué.',
+  needs: ['tool:gravity', 'tool:particle'],
+  seed: ({ world }) => {
+    frameAt(world, { x: 5, y: -3.5 });
+    world.g = null;
+    world.regions = [{ id: world.newId('r'), min: { x: -6, y: -5 }, max: { x: 10, y: 6 }, g: { x: -G_EARTH, y: 0 }, name: 'Rincón' }];
+    world.targets = [{ id: world.newId('t'), pos: { x: -3.5, y: 1 }, radius: 0.5 }];
+  },
+  steps: [
+    {
+      text: 'Aquí g apunta hacia la izquierda de tu pantalla. Si sueltas una partícula, ¿hacia dónde cae?',
+      on: 'end',
+      ask: 'rincon',
+      correct: 'g',
+      choices: [
+        { id: 'pantalla', label: 'Hacia el borde de abajo de la pantalla' },
+        { id: 'g', label: 'Hacia donde apunta g' },
+        { id: 'quieta', label: 'Se queda quieta' },
+      ],
+    },
+    {
+      text: 'Coloca una partícula donde quieras y deja fluir el tiempo para que caiga en el blanco.',
+      on: 'target-hit',
+    },
+    {
+      text: reveal('rincon', 'Cayó hacia la izquierda: **abajo** es la dirección de g, y aquí g apunta de lado. Todo lo que sabes de caídas y tiros sigue valiendo; solo cambió hacia dónde es abajo.', {
+        pantalla: 'El borde de la pantalla no tiene nada de especial: lo que decide es g.',
+        g: 'Lo predijiste bien.',
+        quieta: 'Sin velocidad no se queda quieta: g la acelera desde el primer instante.',
+      }),
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Abajo es la dirección de g, no el borde de la pantalla: las leyes no cambian si g apunta hacia otro lado.',
+    engineering: 'En una estación espacial que gira, «abajo» es hacia afuera: los pisos se diseñan sobre la pared exterior.',
+  },
+  mastery: [
+    {
+      id: 'de-lado',
+      label: 'Acierta lanzándola de lado, con una velocidad perpendicular a g',
+      on: 'target-hit',
+      when: ({ world, sim }) =>
+        world.particles.some((p) => {
+          const v = sim.initialState(p.id)?.vel ?? p.vel;
+          return len(v) > 1 && Math.abs(v.x) < 0.3 * len(v);
+        }),
+    },
+  ],
+};
+
+const G_MOON = 1.62;
+/** Alcance de un tiro que sale y cae a la misma altura: R = 2 vₓ v_y / g. */
+const range = (v: Vec2, g: number) => (2 * Math.abs(v.x) * Math.max(0, v.y)) / g;
+
+/** Velocidad con que salió la partícula de la Luna (la que maneja el jugador). */
+const moonV0 = (ctx: StoryContext): Vec2 | null => {
+  const me = mine(ctx.world);
+  return me ? (ctx.sim.initialState(me.id)?.vel ?? me.vel) : null;
+};
+
+const luna: Site = {
+  id: 'luna',
+  zone: 'pozo',
+  title: 'El mismo tiro en la Luna',
+  at: zoneAt('pozo', 4.5, 1.5),
+  note: 'A un lado dejé la gravedad de la Luna; al otro, la de la Tierra. El mismo tiro no llega igual de lejos.',
+  needs: ['tool:gravity', 'tool:velocity'],
+  seed: ({ world }) => {
+    frameAt(world, { x: 1.5, y: -3.6 });
+    world.g = null;
+    world.regions = [
+      { id: world.newId('r'), min: { x: -9.5, y: -4.2 }, max: { x: -0.5, y: 5 }, g: { x: 0, y: -G_EARTH }, name: 'Tierra' },
+      { id: world.newId('r'), min: { x: 0.5, y: -4.2 }, max: { x: 9.5, y: 5 }, g: { x: 0, y: -G_MOON }, name: 'Luna' },
+    ];
+    world.addSurface({ x: -9.5, y: -3 }, { x: -0.5, y: -3 }, 0.6, 0.4).locked = true;
+    world.addSurface({ x: 0.5, y: -3 }, { x: 9.5, y: -3 }, 0.6, 0.4).locked = true;
+    const earth = world.addParticle({ x: -8.5, y: -3 }, 1);
+    earth.locked = true;
+    world.addParticle({ x: 1.5, y: -3 }, 1);
+    world.targets = [{ id: world.newId('t'), pos: { x: 7, y: -2.6 }, radius: 0.45 }];
+  },
+  steps: [
+    {
+      text: 'A la derecha, g es la de la Luna: 1,62 m/s². Elige Velocidad, dale una a la partícula de la Luna y deja fluir el tiempo para que caiga en el blanco.',
+      on: 'target-hit',
+    },
+    {
+      text: 'Si la partícula de la Tierra sale con exactamente la misma velocidad, ¿hasta dónde llega?',
+      on: 'end',
+      ask: 'luna',
+      correct: 'sexto',
+      choices: [
+        { id: 'igual', label: 'Igual de lejos' },
+        { id: 'mitad', label: 'A la mitad' },
+        { id: 'sexto', label: 'Más o menos a un sexto' },
+      ],
+    },
+    {
+      text: 'Le di a la de la Tierra la misma velocidad. Vuelve a t = 0 y deja fluir el tiempo hasta que las dos toquen el suelo.',
+      on: 'tick',
+      enter: (ctx) => {
+        const v = moonV0(ctx);
+        const earth = ctx.world.particles.find((p) => p.locked);
+        if (ctx.sim.hasRun) ctx.sim.reset();
+        if (v && earth) earth.vel = { ...v };
+      },
+      when: ({ world, sim }) =>
+        sim.hasRun &&
+        sim.t > 0.6 &&
+        world.particles.every((p) => !!sim.contactNormal(p.id)) &&
+        world.particles.some((p) => dist(p.pos, sim.initialState(p.id)?.pos ?? p.pos) > 1),
+    },
+    {
+      text: reveal('luna', 'En la Luna llegó unas seis veces más lejos y más alto: 9,80 / 1,62 ≈ 6. Con la misma v₀, el alcance y la altura máxima son inversamente proporcionales a g.', {
+        igual: 'La velocidad de salida es la misma, pero en la Tierra g la frena seis veces más rápido.',
+        mitad: 'Más que la mitad: g es seis veces mayor, y el alcance va como 1/g.',
+        sexto: 'Lo predijiste bien.',
+      }),
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Con la misma velocidad de salida, el alcance y la altura máxima van como 1/g.',
+    measured: (ctx) => {
+      const v = moonV0(ctx);
+      if (!v) return null;
+      return `Con v₀ = ${fmtVec(userVec(ctx, v), 'm/s')}: alcance ${fmt(range(v, G_MOON))} m en la Luna y ${fmt(range(v, G_EARTH))} m en la Tierra.`;
+    },
+    engineering: 'Los trajes y vehículos lunares se prueban pensando en esto: un salto que en la Tierra sube 30 cm, en la Luna sube casi 2 m.',
+  },
+};
+
+// ---------- Las laderas: la normal y el roce ----------
+
+const quedarse: Site = {
+  id: 'quedarse',
+  zone: 'laderas',
+  title: '¿Se queda o desliza?',
+  at: zoneAt('laderas', 4.5, 0),
+  note: 'Dos rampas del mismo material, una más empinada. Nunca anoté qué pasaba en cada una.',
+  needs: ['tool:surface'],
+  seed: ({ world }) => {
+    frameAt(world, { x: -7, y: -3 });
+    world.g = { x: 0, y: -G_EARTH };
+    world.addSurface({ x: -6.5, y: -3 }, { x: 6.5, y: -3 }).locked = true;
+    for (const [x, a] of [
+      [-6, 20],
+      [1, 40],
+    ]) {
+      const th = (a * Math.PI) / 180;
+      const A = { x, y: -3 };
+      const B = { x: x + 5 * Math.cos(th), y: -3 + 5 * Math.sin(th) };
+      world.addSurface(A, B).locked = true;
+      world.addParticle({ x: A.x + 0.6 * (B.x - A.x), y: A.y + 0.6 * (B.y - A.y) }, 1);
+    }
+  },
+  steps: [
+    {
+      text: 'Las dos rampas tienen el mismo roce: μₛ = 0,60. En la rampa de 20°, ¿la partícula se queda o desliza?',
+      on: 'end',
+      ask: 'rampa20',
+      correct: 'queda',
+      choices: [
+        { id: 'queda', label: 'Se queda' },
+        { id: 'desliza', label: 'Desliza' },
+      ],
+    },
+    {
+      text: '¿Y en la de 40°?',
+      on: 'end',
+      ask: 'rampa40',
+      correct: 'desliza',
+      choices: [
+        { id: 'queda', label: 'Se queda' },
+        { id: 'desliza', label: 'Desliza' },
+      ],
+    },
+    {
+      text: 'Deja fluir el tiempo y mira las dos. Toca una partícula para ver sus fuerzas en el panel.',
+      on: 'tick',
+      when: (ctx) => ctx.total('held') > 0 && ctx.total('slid') > 0,
+    },
+    {
+      text: (ctx) => {
+        const ok = ctx.prediction('rampa20') === 'queda' && ctx.prediction('rampa40') === 'desliza';
+        return `En la de 20° se queda y en la de 40° desliza. El **roce estático** se ajusta a lo que haga falta, hasta un máximo μₛN: la partícula se queda mientras tan α ≤ μₛ. Aquí tan 20° = 0,36 y tan 40° = 0,84. ${ok ? 'Predijiste las dos.' : 'La clave no es el ángulo solo, sino compararlo con el roce.'}`;
+      },
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'Una partícula se queda en una pendiente mientras tan α ≤ μₛ: el roce estático llega hasta μₛN.',
+    engineering: 'El ángulo en que una pila de arena o de áridos deja de sostenerse depende del roce entre los granos: con eso se diseñan taludes y acopios.',
+  },
+};
+
+/** μₛ del plano de «La pendiente justa»: el jugador no lo ve. */
+const SECRET_MU = 0.45;
+
+const pendiente: Site = {
+  id: 'mu',
+  zone: 'laderas',
+  title: 'La pendiente justa',
+  at: zoneAt('laderas', 0, -4.5),
+  note: 'Este plano tiene un roce que no alcancé a medir. Sé que se puede medir sin instrumentos.',
+  needs: ['tool:surface'],
+  seed: ({ world }) => {
+    frameAt(world, { x: -6, y: -3.5 });
+    world.g = { x: 0, y: -G_EARTH };
+    const th = (10 * Math.PI) / 180;
+    const A = { x: -5, y: -2.5 };
+    const B = { x: A.x + 8 * Math.cos(th), y: A.y + 8 * Math.sin(th) };
+    const s = world.addSurface(A, B, SECRET_MU, 0.35);
+    s.secret = true;
+    world.addParticle({ x: A.x + 0.55 * (B.x - A.x), y: A.y + 0.55 * (B.y - A.y) }, 1);
+  },
+  steps: [
+    {
+      text: 'Con Mover, inclina el plano de a poco arrastrando su extremo derecho y deja fluir el tiempo en cada ángulo. Busca el ángulo justo en que la partícula empieza a deslizar; el panel del plano muestra α.',
+      on: 'slid',
+    },
+    {
+      text: ({ world }) => {
+        const s = world.surfaces[0];
+        const a = s ? inclineDeg(world, s.a, s.b) : null;
+        if (a === null) return 'Empezó a deslizar.';
+        return `Empezó a deslizar con α = ${fmt(a, 1)}°. Justo ahí la componente del peso a lo largo del plano igualó el roce máximo, así que **μₛ = tan α** ≈ ${fmt(Math.tan((a * Math.PI) / 180))}. El valor que dejé anotado era ${fmt(SECRET_MU)}: si te pasaste del ángulo justo, tu medición queda un poco más alta.`;
+      },
+      on: 'next',
+    },
+  ],
+  page: {
+    law: 'En el ángulo en que una partícula empieza a deslizar, μₛ = tan α: el roce se mide con una pendiente.',
+    measured: ({ world }) => {
+      const s = world.surfaces[0];
+      const a = s ? inclineDeg(world, s.a, s.b) : null;
+      return a === null ? null : `Mediste α = ${fmt(a, 1)}°: μₛ ≈ ${fmt(Math.tan((a * Math.PI) / 180))} (el valor real era ${fmt(SECRET_MU)}).`;
+    },
+    engineering: 'Así se mide el roce en un laboratorio de materiales: un plano que se inclina de a poco, y el ángulo en que la muestra empieza a deslizar.',
+  },
+  mastery: [
+    {
+      id: 'justo',
+      label: 'Encuentra el ángulo con menos de 2° de error',
+      on: 'slid',
+      when: ({ world }) => {
+        const s = world.surfaces[0];
+        const a = s ? inclineDeg(world, s.a, s.b) : null;
+        return a !== null && a - deg(Math.atan(SECRET_MU)) < 2;
+      },
+    },
+  ],
+};
+
 // ---------- todos los rastros ----------
 
 export const SITES: Site[] = [
@@ -459,25 +751,33 @@ export const SITES: Site[] = [
   boya,
   fromChapter('abajo', {
     zone: 'pozo',
-    at: zoneAt('pozo', -3.2, 1.6),
+    at: zoneAt('pozo', -4.5, 1.5),
     note: 'Aquí las cosas caen. Pero ¿hacia dónde, y por qué todas igual?',
     needs: ['time:flow'],
     law: 'Cerca de la superficie, todo cae con la misma aceleración g, sea cual sea su masa.',
   }),
+  rincon,
+  luna,
   fromChapter('blanco', {
     zone: 'pozo',
-    at: zoneAt('pozo', 3.2, -1.6),
+    at: zoneAt('pozo', 0.5, 4.5),
     note: 'Nunca le acerté a este blanco. Siempre me quedé corto o me pasé.',
     needs: ['tool:gravity', 'tool:velocity'],
     law: 'En un tiro, la parte de v perpendicular a g no cambia; en la cima solo se anula la parte a lo largo de g.',
   }),
   fromChapter('superficies', {
+    id: 'suelo',
+    title: 'El suelo empuja',
+    steps: [0, 4],
     zone: 'laderas',
-    at: zoneAt('laderas', 0, 1.5),
+    at: zoneAt('laderas', -4.5, 0),
     note: 'Puse un suelo para que dejaran de caer. Algo lo empuja de vuelta.',
     needs: ['tool:gravity'],
-    law: 'Una superficie empuja perpendicular a sí misma (la normal); el roce sostiene hasta que tan α supera μₛ.',
+    law: 'Una superficie empuja perpendicular a sí misma con la fuerza justa para no ser atravesada: la **normal** N.',
+    engineering: 'Un puente reparte el peso de los autos sobre sus apoyos: cada apoyo empuja hacia arriba con su propia normal.',
   }),
+  quedarse,
+  pendiente,
   fromChapter('resortes', {
     zone: 'taller',
     at: zoneAt('taller', 0, 0),

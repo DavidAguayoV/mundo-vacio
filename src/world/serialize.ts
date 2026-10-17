@@ -2,7 +2,7 @@ import type { Vec2 } from '../core/vec';
 import { ReferenceFrame } from './frame';
 import { MEDIA, type MediumId } from '../physics/forces/drag';
 import type { Endpoint } from '../physics/forces/force';
-import { World, type Beacon, type FreeVector, type Particle, type SpringLink, type Surface, type Target, type VectorSum } from './world';
+import { World, type Beacon, type GRegion, type FreeVector, type Particle, type SpringLink, type Surface, type Target, type VectorSum } from './world';
 
 /** Formato de un experimento guardado. Cambiar `version` si cambia la forma. */
 export interface WorldJSON {
@@ -23,6 +23,8 @@ export interface WorldJSON {
   /** desde el mundo abierto: la sonda y sus balizas */
   probe?: Vec2 | null;
   beacons?: Beacon[];
+  /** regiones con su propia gravedad */
+  regions?: GRegion[];
 }
 
 const v2 = (v: Vec2): Vec2 => ({ x: v.x, y: v.y });
@@ -41,6 +43,7 @@ export function worldToJSON(w: World): WorldJSON {
     gravitation: w.gravitation ? { G: w.gravitation.G } : null,
     medium: w.medium,
     ...(w.probe ? { probe: v2(w.probe) } : {}),
+    ...(w.regions.length ? { regions: w.regions.map((r) => ({ id: r.id, min: v2(r.min), max: v2(r.max), g: r.g ? v2(r.g) : null, ...(r.name ? { name: r.name } : {}) })) } : {}),
     ...(w.beacons.length ? { beacons: w.beacons.map((b) => ({ id: b.id, pos: v2(b.pos), radius: b.radius, ...(b.hidden ? { hidden: true } : {}) })) } : {}),
   };
 }
@@ -81,6 +84,13 @@ export function worldFromJSON(data: unknown, into = new World()): World {
   w.particles = particles.map((p, i) => ({ id: p.id, label: isStr(p.label) ? p.label : String(i + 1), pos: v2(p.pos), vel: v2(p.vel), mass: p.mass, ...(p.locked ? { locked: true } : {}) }));
   w.vectors = vectors.map((v, i) => ({ id: v.id, label: isStr(v.label) ? v.label : 'ABCDEFGH'[i % 8], tail: v2(v.tail), tip: v2(v.tip), ...(v.fixed ? { fixed: true } : {}) }));
   w.probe = isVec(d.probe) ? v2(d.probe) : null;
+  w.regions = arr<GRegion>(d.regions, (r) => isStr(r?.id) && isVec(r.min) && isVec(r.max) && (r.g === null || isVec(r.g)), 'regiones').map((r) => ({
+    id: r.id,
+    min: v2(r.min),
+    max: v2(r.max),
+    g: r.g ? v2(r.g) : null,
+    ...(isStr(r.name) ? { name: r.name } : {}),
+  }));
   w.beacons = arr<Beacon>(d.beacons, (b) => isStr(b?.id) && isVec(b.pos) && isNum(b.radius), 'balizas').map((b) => ({ id: b.id, pos: v2(b.pos), radius: b.radius, ...(b.hidden ? { hidden: true } : {}) }));
   const vecIds = new Set(w.vectors.map((v) => v.id));
   w.sums = sums.filter((s) => vecIds.has(s.a) && vecIds.has(s.b)).map((s) => ({ ...s }));
@@ -89,6 +99,6 @@ export function worldFromJSON(data: unknown, into = new World()): World {
   const ids = new Set(w.particles.map((p) => p.id));
   const alive = (e: Endpoint) => 'anchor' in e || ids.has(e.particle);
   w.springs = springs.filter((s) => alive(s.a) && alive(s.b)).map((s) => ({ id: s.id, a: endJSON(s.a), b: endJSON(s.b), k: s.k, restLength: s.restLength }));
-  w.bumpIds([...w.particles, ...w.vectors, ...w.sums, ...w.targets, ...w.surfaces, ...w.springs, ...w.beacons].map((e) => e.id));
+  w.bumpIds([...w.particles, ...w.vectors, ...w.sums, ...w.targets, ...w.surfaces, ...w.springs, ...w.beacons, ...w.regions].map((e) => e.id));
   return w;
 }

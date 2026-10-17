@@ -239,7 +239,8 @@ export class Inspector {
     /** inclinación respecto de la horizontal (perpendicular a g), en [0°, 90°] */
     const incline = (): number | null => {
       const d = dir();
-      const g = this.world.g;
+      const q = s();
+      const g = q ? this.world.gAt({ x: (q.a.x + q.b.x) / 2, y: (q.a.y + q.b.y) / 2 }) : null;
       if (!d || !g || !len(d) || !len(g)) return null;
       const sin = Math.abs(d.x * g.x + d.y * g.y) / (len(d) * len(g));
       return Math.asin(Math.min(1, sin));
@@ -260,7 +261,7 @@ export class Inspector {
       () => (s()?.muK ?? 0) > 1e-9,
       () => (s()?.muK ?? 0) < (s()?.muS ?? 0) - 1e-9,
     );
-    if (this.world.g) {
+    if (this.world.anyG) {
       this.row(dl, 'α', '', () => {
         const a = incline();
         return a === null ? '—' : fmtDeg((a * 180) / Math.PI);
@@ -275,7 +276,9 @@ export class Inspector {
       return d ? `${fmt(len(d))} m` : '—';
     });
     const note = h('p', { class: 'note' }, 'α: inclinación respecto de la horizontal (perpendicular a g). Arrastra un extremo con Mover para cambiarla.');
-    this.el.replaceChildren(close, h('h2', {}, 'Superficie'), muS, muK, dl, note, del);
+    // un roce secreto se mide con la pendiente: no se muestra ni se cambia
+    const mu = s()?.secret ? [h('p', { class: 'note' }, 'μₛ y μc: desconocidos. Mídelos con la pendiente.')] : [muS, muK];
+    this.el.replaceChildren(close, h('h2', {}, 'Superficie'), ...mu, dl, note, del);
   }
 
   private buildSpring(id: string, dl: HTMLElement, del: HTMLElement, close: HTMLElement): void {

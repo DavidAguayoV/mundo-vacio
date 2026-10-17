@@ -41,6 +41,19 @@ export interface ProbeChain {
   blocked: boolean;
 }
 
+/**
+ * Región con su propia gravedad (un rincón donde «abajo» es hacia el lado, la Luna junto a la Tierra).
+ * Dentro de ella manda su g (null = sin gravedad); afuera, la g del mundo.
+ */
+export interface GRegion {
+  id: string;
+  min: Vec2;
+  max: Vec2;
+  g: Vec2 | null;
+  /** nombre que se muestra en la esquina («Luna», «Tierra») */
+  name?: string;
+}
+
 /** Distancia (m) a la que la cola de una tarjeta se pega a la sonda o a la punta de otra. */
 export const SNAP_DIST = 0.4;
 
@@ -96,6 +109,8 @@ export class World implements ForceWorld {
   /** sonda que salta siguiendo vectores (posición de partida); null si el rastro no la usa */
   probe: Vec2 | null = null;
   beacons: Beacon[] = [];
+  /** regiones con su propia gravedad */
+  regions: GRegion[] = [];
   /** con qué cadenas llegó la sonda a una baliza en este rastro («A,B», «B,A»…), para los retos */
   probeLog: string[] = [];
 
@@ -127,6 +142,27 @@ export class World implements ForceWorld {
     this.probe = null;
     this.beacons = [];
     this.probeLog = [];
+    this.regions = [];
+  }
+
+  /** La región que contiene un punto (la última, si se superponen). */
+  regionAt(p: Vec2): GRegion | undefined {
+    for (let i = this.regions.length - 1; i >= 0; i--) {
+      const r = this.regions[i];
+      if (p.x >= r.min.x && p.x <= r.max.x && p.y >= r.min.y && p.y <= r.max.y) return r;
+    }
+    return undefined;
+  }
+
+  /** g en un punto: la de su región, o la del mundo. */
+  gAt(p: Vec2): Vec2 | null {
+    const r = this.regions.length ? this.regionAt(p) : undefined;
+    return r ? r.g : this.g;
+  }
+
+  /** ¿Hay gravedad en alguna parte? */
+  get anyG(): boolean {
+    return !!this.g || this.regions.some((r) => !!r.g);
   }
 
   // ----- sonda -----

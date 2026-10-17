@@ -330,7 +330,10 @@ describe('progreso guardado', () => {
     store.set('mundoVacio.progress', JSON.stringify({ version: 1, chapter: 5, step: 3, free: true }));
     const p = loadProgress(SITE_IDS);
     expect(p.free).toBe(true);
-    expect(p.site).toBe('superficies');
+    // «Superficies» se volvió tres rastros: se vuelve al mapa con lo anterior resuelto
+    expect(p.site).toBeNull();
+    expect(p.solved.blanco).toBeDefined();
+    expect(p.solved.suelo).toBeUndefined();
   });
 
   it('un progreso v3 dañado no rompe el juego', () => {

@@ -11,14 +11,14 @@ export type TimeSkill = 'flow' | 'rewind' | 'step' | 'slow' | 'timeline';
 export type ForceSwitch = 'gravitation' | 'drag';
 
 /** Formas de mirar el mundo que no cambian la física (solo muestran). */
-export type LensId = 'energy';
+export type LensId = 'energy' | 'graphs';
 
 /** Algo que el relato le entrega al jugador: una herramienta, una habilidad del tiempo, un interruptor de fuerza o un lente. */
 export type Grant = `tool:${ToolId}` | `time:${TimeSkill}` | `force:${ForceSwitch}` | `lens:${LensId}`;
 
 export const TIME_SKILLS: TimeSkill[] = ['flow', 'rewind', 'step', 'slow', 'timeline'];
 export const FORCE_SWITCHES: ForceSwitch[] = ['gravitation', 'drag'];
-export const LENSES: LensId[] = ['energy'];
+export const LENSES: LensId[] = ['energy', 'graphs'];
 
 /** Lo que un capítulo puede consultar o preparar. */
 export interface StoryContext {

@@ -19,6 +19,8 @@ export interface SystemState {
 export interface ForceWorld {
   /** campo gravitacional uniforme, m/s² (null = sin gravedad) */
   g: Vec2 | null;
+  /** g en un punto, si el mundo tiene regiones con su propia gravedad (si no, vale g) */
+  gAt?(p: Vec2): Vec2 | null;
 }
 
 export interface Body {

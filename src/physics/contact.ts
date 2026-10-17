@@ -11,6 +11,8 @@ export interface SurfaceLike {
   muK: number;
   /** parte del escenario de un rastro (un muro): no se mueve ni se borra */
   locked?: boolean;
+  /** su roce no se muestra: el jugador lo tiene que medir */
+  secret?: boolean;
 }
 
 export interface SurfaceFrame {

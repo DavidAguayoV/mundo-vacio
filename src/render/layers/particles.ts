@@ -83,7 +83,7 @@ export function particlesLayer(scene: Scene): void {
   const { world, sim, view } = scene;
   const O = world.frame?.origin;
   const showR = scene.display.positions;
-  const showG = !!world.g && (sim.running || sim.hasRun);
+  const showG = world.anyG && (sim.running || sim.hasRun);
 
   // primero los núcleos ocupan su lugar, para que ningún rótulo caiga encima de una partícula
   for (const q of world.particles) {
@@ -106,8 +106,9 @@ export function particlesLayer(scene: Scene): void {
     const contact = sim.contactNormal(q.id) || world.springsOf(q.id).length > 0 || (!!world.gravitation && world.particles.length > 1) || !!world.medium;
     if (contact) {
       forceDiagram(scene, q.id, q.pos, q.mass);
-    } else if (showG && world.g) {
-      const tip = { x: q.pos.x + world.g.x * ACC_SCALE, y: q.pos.y + world.g.y * ACC_SCALE };
+    } else if (showG && world.gAt(q.pos)) {
+      const gq = world.gAt(q.pos)!;
+      const tip = { x: q.pos.x + gq.x * ACC_SCALE, y: q.pos.y + gq.y * ACC_SCALE };
       p.arrow(q.pos, tip, pal.acc, 2.2);
       p.tipLabel('g', q.pos, tip, pal.acc, -1);
     }

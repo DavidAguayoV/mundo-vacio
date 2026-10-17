@@ -1,6 +1,8 @@
+import { fmt } from '../core/format';
+import type { LabControl, LabGuide } from '../lab/examples';
 import type { SiteEngine } from '../story/siteEngine';
 import type { Grant } from '../story/types';
-import { $, h } from './dom';
+import { $, h, symbol } from './dom';
 
 export interface CardActions {
   next(): void;
@@ -12,6 +14,17 @@ export interface CardActions {
   enter(id: string): void;
   toMap(): void;
   openJournal(site?: string): void;
+  /** un deslizador del laboratorio cambió */
+  setControl(id: string, value: number): void;
+  /** valor actual de un deslizador (null si lo que controla ya no existe) */
+  controlValue(c: LabControl): number | null;
+}
+
+/** El laboratorio con guía que está abierto. */
+export interface OpenLab {
+  id: string;
+  name: string;
+  guide: LabGuide;
 }
 
 /** «una **idea** clave» → texto con <strong>, sin innerHTML. */
@@ -36,6 +49,11 @@ export class StoryCard {
   private kind = h('div', { class: 'kind' });
   private quote = h('blockquote', { class: 'trace' });
   private extra = h('p', { class: 'extra' });
+  /** listas «qué medir» y «preguntas» de un laboratorio */
+  private lists = h('div', { class: 'lab-lists' });
+  /** deslizadores del profesor */
+  private controls = h('div', { class: 'lab-controls' });
+  private controlsFor = '';
   /** paso que se está mostrando: al cambiar, el texto entra con un fundido */
   private shown = '';
 
@@ -45,7 +63,7 @@ export class StoryCard {
   ) {
     this.minBtn.addEventListener('click', () => this.setCollapsed(!this.card.classList.contains('collapsed')));
     this.text.before(this.kind, this.quote);
-    this.text.after(this.extra);
+    this.text.after(this.extra, this.lists, this.controls);
   }
 
   setCollapsed(c: boolean): void {
@@ -80,13 +98,15 @@ export class StoryCard {
     this.kind.textContent = '';
     this.quote.textContent = '';
     this.extra.replaceChildren();
+    this.lists.replaceChildren();
     this.dots.replaceChildren();
     this.eyebrow.removeAttribute('title');
   }
 
-  render(story: SiteEngine, mapSelection: string | null): void {
+  render(story: SiteEngine, mapSelection: string | null, lab: OpenLab | null = null): void {
     this.clear();
-    if (story.free) return this.renderFree();
+    if (!story.free || !lab) this.clearControls();
+    if (story.free) return lab ? this.renderLab(lab) : this.renderFree();
     const site = story.site;
     if (!site) return this.renderMap(story, mapSelection);
     if (story.done) return this.renderPage(story);
@@ -124,6 +144,66 @@ export class StoryCard {
     this.enter('libre');
   }
 
+  private clearControls(): void {
+    this.controls.replaceChildren();
+    this.controlsFor = '';
+  }
+
+  private fmtControl(c: LabControl, v: number): string {
+    const unit = !c.unit ? '' : c.unit === '°' ? '°' : ` ${c.unit}`;
+    return `${fmt(v, c.decimals ?? 2)}${unit}`;
+  }
+
+  /** Laboratorio con guía: el objetivo, qué medir, qué preguntar y los deslizadores del profesor. */
+  private renderLab(lab: OpenLab): void {
+    const g = lab.guide;
+    this.eyebrow.textContent = 'Laboratorio';
+    this.title.textContent = lab.name;
+    this.text.textContent = g.goal;
+    const list = (title: string, items: string[]) => h('section', {}, h('h3', {}, title), h('ul', {}, ...items.map((t) => h('li', {}, t))));
+    // en el celular la guía parte plegada: así se ven los deslizadores y la escena
+    const prev = this.lists.querySelector('details');
+    const open = prev ? prev.open : window.innerWidth >= 700;
+    const details = h('details', {}, h('summary', {}, 'Qué medir y preguntas'), h('div', { class: 'lab-lists-body' }, list('Qué medir', g.measure), list('Preguntas', g.questions)));
+    details.open = open;
+    this.lists.replaceChildren(details);
+    // los deslizadores se arman una vez por laboratorio: no se reemplazan bajo el dedo
+    if (this.controlsFor !== lab.id) {
+      this.controlsFor = lab.id;
+      this.controls.replaceChildren(...(g.controls ?? []).map((c) => this.slider(c)));
+    } else {
+      this.syncControls(g.controls ?? []);
+    }
+    this.row.append(this.button('Otros laboratorios', false, this.actions.openLab), this.button('Volver al mapa', false, this.actions.toMap));
+    this.enter(`lab:${lab.id}`);
+  }
+
+  private slider(c: LabControl): HTMLElement {
+    const v = this.actions.controlValue(c) ?? c.min;
+    const id = `ctl-${c.id}`;
+    const input = h('input', { type: 'range', id, min: String(c.min), max: String(c.max), step: String(c.step), value: String(v), 'data-ctl': c.id });
+    const out = h('output', { for: id }, this.fmtControl(c, v));
+    input.addEventListener('input', () => {
+      const x = Number(input.value);
+      out.textContent = this.fmtControl(c, x);
+      this.actions.setControl(c.id, x);
+    });
+    return h('div', { class: 'lab-control' }, h('label', { for: id }, ...symbol(c.label)), input, out);
+  }
+
+  /** Si el mundo cambió por otro lado (con las herramientas), los deslizadores lo muestran. */
+  private syncControls(cs: LabControl[]): void {
+    for (const c of cs) {
+      const input = this.controls.querySelector<HTMLInputElement>(`[data-ctl="${c.id}"]`);
+      if (!input || document.activeElement === input) continue;
+      const v = this.actions.controlValue(c);
+      if (v === null) continue;
+      input.value = String(v);
+      const out = input.nextElementSibling;
+      if (out) out.textContent = this.fmtControl(c, v);
+    }
+  }
+
   private renderMap(story: SiteEngine, selection: string | null): void {
     const site = selection ? story.siteById(selection) : undefined;
     if (!site) {
@@ -132,7 +212,7 @@ export class StoryCard {
       this.title.textContent = 'Rastros';
       this.text.textContent = 'Cada señal es algo que dejó quien estuvo aquí antes. Toca una para leer su nota; arrastra para recorrer el mapa.';
       this.extra.textContent = `${solved} de ${story.sites.length} rastros resueltos.`;
-      this.row.append(this.button('Bitácora', false, () => this.actions.openJournal()));
+      this.row.append(this.button('Bitácora', false, () => this.actions.openJournal()), this.button('Laboratorios', false, this.actions.openLab));
       this.enter('mapa');
       return;
     }
