@@ -187,14 +187,16 @@ const loadControl = (i: number, what: 'mass' | 's'): LabControl => ({
   },
 });
 
+/** Largo de cada pista de la carrera (m). */
+export const RACE_LANE = 7;
+
 /** Las tres pistas de la carrera, inclinadas alpha grados; los cuerpos vuelven arriba. */
 function raceLanes(w: World, alphaDeg: number): void {
   const th = (alphaDeg * Math.PI) / 180;
   w.surfaces.forEach((surf, i) => {
-    const y0 = 3.2 - i * 1.7;
-    // a la derecha del eje y: la guía del laboratorio ocupa la izquierda
-    surf.a = { x: -2.5, y: y0 };
-    surf.b = { x: -2.5 + 9 * Math.cos(th), y: y0 - 9 * Math.sin(th) };
+    const y0 = 2.6 - i * 1.4;
+    surf.a = { x: -2, y: y0 };
+    surf.b = { x: -2 + RACE_LANE * Math.cos(th), y: y0 - RACE_LANE * Math.sin(th) };
   });
   const rw = { bodies: w.bodies, surfaces: w.surfaces, gAt: (p: Vec2) => w.gAt(p) };
   for (const b of w.bodies) {
