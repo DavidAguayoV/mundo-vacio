@@ -20,6 +20,10 @@ export interface InspectorActions {
   /** multiplica la masa propia de un cuerpo rígido */
   changeBodyMass(bodyId: string, factor: number): void;
   close(): void;
+  /** ¿se le puede ajustar la velocidad a esta partícula con los botones ±? (no a una del escenario, y solo con Velocidad) */
+  canNudgeVel(id: string): boolean;
+  /** suma `delta` m/s a una componente de la velocidad inicial, en los ejes del jugador */
+  nudgeVel(id: string, axis: 'x' | 'y', delta: number): void;
   /** fuerzas sobre una partícula en el estado actual (null si no hay simulación que consultar) */
   forces(id: string): ForcePart[] | null;
 }
@@ -49,6 +53,8 @@ export const K_STEP = 5;
 export const L0_MIN = 0.25;
 export const L0_MAX = 10;
 export const L0_STEP = 0.25;
+/** Paso de los botones ± de la velocidad, m/s. */
+export const VEL_STEP = 0.1;
 
 /**
  * Inspector del objeto seleccionado. Todo se expresa en los ejes del usuario.
@@ -235,7 +241,21 @@ export class Inspector {
     }
     // la masa de una partícula del escenario no se cambia: solo se lee
     const massRow = p()?.locked ? h('div', { class: 'mass' }, h('span', {}, `m = ${fmt(p()?.mass ?? 0, (p()?.mass ?? 0) < 1 ? 2 : 1)} kg`)) : mass;
-    this.el.replaceChildren(close, h('h2', {}, `Partícula ${label}`), massRow, dl, del);
+    // velocidades bajas, difíciles de arrastrar: de a 0,1 m/s por componente, en tus ejes
+    const velSteps = this.actions.canNudgeVel(id)
+      ? (['x', 'y'] as const).map((axis) => {
+          const sub = axis === 'x' ? 'ₓ' : 'ᵧ';
+          return this.stepper(
+            () => `v${sub} = ${fmt(p() ? this.frame.toUser(p()!.vel)[axis] : 0, 1)} m/s`,
+            [`Restar 0,1 m/s a v${sub}`, `Sumar 0,1 m/s a v${sub}`],
+            () => this.actions.nudgeVel(id, axis, -VEL_STEP),
+            () => this.actions.nudgeVel(id, axis, VEL_STEP),
+            () => true,
+            () => true,
+          );
+        })
+      : [];
+    this.el.replaceChildren(close, h('h2', {}, `Partícula ${label}`), massRow, ...velSteps, dl, del);
   }
 
   private buildSurface(id: string, dl: HTMLElement, del: HTMLElement, close: HTMLElement): void {

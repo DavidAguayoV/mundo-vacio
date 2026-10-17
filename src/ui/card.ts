@@ -168,7 +168,7 @@ export class StoryCard {
     this.showDares(story, site);
     if (step.choices) {
       this.row.classList.add('choices');
-      for (const c of step.choices) {
+      for (const c of story.choices(step)) {
         const b = h('button', { class: 'choice', type: 'button' }, c.label);
         b.addEventListener('click', () => this.actions.choose(c.id));
         this.row.append(b);

@@ -61,10 +61,18 @@ export interface Step {
   retry?(ctx: StoryContext): string | null;
   /** se llama al entrar al paso, y también al retomarlo tras recargar la página */
   enter?(ctx: StoryContext): void;
-  /** herramientas o habilidades que se ganan al llegar a este paso */
+  /** herramientas o habilidades que se prestan desde este paso (se quedan al resolver el rastro) */
   grants?: Grant[];
-  /** predicción: la tarjeta muestra estas opciones y el paso se completa al elegir una */
-  choices?: Choice[];
+  /**
+   * predicción o pregunta: la tarjeta muestra estas opciones y el paso se completa al elegir una
+   * (si `retry` no pide repetir). Pueden depender del mundo, por ejemplo de los números del tiro del jugador.
+   */
+  choices?: Choice[] | ((ctx: StoryContext) => Choice[]);
+  /**
+   * la herramienta, habilidad o lente que pide la tarjeta: la barra la deja a la vista (fuera de
+   * «Más herramientas») y la destaca
+   */
+  tool?: Grant;
   /** clave con que se guarda la predicción */
   ask?: string;
   /** la opción que acierta (da la estrella de predicción) */
@@ -132,9 +140,12 @@ export interface Site {
   at: { x: number; y: number };
   /** la nota que dejó quien estuvo antes: lo primero que se lee del rastro */
   note: string;
-  /** lo que hace falta para resolverlo (puertas suaves: se ve, pero no se entra sin esto) */
+  /** lo que hace falta para entrar (se ve en el mapa, pero no se entra sin esto) */
   needs?: Grant[];
-  /** lo que se gana al entrar */
+  /**
+   * lo que el rastro presta desde que se entra; se queda con el jugador solo al resolverlo
+   * (igual que lo que presta cada paso con `Step.grants`)
+   */
   grants?: Grant[];
   /** arma el mundo del rastro desde cero */
   seed?(ctx: StoryContext): void;

@@ -145,7 +145,7 @@ describe('fallos que informan', () => {
   });
 
   it('el rastro dice cuándo espera un blanco o una boya', () => {
-    const { story } = setup(having(['vacio', 'particula', 'desde-siempre', 'boya', 'abajo']));
+    const { story } = setup(having(['vacio', 'particula', 'desde-siempre', 'cuadro-a-cuadro', 'boya', 'abajo']));
     story.enter('blanco');
     expect(story.listensFor('target-hit')).toBe(true);
     expect(story.listensFor('caught')).toBe(false);

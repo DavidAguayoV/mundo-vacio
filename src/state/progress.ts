@@ -52,7 +52,7 @@ export const LEGACY_CHAPTERS: { chapter: string; sites: string[]; grants: Grant[
   { chapter: 'vacio', sites: ['vacio'], grants: ['tool:origin'] },
   { chapter: 'particula', sites: ['particula'], grants: ['tool:particle', 'tool:move'] },
   { chapter: 'vectores', sites: ['dos-saltos', 'atajo', 'escalar', 'ejes-ajenos'], grants: ['tool:vector', 'tool:sum'] },
-  { chapter: 'tiempo', sites: ['desde-siempre', 'boya'], grants: ['time:flow', 'tool:velocity', 'time:rewind', 'time:step', 'lens:graphs'] },
+  { chapter: 'tiempo', sites: ['desde-siempre', 'cuadro-a-cuadro', 'boya'], grants: ['time:flow', 'tool:velocity', 'time:rewind', 'time:step', 'lens:graphs'] },
   { chapter: 'abajo', sites: ['abajo'], grants: ['tool:gravity', 'time:slow'] },
   { chapter: 'blanco', sites: ['blanco'], grants: ['time:timeline'] },
   { chapter: 'superficies', sites: ['suelo', 'quedarse', 'mu'], grants: ['tool:surface'] },
@@ -127,7 +127,35 @@ function sanitize(p: Record<string, unknown>, siteIds: readonly string[]): Progr
   if (p.earned && typeof p.earned === 'object') {
     for (const [id, v] of Object.entries(p.earned as Record<string, string[]>)) if (Array.isArray(v)) out.earned[id] = v.filter((x) => typeof x === 'string');
   }
-  return out;
+  return splitDrift(out, siteIds);
+}
+
+/**
+ * Paso de «Desde siempre» antes de dividirse → paso de «Cuadro a cuadro»: el 5 era el paso a paso,
+ * el 6 los gráficos y el 7 la página del rastro resuelto.
+ */
+const DRIFT_STEPS: Record<number, number> = { 5: 0, 6: 2, 7: 3 };
+const DRIFT_SPLIT_AT = 5;
+
+/**
+ * «Desde siempre» se dividió en dos rastros: la inercia y la apuesta quedaron en él; el paso a paso
+ * y los gráficos pasaron a «Cuadro a cuadro». Quien lo había resuelto tiene los dos resueltos, y
+ * quien iba en la segunda mitad sigue en el rastro nuevo, en el paso que le corresponde.
+ */
+export function splitDrift(p: Progress, siteIds: readonly string[]): Progress {
+  const OLD = 'desde-siempre';
+  const NEW = 'cuadro-a-cuadro';
+  if (!siteIds.includes(NEW)) return p;
+  const done = p.solved[OLD];
+  // antes de dividirlo, resolver «Desde siempre» entregaba el paso a paso y los gráficos
+  if (done && !p.solved[NEW] && p.have.includes('lens:graphs')) p.solved[NEW] = { stars: ['resuelto'], at: done.at };
+  if (p.site === OLD && p.step >= DRIFT_SPLIT_AT) {
+    // la inercia y la apuesta ya estaban hechas: «Desde siempre» queda resuelto
+    if (!done) p.solved[OLD] = { stars: ['resuelto', ...(p.earned[OLD] ?? [])], at: Date.now() };
+    p.site = NEW;
+    p.step = DRIFT_STEPS[Math.min(p.step, 7)];
+  }
+  return p;
 }
 
 export function saveProgress(p: Progress): void {

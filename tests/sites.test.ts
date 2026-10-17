@@ -116,6 +116,11 @@ describe('mundo abierto', () => {
       expect(s.page.engineering.length, s.id).toBeGreaterThan(10);
       expect(s.steps.some((st) => st.kind === 'engineering'), s.id).toBe(false);
       for (const st of s.steps.filter((x) => x.choices)) {
+        // una pregunta con opciones calculadas del tiro se comprueba con retry (no da estrella de predicción)
+        if (typeof st.choices === 'function') {
+          expect(st.retry, `${s.id}: ${st.ask}`).toBeDefined();
+          continue;
+        }
         expect(st.correct, `${s.id}: ${st.ask}`).toBeDefined();
         expect(st.choices!.map((c) => c.id)).toContain(st.correct);
       }
@@ -324,7 +329,7 @@ describe('capítulos que siguen como rastros', () => {
   });
 
   it('el blanco de «Al blanco» queda dentro de la pantalla', () => {
-    const p = having(['vacio', 'particula', 'desde-siempre', 'boya', 'abajo']);
+    const p = having(['vacio', 'particula', 'desde-siempre', 'cuadro-a-cuadro', 'boya', 'abajo']);
     const { story, world, view } = setup(p);
     expect(story.enter('blanco')).toBe(true);
     const b = view.bounds();
@@ -363,7 +368,7 @@ describe('progreso guardado', () => {
     const p = loadProgress(SITE_IDS);
     expect(p.version).toBe(3);
     expect(p.site).toBe('abajo');
-    expect(Object.keys(p.solved).sort()).toEqual(['atajo', 'boya', 'desde-siempre', 'dos-saltos', 'ejes-ajenos', 'escalar', 'particula', 'vacio']);
+    expect(Object.keys(p.solved).sort()).toEqual(['atajo', 'boya', 'cuadro-a-cuadro', 'desde-siempre', 'dos-saltos', 'ejes-ajenos', 'escalar', 'particula', 'vacio']);
     expect(p.have).toEqual(expect.arrayContaining(['tool:velocity', 'time:step', 'tool:sum']));
     expect(p.predictions.caida).toBe('juntas');
   });

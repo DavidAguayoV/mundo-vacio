@@ -319,8 +319,9 @@ button {
   flex: none;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  /* 44 × 44 px: el mínimo cómodo para un dedo */
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -484,7 +485,7 @@ button {
 
 .menu .tool {
   width: 100%;
-  height: 40px;
+  height: 44px;
   display: flex;
   justify-content: flex-start;
   gap: 10px;
@@ -511,6 +512,22 @@ button {
 
 .tool.new {
   animation: glow 1.2s ease-in-out 3;
+}
+
+/* lo que pide la tarjeta: un anillo de tinta, sin el cian (que es solo para la velocidad) */
+.tool.wanted:not(.play) {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+.tool.play.wanted {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.timeline.wanted {
+  outline: 1.5px solid color-mix(in srgb, var(--ink) 55%, transparent);
+  outline-offset: 4px;
+  border-radius: 10px;
 }
 
 @keyframes glow {
@@ -1403,7 +1420,12 @@ button {
   }
 
   .bar:not(.labeled) .tool:not(.play) {
-    width: 36px;
+    width: 44px;
+  }
+
+  /* dentro de un rastro, la derecha guarda un solo botón (el Mapa) y las herramientas ganan espacio */
+  .bar.working {
+    grid-template-columns: minmax(0, 1fr) auto 44px;
   }
 
   .tool.play {
@@ -1613,6 +1635,43 @@ button {
 .site-marker:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
+}
+
+/* zona sin nombre (lejos de lo abierto): el rastro es un punto atenuado */
+.site-marker.quiet {
+  opacity: 0.35;
+}
+
+.site-marker.quiet .dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 3px;
+}
+
+.site-marker.quiet .name,
+.site-marker.quiet .stars {
+  display: none;
+}
+
+/* un nombre que no cabe (pisaría otro o quedaría cortado en el borde) espera al mouse o al foco */
+.site-marker.nameless .name,
+.site-marker.nameless .stars {
+  visibility: hidden;
+}
+
+.site-marker:is(:hover, :focus-visible) .name,
+.site-marker:is(:hover, :focus-visible) .stars {
+  display: block;
+  visibility: visible;
+}
+
+.site-marker:is(:hover, :focus-visible) .stars:empty {
+  display: none;
+}
+
+.site-marker.quiet:is(:hover, :focus-visible) {
+  opacity: 1;
+  z-index: 1;
 }
 
 /* ---------- la nota de quien estuvo antes ---------- */
@@ -1833,6 +1892,13 @@ button {
   padding: 12px 14px 10px;
   display: grid;
   gap: 8px;
+}
+
+/* anchos medianos: la tarjeta y los paneles no caben lado a lado, y los gráficos van bajo la tarjeta
+   (top, left y width los pone Game.placeDock) */
+.graphs.below-card {
+  position: fixed;
+  z-index: 1;
 }
 
 .graphs h2 .who {

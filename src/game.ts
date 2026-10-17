@@ -32,8 +32,13 @@ import { Timeline } from './ui/timeline';
 import { EnergyMeter } from './ui/energyMeter';
 import { GraphsPanel } from './ui/graphs';
 import { LENS_NAMES, SWITCH_NAMES, TIME_NAMES, Toolbar } from './ui/toolbar';
-import { ReferenceFrame } from './world/frame';
+import { IDENTITY_FRAME, ReferenceFrame } from './world/frame';
+import { MAX_SPEED } from './render/scales';
 import { G_EARTH, World, type EntityRef } from './world/world';
+
+/** Ancho de los paneles de la derecha (como en styles.css) y lo mínimo a que se pueden angostar, px. */
+const DOCK_WIDTH = 252;
+const DOCK_MIN_WIDTH = 200;
 
 /** Segundos que tarda la sonda en cada salto. */
 const PROBE_HOP = 0.45;
@@ -248,6 +253,21 @@ export class Game {
         this.inspector.rebuild();
         this.bus.emit({ type: 'vector-flipped' });
       },
+      canNudgeVel: (id) => !this.world.particle(id)?.locked && this.unlocked().has('velocity'),
+      nudgeVel: (id, axis, delta) => {
+        const q = this.world.particle(id);
+        if (!q || q.locked) return;
+        // como con la herramienta Velocidad, lo que se cambia es la velocidad inicial
+        if (this.sim.hasRun) this.sim.reset();
+        const frame = this.world.frame ?? IDENTITY_FRAME;
+        const u = frame.toUser(q.vel);
+        u[axis] = Math.round((u[axis] + delta) * 10) / 10;
+        let v = frame.toGlobal(u);
+        const s = Math.hypot(v.x, v.y);
+        if (s > MAX_SPEED) v = { x: (v.x * MAX_SPEED) / s, y: (v.y * MAX_SPEED) / s };
+        q.vel = v;
+        if (s > 0.3) this.bus.emit({ type: 'v-set' });
+      },
       close: () => this.select(null),
     });
     this.hud = new Hud(!!opts.debug || stress > 0);
@@ -284,6 +304,7 @@ export class Game {
     this.timeline = new Timeline((t) => {
       if (!this.has('timeline')) return;
       this.sim.seek(t);
+      this.bus.emit({ type: 'timeline-seek' });
       this.checkPeak();
     });
 
@@ -353,13 +374,16 @@ export class Game {
       time: inMap ? new Set() : this.story.timeSkills(),
       switches: inMap ? [] : [...this.story.forceSwitches()].map((id) => ({ id, on: this.forceOn(id), label: this.switchLabel(id) })),
       lenses: inMap ? [] : [...this.story.lenses()].map((id) => ({ id, on: this.lensOn.has(id) })),
-      // los laboratorios con guía se abren desde cualquier parte
-      labEnabled: true,
-      mapEnabled: !inMap,
+      // los laboratorios con guía se abren desde cualquier parte, una vez que se sale del vacío:
+      // antes, el Mapa y el Lab le quitarían fuerza a «Mirar alrededor»
+      labEnabled: this.story.free || this.story.isSolved('vacio'),
+      mapEnabled: !inMap && (this.story.free || this.story.isSolved('vacio')),
       running: this.sim.running,
       timeScale: this.timeScale,
       fresh,
+      wanted: this.story.step?.tool ?? null,
     });
+    $('timeline').classList.toggle('wanted', this.story.step?.tool === 'time:timeline');
     const guide = this.lab.guide;
     this.card.render(this.story, this.mapSelection, guide?.guide ? { id: guide.id, name: guide.name, guide: guide.guide } : null);
     this.map.selected = this.mapSelection;
@@ -1082,6 +1106,7 @@ export class Game {
     this.updateProbe(dt);
     this.watchSite();
     this.story.tick();
+    this.placeDock();
 
     const tool = this.activeTool;
     drawScene({
@@ -1098,6 +1123,39 @@ export class Game {
       probe: this.probeDrawPos(),
     });
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  /**
+   * Los paneles de la derecha (inspector, energía, gráficos) van al lado de la tarjeta. En anchos
+   * medianos (~740 px) no caben lado a lado y tapaban la tarjeta: ahí los gráficos pasan bajo la
+   * tarjeta y el resto se angosta (o, si no alcanza, también baja). En el celular (≤ 700 px) los
+   * paneles ya van abajo, sobre la barra.
+   */
+  private placeDock(): void {
+    const dock = $('dock');
+    const card = $('card');
+    const graphs = document.querySelector<HTMLElement>('#dock > .graphs');
+    const W = window.innerWidth;
+    let dockTop = '';
+    let dockWidth = '';
+    let below: { top: string; left: string; width: string } | null = null;
+    if (W > 700 && !card.hidden) {
+      const c = card.getBoundingClientRect();
+      const room = W - 16 - (c.right + 12);
+      if (c.height && room < DOCK_WIDTH) {
+        below = { top: `${Math.round(c.bottom + 12)}px`, left: `${Math.round(c.left)}px`, width: `${Math.round(Math.min(c.width, 380))}px` };
+        if (room >= DOCK_MIN_WIDTH) dockWidth = `${Math.floor(room)}px`;
+        else dockTop = below.top;
+      }
+    }
+    if (dock.style.top !== dockTop) dock.style.top = dockTop;
+    if (dock.style.width !== dockWidth) dock.style.width = dockWidth;
+    if (!graphs) return;
+    graphs.classList.toggle('below-card', !!below);
+    for (const k of ['top', 'left', 'width'] as const) {
+      const v = below?.[k] ?? '';
+      if (graphs.style[k] !== v) graphs.style[k] = v;
+    }
   }
 
   /** Zonas del lienzo tapadas por la interfaz: los rótulos de masa y de vectores no se dibujan debajo. */
