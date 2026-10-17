@@ -17,6 +17,8 @@ Después del primer rastro («El vacío») se revela el **mapa**: zonas alrededo
 - Cada zona tiene al menos un reto de maestría (una estrella extra): poner el origen sobre una partícula, una órbita casi circular, escapar con lo justo, aterrizar suave en el aire…
 - **Cámara**: rueda o pellizco para acercar; arrastrar el espacio vacío con Mover (o con el botón del medio o el derecho) para recorrer; «Centrar la vista» o la tecla 0 para volver. Teclas + y − también acercan y alejan.
 
+El avance se guarda solo en el navegador. Al abrir la página, sin avance se parte en «El vacío»; con avance, en el mapa (no a mitad de un rastro ni en el laboratorio). En la bitácora, **Guardar avance** lo descarga como `.json` y **Cargar avance** lo abre en otro navegador o equipo.
+
 El avance guardado del relato lineal se migra solo: lo de los capítulos terminados queda resuelto.
 
 ## Uso
