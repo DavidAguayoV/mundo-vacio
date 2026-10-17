@@ -1,4 +1,5 @@
-// Progreso en localStorage. Si el almacenamiento no está disponible, el juego funciona igual sin recordar.
+// Progreso en localStorage (y en un archivo .json, si el jugador lo descarga). Si el almacenamiento no
+// está disponible, el juego funciona igual sin recordar.
 
 import type { Grant } from '../story/types';
 
@@ -109,6 +110,47 @@ export function loadProgress(siteIds: readonly string[]): Progress {
     /* almacenamiento bloqueado o JSON dañado: se parte de cero */
   }
   return freshProgress();
+}
+
+/**
+ * Dónde se entra al abrir la página: sin nada resuelto, donde quedó (al comienzo, «El vacío»); con
+ * avance, en el mapa con todo lo ganado, en vez de caer a mitad de un rastro o en el laboratorio.
+ */
+export function openingProgress(p: Progress): Progress {
+  if (!Object.keys(p.solved).length) return p;
+  return { ...p, site: null, step: 0, free: false };
+}
+
+/** Marca del archivo de avance (para no confundirlo con un experimento del laboratorio). */
+const FILE_KIND = 'mundo-vacio/avance';
+
+/** El avance como archivo .json: se descarga para llevarlo a otro navegador o guardarlo aparte. */
+export function progressFile(p: Progress, now = new Date()): string {
+  return JSON.stringify({ kind: FILE_KIND, savedAt: now.toISOString(), progress: p }, null, 2);
+}
+
+/** Nombre del archivo: mundo-vacio-avance-2026-10-17.json */
+export const progressFileName = (now = new Date()): string => {
+  const d = (n: number) => String(n).padStart(2, '0');
+  return `mundo-vacio-avance-${now.getFullYear()}-${d(now.getMonth() + 1)}-${d(now.getDate())}.json`;
+};
+
+/**
+ * Lee un archivo de avance. Acepta el que descarga el juego y también un progreso suelto (lo que
+ * guarda el navegador). Devuelve null si no es un avance; lo que no calza se descarta, como al cargar.
+ */
+export function readProgressFile(text: string, siteIds: readonly string[]): Progress | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const p = (d.kind === FILE_KIND ? d.progress : d) as Record<string, unknown> | undefined;
+  if (!p || typeof p !== 'object' || p.version !== 3 || !p.solved || typeof p.solved !== 'object') return null;
+  return sanitize(p, siteIds);
 }
 
 /** Revisa un progreso v3 leído del almacenamiento: lo que no calza se descarta en vez de romper el juego. */

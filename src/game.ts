@@ -10,7 +10,16 @@ import { Painter, type Rect } from './render/painter';
 import { drawScene } from './render/renderer';
 import { applyTheme, loadTheme, readPalette } from './render/theme';
 import { View } from './render/view';
-import { freshProgress, loadProgress, saveProgress, type Progress } from './state/progress';
+import {
+  freshProgress,
+  loadProgress,
+  openingProgress,
+  progressFile,
+  progressFileName,
+  readProgressFile,
+  saveProgress,
+  type Progress,
+} from './state/progress';
 import { seedFree } from './story/chapters';
 import { MissMonitor } from './story/missMonitor';
 import { RunMonitor } from './story/runMonitor';
@@ -137,7 +146,8 @@ export class Game {
     this.monitor = new RunMonitor(this.world, this.sim, (ev) => this.bus.emit(ev));
 
     const stress = opts.stress ?? 0;
-    const progress: Progress = stress ? { ...freshProgress(), free: true } : loadProgress(SITE_IDS);
+    // con avance guardado se entra al mapa; sin avance, al comienzo
+    const progress: Progress = stress ? { ...freshProgress(), free: true } : openingProgress(loadProgress(SITE_IDS));
     this.story = new SiteEngine(SITES, ZONES, progress, { world: this.world, view: this.view, sim: this.sim }, stress ? () => {} : saveProgress);
     // un tiro que no llega dice a qué distancia pasó, mientras acertar todavía cuente en el rastro
     this.misses = new MissMonitor(this.world, this.sim, (m) => this.toast.show(m, 3600), () => ({
@@ -313,6 +323,7 @@ export class Game {
     if (opts.debug) (window as unknown as { mundo: Game }).mundo = this;
     this.wireEvents();
     this.wireTreeButtons();
+    this.wireProgressFile();
   }
 
   start(): void {
@@ -787,20 +798,53 @@ export class Game {
     this.refreshUI();
   }
 
-  private restart(): void {
+  /** Empieza de nuevo, o con un avance cargado desde un archivo (entonces se entra como al abrir la página). */
+  private restart(progress?: Progress): void {
     this.sim.clearRun();
     this.lab.forget('story');
     this.world.clear();
     this.select(null);
     this.highlighted.clear();
-    this.story.restart();
+    this.story.restart(progress ? openingProgress(progress) : undefined);
     this.resetProbe();
     this.mapSelection = null;
     this.story.resume();
-    this.setTool('origin', false);
+    if (this.story.inMap) this.map.riseFrom(null, 0);
+    this.setTool(this.initialTool(), false);
     this.tree.hide();
     this.journal.hide();
+    this.lab.hide();
     this.refreshUI();
+  }
+
+  /** Guardar y cargar el avance como archivo .json (desde la bitácora). */
+  private wireProgressFile(): void {
+    $('saveProgress').addEventListener('click', () => {
+      const blob = new Blob([progressFile(this.story.progress)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = progressFileName();
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.toast.show('Descargaste tu avance: ábrelo con «Cargar avance» en otro navegador');
+    });
+    const input = $<HTMLInputElement>('progressFile');
+    $('loadProgress').addEventListener('click', () => input.click());
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      input.value = '';
+      if (!file) return;
+      const p = readProgressFile(await file.text(), SITE_IDS);
+      if (!p) {
+        this.toast.show('Ese archivo no es un avance de Mundo Vacío', 3600);
+        return;
+      }
+      this.restart(p);
+      this.toast.show(`Avance cargado: ${Object.keys(p.solved).length} de ${SITES.length} rastros resueltos`, 3600);
+    });
   }
 
   // ---------- eventos ----------

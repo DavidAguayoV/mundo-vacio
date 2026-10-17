@@ -438,8 +438,9 @@ export class SiteEngine {
     this.onChange?.({ newGrants: [] });
   }
 
-  restart(): void {
-    this.progress = freshProgress();
+  /** Empieza de nuevo (o con un avance traído de un archivo). */
+  restart(progress: Progress = freshProgress()): void {
+    this.progress = progress;
     this.resetCounters();
     this.lent.clear();
     this.save(this.progress);
