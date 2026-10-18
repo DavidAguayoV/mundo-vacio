@@ -1,14 +1,8 @@
-// Pantalla de entrada de la demo: qué es, cuánto dura y quién lo hizo, antes del primer rastro.
+// Pantalla de entrada del juego simple: el nombre, una línea y un botón. Nada más.
 
 import type { GameHost } from '../mode';
 import { h } from '../ui/dom';
-import { qrSvg } from './qr';
-import { routeState } from './policy';
-import { ROUTE_IDS } from './route';
 import { resetDemo } from './reset';
-
-/** Adónde lleva el código QR del kiosco: la demo publicada, para jugarla en el celular. */
-export const PUBLIC_DEMO_URL = 'https://davidaguayov.github.io/mundo-vacio/demo.html';
 
 /** Tras «Empezar de nuevo» en la entrada, la página se recarga y parte directo en el vacío. */
 const SKIP_KEY = 'mundoVacio.demo.skipIntro';
@@ -23,7 +17,7 @@ function takeSkip(): boolean {
   }
 }
 
-/** ¿Hay algo jugado en la demo? */
+/** ¿Hay algo jugado? */
 function hasProgress(host: GameHost): boolean {
   const p = host.story.progress;
   return Object.keys(p.solved).length > 0 || p.step > 0;
@@ -35,7 +29,7 @@ export function introOpen(): boolean {
   return !!current;
 }
 
-export function showIntro(host: GameHost, opts: { kiosk: boolean }): void {
+export function showIntro(host: GameHost): void {
   if (takeSkip()) return;
   current?.remove();
   const resume = hasProgress(host);
@@ -47,12 +41,11 @@ export function showIntro(host: GameHost, opts: { kiosk: boolean }): void {
     setTimeout(() => el.remove(), 320);
     document.getElementById('cv')?.focus();
   };
-  const start = h('button', { class: 'btn primary big', type: 'button' }, resume ? 'Seguir donde quedaste' : 'Empezar');
+  const start = h('button', { class: 'intro-start', type: 'button' }, resume ? 'Seguir' : 'Empezar');
   start.addEventListener('click', close);
   const actions = h('div', { class: 'intro-actions' }, start);
   if (resume) {
-    const r = routeState(host.story);
-    const again = h('button', { class: 'btn', type: 'button' }, 'Empezar de nuevo');
+    const again = h('button', { class: 'intro-again', type: 'button' }, 'Empezar de nuevo');
     again.addEventListener('click', () => {
       try {
         sessionStorage.setItem(SKIP_KEY, '1');
@@ -62,27 +55,17 @@ export function showIntro(host: GameHost, opts: { kiosk: boolean }): void {
       resetDemo();
     });
     actions.append(again);
-    const where = r.complete ? 'Ya terminaste el recorrido: el mundo está abierto.' : `Ibas en el rastro ${r.done + 1} de ${ROUTE_IDS.length}: «${r.next?.title ?? ''}».`;
-    actions.append(h('p', { class: 'intro-where' }, where));
-  }
-  const body = h(
-    'div',
-    { class: 'intro-body' },
-    h('h1', { id: 'introTitle' }, 'Mundo Vacío'),
-    h('p', { class: 'intro-lead' }, 'Un juego sobre física: parte en un espacio vacío y construye las herramientas para describir el movimiento.'),
-    h('p', { class: 'intro-meta' }, '≈ 12 minutos · funciona con mouse o con el dedo'),
-    actions,
-  );
-  if (opts.kiosk) {
-    const qr = h('figure', { class: 'intro-qr' });
-    qr.innerHTML = qrSvg(PUBLIC_DEMO_URL);
-    qr.append(h('figcaption', {}, 'Juégalo en tu celular'));
-    body.append(qr);
   }
   const el = h(
     'div',
     { class: 'demo-intro', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'introTitle' },
-    body,
+    h(
+      'div',
+      { class: 'intro-body' },
+      h('h1', { id: 'introTitle' }, 'Mundo Vacío'),
+      h('p', { class: 'intro-lead' }, 'Un juego sobre física: parte en un espacio vacío y construye las herramientas para describir el movimiento.'),
+      actions,
+    ),
     h('p', { class: 'intro-credit' }, 'David Aguayo Vera · Universidad Adolfo Ibáñez'),
   );
   document.getElementById('app')!.append(el);

@@ -1,7 +1,7 @@
 /* La demo: pantalla de entrada, «Empezar de nuevo», la ayuda del primer gesto y el kiosco.
    Todo con los tokens del juego (styles.css), así sirve en el tema oscuro y en el claro. */
 
-/* ---------- pantalla de entrada ---------- */
+/* ---------- pantalla de entrada: el nombre, una línea y un botón ---------- */
 
 .demo-intro {
   position: absolute;
@@ -10,11 +10,10 @@
   display: grid;
   grid-template-rows: 1fr auto;
   justify-items: center;
-  padding: max(32px, env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  padding: max(32px, env(safe-area-inset-top, 0px)) 24px calc(20px + env(safe-area-inset-bottom, 0px));
   background: var(--bg);
-  background-image: radial-gradient(ellipse 75% 70% at 50% 45%, var(--bg-center) 0%, var(--bg) 55%, var(--bg-edge) 100%);
   overflow-y: auto;
-  animation: intro-in 0.5s ease-out both;
+  animation: intro-in 0.6s ease-out both;
 }
 
 .demo-intro.leaving {
@@ -36,9 +35,9 @@
 
 .intro-body {
   align-self: center;
-  max-width: 34rem;
+  max-width: 26rem;
   display: grid;
-  gap: 18px;
+  gap: 20px;
   justify-items: center;
   text-align: center;
 }
@@ -47,64 +46,78 @@
   margin: 0;
   font-family: var(--display);
   font-weight: 400;
-  font-size: clamp(48px, 13vw, 84px);
+  font-size: clamp(52px, 14vw, 88px);
   line-height: 0.95;
   letter-spacing: -0.01em;
 }
 
 .intro-lead {
   margin: 0;
-  font-size: 18px;
-  line-height: 1.45;
-  text-wrap: balance;
-}
-
-.intro-meta {
-  margin: 0;
   color: var(--muted);
-  font-size: var(--t-md);
+  font-size: 15px;
+  line-height: 1.5;
+  text-wrap: balance;
 }
 
 .intro-actions {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   justify-items: center;
-  margin-top: 10px;
+  margin-top: 18px;
 }
 
-.btn.big {
-  font-size: 17px;
-  padding: 13px 32px;
+/* un solo botón, sin relleno: una línea fina */
+.intro-start {
+  min-width: 10rem;
+  padding: 11px 28px;
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 999px;
-  min-width: 13rem;
+  background: transparent;
+  color: var(--ink);
+  font: 500 15px var(--body);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
 }
 
-.intro-where {
-  margin: 0;
+.intro-start:hover {
+  border-color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.intro-again {
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
   color: var(--muted);
-  font-size: var(--t-sm);
+  font: 400 var(--t-sm) var(--body);
+  cursor: pointer;
 }
 
-.intro-qr {
-  margin: 14px 0 0;
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  color: var(--muted);
-  font-size: var(--t-sm);
+.intro-again:hover {
+  color: var(--ink);
 }
 
-.intro-qr svg {
-  width: 132px;
-  height: 132px;
-  border-radius: 6px;
+.intro-start:focus-visible,
+.intro-again:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
 }
 
 .intro-credit {
   margin: 24px 0 0;
   color: var(--muted);
-  font-size: var(--t-sm);
-  letter-spacing: 0.02em;
+  font-size: var(--t-xs);
+  letter-spacing: 0.03em;
+  opacity: 0.7;
+}
+
+/* el botón grande de «¿Sigues ahí?» (kiosco) */
+.btn.big {
+  font-size: 17px;
+  padding: 13px 32px;
+  border-radius: 999px;
+  min-width: 13rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
