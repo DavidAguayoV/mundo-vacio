@@ -179,7 +179,7 @@ export function createDemo(opts: DemoOptions): ModeHooks {
       // el recorrido ya se cerró en otra visita: todo sigue ganado
       if (open() && story().grantAll(ALL_GRANTS).length) h.refresh();
       mountChrome(h, opts);
-      showIntro(h, { kiosk: opts.kiosk });
+      showIntro(h);
     },
   };
 }
