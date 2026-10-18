@@ -4,7 +4,7 @@
 
 import type { MapHooks, WorldMap } from './map/worldMap';
 import type { SiteEngine, SitePolicy } from './story/siteEngine';
-import type { Site } from './story/types';
+import type { Site, Zone } from './story/types';
 import type { CardHooks } from './ui/card';
 
 /** Lo que el juego le deja manejar a un modo. */
@@ -25,6 +25,8 @@ export interface GameHost {
   /** vuelve a dibujar la tarjeta, la barra y el mapa */
   refresh(): void;
   toast(message: string, ms?: number): void;
+  /** entrar al laboratorio libre (o salir de él) */
+  setFree(free: boolean): void;
   /** dónde están en la pantalla el origen y el asa de los ejes (null si no hay ejes) */
   axisOnScreen(): { origin: { x: number; y: number }; handle: { x: number; y: number } } | null;
 }
@@ -32,6 +34,8 @@ export interface GameHost {
 export interface ModeHooks {
   /** los rastros del modo (por defecto, los del juego completo) */
   sites?: Site[];
+  /** las zonas del mapa (por defecto, las diez del juego completo) */
+  zones?: Zone[];
   /** qué rastros se abren */
   policy?: SitePolicy;
   card?: CardHooks;
@@ -40,6 +44,8 @@ export interface ModeHooks {
   mapSelection?(left: string | null): string | null;
   /** la barra en grupos con rótulo (herramientas · fuerzas y lentes · tiempo · navegación) */
   groupedBar?(): boolean;
+  /** qué botones de navegación se ven (por defecto, los de siempre) */
+  bar?(): { lab?: boolean; tree?: boolean };
   /** el juego ya existe (al final de su constructor, antes de dibujar nada): el modo lo recibe */
   bind?(host: GameHost): void;
   /** el juego arrancó: el modo agrega su interfaz */

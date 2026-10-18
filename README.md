@@ -21,14 +21,16 @@ El avance se guarda solo en el navegador. Al abrir la página, sin avance se par
 
 El avance guardado del relato lineal se migra solo: lo de los capítulos terminados queda resuelto.
 
-## Demo para mostrar
+## El juego simple (demo.html)
 
-`demo.html` (publicada en https://davidaguayov.github.io/mundo-vacio/demo.html) es el mismo juego armado para alguien que lo ve por primera vez y tiene 10 a 15 minutos: una pantalla de entrada, una ruta guiada de siete rastros («El vacío», «Una partícula», «Dos saltos», «Desde siempre», «¿Dónde es abajo?», «La boya» y «En órbita») con «Siguiente» y el progreso a la vista («Rastro 3 de 7»), y al final **el mundo se abre**: todo ganado y los 36 rastros disponibles.
+`demo.html` (publicada en https://davidaguayov.github.io/mundo-vacio/demo.html) es la versión simple del juego, para quien lo ve por primera vez: «Lanza y acierta». Ver `PROPUESTA_JUEGO_SIMPLE.md`.
 
-- El avance de la demo se guarda aparte (claves `mundoVacio.demo.*`): no toca el del juego completo.
-- «Empezar de nuevo» está siempre a la vista (dos toques) y vuelve a la pantalla de entrada.
+- **Siete rastros en cuatro zonas** (el claro, la deriva, el pozo y el astro), en orden: «El vacío», «Una partícula», «Desde siempre», «La boya», «¿Dónde es abajo?», «Al blanco» y «En órbita». Solo el siguiente está abierto; «Siguiente: …» lleva de uno al otro y la tarjeta dice «Rastro 3 de 7».
+- **Pocas herramientas:** Origen, Partícula, Mover, Velocidad y Gravedad, el tiempo (▶ y t = 0) y la Atracción en el final. Sin cámara lenta, gráficos ni línea de tiempo: en «Al blanco», el tiempo se detiene solo en la cima para comprobar la predicción.
+- **Al terminar** se ganan todas las herramientas del juego (superficies, resortes, el medio, la energía, los gráficos…), aparecen el laboratorio y el árbol, y se puede volver a cualquier rastro por las estrellas que faltan.
+- El avance se guarda aparte (claves `mundoVacio.demo.*`): no toca el del juego completo. «Empezar de nuevo» está siempre a la vista (dos toques).
 - `demo.html?kiosco`, para un computador o tablet de feria: tras 90 s sin nadie pregunta «¿Sigues ahí?» y, si nadie toca en 30 s, vuelve al comienzo con el avance borrado. La entrada muestra un código QR para jugarla en el celular.
-- La ruta está en `src/demo/route.ts` (como datos: cada parada es un rastro del juego, con sus ajustes solo para la demo) y sus reglas en `src/demo/policy.ts`.
+- La ruta está en `src/demo/route.ts` (como datos: cada parada es un rastro del juego completo, con sus ajustes) y sus reglas en `src/demo/policy.ts`. Para ampliarla se suman rastros y zonas a esa lista.
 
 ## Uso
 
@@ -81,7 +83,7 @@ El workflow `.github/workflows/deploy.yml` corre los tests, construye y publica 
 | `src/lab` | experimentos (formato, enlaces, biblioteca local, ejemplos) y el panel del laboratorio |
 | `src/tree` | árbol de habilidades |
 | `src/ui` | tarjeta de relato, caja de herramientas, inspector, HUD, bitácora |
-| `src/demo` | la demo (`demo.html`): ruta, puertas, pantalla de entrada, final, kiosco y el código QR; se engancha al juego por `src/mode.ts` |
+| `src/demo` | el juego simple (`demo.html`): ruta, puertas, pantalla de entrada, final, kiosco y el código QR; se engancha al juego por `src/mode.ts` |
 
 Agregar un rastro: un objeto `Site` más en `src/story/sites.ts` (zona, posición en el mapa, nota, lo que pide, cómo se arma, sus pasos y su página). Agregar una herramienta: un archivo en `src/tools/` y una línea en `registry.ts`. Agregar una fuerza: una clase que implemente `Force` en `src/physics/forces/`.
 

@@ -1,25 +1,34 @@
-// El modo demo: la ruta de siete rastros con «Siguiente», el progreso a la vista, la pantalla de
-// entrada, el final «El mundo se abre» y, con ?kiosco, el reinicio por inactividad.
+// El juego simple («Lanza y acierta», en demo.html): siete rastros en cuatro zonas, con «Siguiente»
+// y el progreso a la vista, la pantalla de entrada y, al final, todas las herramientas del juego.
+// Con ?kiosco, el reinicio por inactividad.
 
 import type { GameHost, ModeHooks } from '../mode';
 import { storageKey } from '../state/storage';
-import { ZONES } from '../story/sites';
-import type { Site } from '../story/types';
+import { FORCE_SWITCHES, LENSES, TIME_SKILLS, type Grant, type Site } from '../story/types';
+import { TOOL_ORDER } from '../tools/registry';
 import type { CardButton, MapCardContent } from '../ui/card';
 import { mountChrome } from './chrome';
 import { showIntro } from './intro';
 import { demoPolicy, routeIndex, routeState } from './policy';
-import { demoSites, ROUTE_IDS } from './route';
+import { demoSites, demoZones, ROUTE_IDS } from './route';
 
 export interface DemoOptions {
   /** computador o tablet de feria: vuelve sola al comienzo tras un rato sin nadie */
   kiosk: boolean;
 }
 
-export const FINALE_TEXT =
-  'Empezaste sin un «aquí». Ahora tienes ejes, vectores, tiempo, gravedad y una órbita: una caída que nunca llega. Quien estuvo antes dejó más rastros (resortes, planos con roce, aire, energía, cuerpos que giran), y ya están todos abiertos. Tus herramientas también.';
+/** Todo lo que se puede tener en el juego completo: lo que se entrega al terminar el recorrido. */
+export const ALL_GRANTS: Grant[] = [
+  ...TOOL_ORDER.map((t) => `tool:${t}` as Grant),
+  ...TIME_SKILLS.map((t) => `time:${t}` as Grant),
+  ...FORCE_SWITCHES.map((f) => `force:${f}` as Grant),
+  ...LENSES.map((l) => `lens:${l}` as Grant),
+];
 
-/** ¿Ya se vio «El mundo se abre»? (con la ruta terminada, el mundo queda abierto desde entonces) */
+export const FINALE_TEXT =
+  'Empezaste sin un «aquí». Ahora tienes ejes, tiempo, velocidad, gravedad y una órbita: una caída que nunca llega. Desde ahora tienes **todas las herramientas** (superficies, resortes, el aire, la energía, los gráficos y más) para probarlas en el laboratorio o en los rastros.';
+
+/** ¿Ya se vio el final? (con la ruta terminada, todo queda ganado desde entonces) */
 function finaleSeen(): boolean {
   try {
     return localStorage.getItem(storageKey('finale')) === '1';
@@ -32,31 +41,34 @@ function markFinaleSeen(): void {
   try {
     localStorage.setItem(storageKey('finale'), '1');
   } catch {
-    /* sin almacenamiento: el mundo se abre igual en esta visita */
+    /* sin almacenamiento: el final vale para esta visita */
   }
 }
 
-/** Zonas con nombre durante la ruta: las que tienen un rastro de la ruta. */
-const ROUTE_ZONES = new Set(['claro', ...ZONES.filter((z) => demoSites().some((s) => s.zone === z.id && ROUTE_IDS.includes(s.id))).map((z) => z.id)]);
-
 export function createDemo(opts: DemoOptions): ModeHooks {
   let host: GameHost | null = null;
-  /** la tarjeta del final está a la vista (hasta «Explorar el mapa») */
+  /** la tarjeta del final está a la vista (hasta «Volver al mapa») */
   let finale = false;
 
+  const sites = demoSites();
+  const zones = demoZones();
   const story = () => host!.story;
   const route = () => routeState(story());
   const zoneName = (site: Site) => story().zone(site.zone)?.name ?? '';
+  /** ¿Terminó el recorrido y ya se entregó todo? */
+  const open = () => route().complete && finaleSeen();
 
-  /** El mundo se abre: todo ganado, la cámara se aleja y las zonas aparecen una tras otra. */
-  function openWorld(): void {
+  /** El final: todas las herramientas, la cámara muestra las cuatro zonas y aparecen una tras otra. */
+  function finish(): void {
     if (!host) return;
-    story().grantAll();
+    story().grantAll(ALL_GRANTS);
     markFinaleSeen();
     finale = true;
     host.toMap();
-    host.map.showAll(1800);
-    host.map.reveal(ZONES.map((z) => z.id));
+    const map = host.map;
+    const all = map.frameOf([...zones.map((z) => z.at), ...sites.map((s) => s.at)]);
+    map.flyTo(all.center, all.zoom, 1800);
+    map.reveal(zones.map((z) => z.id), 380);
   }
 
   const nextButton = (next: Site, fromSite: boolean): CardButton => ({
@@ -67,9 +79,19 @@ export function createDemo(opts: DemoOptions): ModeHooks {
 
   const pageOf = (site: Site): CardButton => ({ label: 'Ver su página', run: () => host!.openJournal(site.id) });
 
+  const starCount = () => {
+    const s = story();
+    return { got: s.sites.reduce((n, x) => n + s.stars(x.id).length, 0), max: s.sites.reduce((n, x) => n + s.maxStars(x), 0) };
+  };
+
   return {
-    sites: demoSites(),
-    policy: demoPolicy,
+    sites,
+    zones,
+    policy: {
+      ...demoPolicy,
+      // el laboratorio libre se abre al terminar: con todo
+      freeGrants: () => new Set(ALL_GRANTS),
+    },
     card: {
       eyebrow(site) {
         const i = routeIndex(site);
@@ -80,9 +102,9 @@ export function createDemo(opts: DemoOptions): ModeHooks {
         const r = route();
         if (routeIndex(site) < 0) return null;
         if (r.next) return [nextButton(r.next, true), pageOf(site)];
-        // el último de la ruta: el mundo se abre (si ya estaba abierto, la tarjeta de siempre)
+        // el último de la ruta cierra el recorrido (si ya se cerró, la tarjeta de siempre)
         if (site.id !== ROUTE_IDS.at(-1) || finaleSeen()) return null;
-        return [{ label: 'El mundo se abre', primary: true, run: openWorld }, pageOf(site)];
+        return [{ label: 'Terminar el recorrido', primary: true, run: finish }, pageOf(site)];
       },
       solvedButtons(site) {
         const r = route();
@@ -91,36 +113,35 @@ export function createDemo(opts: DemoOptions): ModeHooks {
       },
       mapCard(): MapCardContent | null {
         if (finale) {
-          const solved = story().sites.filter((s) => story().isSolved(s.id)).length;
+          const { got, max } = starCount();
           return {
             key: 'final',
             eyebrow: 'Fin del recorrido',
-            title: 'El mundo se abre',
+            title: 'Del vacío a una órbita',
             text: FINALE_TEXT,
-            extra: `${solved} de ${story().sites.length} rastros resueltos.`,
+            extra: `${got} de ${max} estrellas: vuelve a cualquier rastro para ganar las que faltan.`,
             buttons: [
+              { label: 'Abrir el laboratorio', primary: true, run: () => host!.openLab() },
+              { label: 'Ver mi bitácora', run: () => host!.openJournal() },
               {
-                label: 'Explorar el mapa',
-                primary: true,
+                label: 'Volver al mapa',
                 run: () => {
                   finale = false;
                   host!.selectSite(null);
                 },
               },
-              { label: 'Abrir el laboratorio', run: () => host!.openLab() },
-              { label: 'Ver mi bitácora', run: () => host!.openJournal() },
             ],
           };
         }
         const r = route();
-        // la ruta terminó, pero se salió (o se recargó) antes de abrir el mundo
+        // la ruta terminó, pero se salió (o se recargó) antes de cerrarla
         if (r.complete && !finaleSeen()) {
           return {
-            key: 'abrir',
+            key: 'cerrar',
             eyebrow: `Rastro ${ROUTE_IDS.length} de ${ROUTE_IDS.length} · resuelto`,
-            title: 'El mundo se abre',
+            title: 'Del vacío a una órbita',
             text: 'Resolviste los siete rastros del recorrido.',
-            buttons: [{ label: 'El mundo se abre', primary: true, run: openWorld }],
+            buttons: [{ label: 'Terminar el recorrido', primary: true, run: finish }],
           };
         }
         if (r.complete || !r.next) return null;
@@ -134,12 +155,12 @@ export function createDemo(opts: DemoOptions): ModeHooks {
       },
     },
     map: {
-      named: () => (route().complete ? null : ROUTE_ZONES),
-      faint: (site) => !route().complete && routeIndex(site) < 0,
+      // solo hay cuatro zonas: todas con nombre desde el comienzo
+      named: () => new Set(zones.map((z) => z.id)),
       focus() {
         const r = route();
-        if (r.complete || !r.next) return null;
-        return [ZONES[0].at, r.next.at];
+        if (r.complete || !r.next) return [...zones.map((z) => z.at), ...sites.map((s) => s.at)];
+        return [zones[0].at, r.next.at];
       },
     },
     mapSelection(left) {
@@ -147,13 +168,16 @@ export function createDemo(opts: DemoOptions): ModeHooks {
       if (finale || (r.complete && !finaleSeen())) return null;
       return r.complete ? left : (r.next?.id ?? left);
     },
-    groupedBar: () => route().complete,
+    // con todas las herramientas son más de veinte botones: en grupos
+    groupedBar: open,
+    // el laboratorio y el árbol aparecen al terminar el recorrido
+    bar: () => ({ lab: open(), tree: open() }),
     bind(h) {
       host = h;
     },
     attach(h) {
-      // el mundo ya se abrió en otra visita: todo sigue ganado
-      if (route().complete && finaleSeen() && story().grantAll().length) h.refresh();
+      // el recorrido ya se cerró en otra visita: todo sigue ganado
+      if (open() && story().grantAll(ALL_GRANTS).length) h.refresh();
       mountChrome(h, opts);
       showIntro(h, { kiosk: opts.kiosk });
     },
