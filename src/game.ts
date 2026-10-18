@@ -158,7 +158,7 @@ export class Game {
     const stress = opts.stress ?? 0;
     // con avance guardado se entra al mapa; sin avance, al comienzo
     const progress: Progress = stress ? { ...freshProgress(), free: true } : openingProgress(loadProgress(this.siteIds));
-    this.story = new SiteEngine(this.sites, ZONES, progress, { world: this.world, view: this.view, sim: this.sim }, stress ? () => {} : saveProgress, opts.mode?.policy);
+    this.story = new SiteEngine(this.sites, opts.mode?.zones ?? ZONES, progress, { world: this.world, view: this.view, sim: this.sim }, stress ? () => {} : saveProgress, opts.mode?.policy);
     // un tiro que no llega dice a qué distancia pasó, mientras acertar todavía cuente en el rastro
     this.misses = new MissMonitor(this.world, this.sim, (m) => this.toast.show(m, 3600), () => ({
       targets: this.story.listensFor('target-hit'),
@@ -374,6 +374,7 @@ export class Game {
       openJournal: (id) => this.journal.show(id),
       refresh: () => this.refreshUI(),
       toast: (m, ms) => this.toast.show(m, ms),
+      setFree: (free) => this.setFree(free),
       axisOnScreen: () => {
         const f = this.world.frame;
         const h = handlePos(this.world);
@@ -425,7 +426,8 @@ export class Game {
       lenses: inMap ? [] : [...this.story.lenses()].map((id) => ({ id, on: this.lensOn.has(id) })),
       // los laboratorios con guía se abren desde cualquier parte, una vez que se sale del vacío:
       // antes, el Mapa y el Lab le quitarían fuerza a «Mirar alrededor»
-      labEnabled: this.story.free || this.story.isSolved('vacio'),
+      labEnabled: this.opts.mode?.bar?.().lab ?? (this.story.free || this.story.isSolved('vacio')),
+      treeEnabled: this.opts.mode?.bar?.().tree ?? true,
       mapEnabled: !inMap && (this.story.free || this.story.isSolved('vacio')),
       running: this.sim.running,
       timeScale: this.timeScale,

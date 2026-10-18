@@ -49,6 +49,8 @@ export interface SitePolicy {
   status?(site: Site, base: SiteStatus, engine: SiteEngine): SiteStatus;
   /** por qué está cerrado, cuando no es por herramientas que falten (null: lo de siempre) */
   lockReason?(site: Site, engine: SiteEngine): string | null;
+  /** lo que se tiene en el laboratorio libre (por defecto, todo) */
+  freeGrants?(engine: SiteEngine): Set<Grant>;
 }
 
 /**
@@ -217,6 +219,7 @@ export class SiteEngine {
   }
 
   grants(): Set<Grant> {
+    if (this.free && this.policy.freeGrants) return this.policy.freeGrants(this);
     if (this.free) {
       const all = this.allGrants();
       TIME_SKILLS.forEach((t) => all.add(`time:${t}`));
@@ -300,11 +303,13 @@ export class SiteEngine {
 
   /**
    * Entrega todo lo que se puede ganar en el mundo, más todos los controles del tiempo, fuerzas y
-   * lentes (el final de la demo: el mundo se abre). Devuelve lo nuevo. No avisa con onChange: quien
-   * lo llama refresca la interfaz (veinte avisos de «Nueva herramienta» serían ruido).
+   * lentes (el final de la demo: el mundo se abre), más lo que se pida en `extra` (herramientas que
+   * ningún rastro del modo entrega). Devuelve lo nuevo. No avisa con onChange: quien lo llama
+   * refresca la interfaz (veinte avisos de «Nueva herramienta» serían ruido).
    */
-  grantAll(): Grant[] {
+  grantAll(extra: Iterable<Grant> = []): Grant[] {
     const all = this.allGrants();
+    for (const g of extra) all.add(g);
     TIME_SKILLS.forEach((t) => all.add(`time:${t}`));
     FORCE_SWITCHES.forEach((f) => all.add(`force:${f}`));
     LENSES.forEach((l) => all.add(`lens:${l}`));

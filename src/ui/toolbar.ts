@@ -16,6 +16,8 @@ export interface ToolbarState {
   labEnabled?: boolean;
   /** botón Mapa (dentro de un rastro o en modo libre) */
   mapEnabled?: boolean;
+  /** botón Árbol (por defecto, sí) */
+  treeEnabled?: boolean;
   running: boolean;
   timeScale: number;
   /** herramientas o habilidades recién ganadas: brillan un momento */
@@ -220,7 +222,7 @@ export class Toolbar {
     if (s.labEnabled) this.metaItems.push(this.button(ICONS.lab, 'Lab', this.actions.openLab, { 'data-cmd': 'lab' }));
     if (s.mapEnabled) this.metaItems.push(this.button(ICONS.map, 'Mapa', this.actions.openMap, { 'data-cmd': 'map' }));
     this.metaItems.push(this.button(ICONS.journal, 'Bitácora', this.actions.openJournal, { 'data-cmd': 'journal' }));
-    this.metaItems.push(this.button(ICONS.tree, 'Árbol', this.actions.openTree, { 'data-cmd': 'tree' }));
+    if (s.treeEnabled !== false) this.metaItems.push(this.button(ICONS.tree, 'Árbol', this.actions.openTree, { 'data-cmd': 'tree' }));
 
     const labeled = s.tools.length <= LABELED_MAX && !s.switches?.length && !s.lenses?.length;
     this.bar.classList.toggle('labeled', labeled);

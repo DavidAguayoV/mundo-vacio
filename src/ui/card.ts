@@ -215,6 +215,17 @@ export class StoryCard {
     return this.hooks.eyebrow?.(site) ?? story.zone(site.zone)?.name ?? '';
   }
 
+  /** Una tarjeta armada por un modo de juego (ver CardHooks). */
+  private renderCustom(custom: MapCardContent, where: string): void {
+    this.eyebrow.textContent = custom.eyebrow;
+    this.title.textContent = custom.title;
+    this.text.replaceChildren(...rich(custom.text));
+    if (custom.extra) this.extra.textContent = custom.extra;
+    this.row.append(...this.hookButtons(custom.buttons));
+    this.setCollapsed(false);
+    this.enter(`${where}:${custom.key}`);
+  }
+
   private hookButtons(buttons: CardButton[]): HTMLButtonElement[] {
     return buttons.map((b) => this.button(b.label, !!b.primary, b.run));
   }
@@ -296,16 +307,7 @@ export class StoryCard {
   private renderMap(story: SiteEngine, selection: string | null): void {
     const site = selection ? story.siteById(selection) : undefined;
     const custom = site ? null : this.hooks.mapCard?.();
-    if (custom) {
-      this.eyebrow.textContent = custom.eyebrow;
-      this.title.textContent = custom.title;
-      this.text.replaceChildren(...rich(custom.text));
-      if (custom.extra) this.extra.textContent = custom.extra;
-      this.row.append(...this.hookButtons(custom.buttons));
-      this.setCollapsed(false);
-      this.enter(`mapa:${custom.key}`);
-      return;
-    }
+    if (custom) return this.renderCustom(custom, 'mapa');
     if (!site) {
       const solved = story.sites.filter((s) => story.isSolved(s.id)).length;
       this.eyebrow.textContent = 'El mapa';

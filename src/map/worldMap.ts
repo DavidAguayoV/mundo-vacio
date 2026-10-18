@@ -37,8 +37,9 @@ export interface MapHooks {
   focus?(): Vec2[] | null;
 }
 
-/** Zoom máximo con que el mapa encuadra lo que pide un modo de juego. */
+/** Zoom máximo y mínimo con que el mapa encuadra lo que pide un modo de juego. */
 const FOCUS_ZOOM_MAX = 2.6;
+const FOCUS_ZOOM_MIN = 0.5;
 
 /** Distancia (unidades del mapa) hasta la que una zona cuenta como vecina de una abierta. */
 const NEIGHBOR = 20;
@@ -138,7 +139,7 @@ export class WorldMap {
 
   /**
    * Cámara que encuadra unos puntos del mapa en lo que dejan libre la tarjeta (a la izquierda en una
-   * pantalla ancha, arriba en el celular) y la barra; nunca más lejos que el mapa entero.
+   * pantalla ancha, arriba en el celular) y la barra.
    */
   frameOf(points: Vec2[], pad = 6): { center: Vec2; zoom: number } {
     const v = this.view;
@@ -152,7 +153,7 @@ export class WorldMap {
     const left = !narrow && card?.width ? card.right + 12 : 0;
     const top = narrow && card?.height ? card.bottom + 8 : 0;
     const bottom = bar?.height ? bar.top - 8 : v.H;
-    const zoom = Math.max(1, Math.min(FOCUS_ZOOM_MAX, (v.W - left) / ((maxX - minX) * v.base), (bottom - top) / ((maxY - minY) * v.base)));
+    const zoom = Math.max(FOCUS_ZOOM_MIN, Math.min(FOCUS_ZOOM_MAX, (v.W - left) / ((maxX - minX) * v.base), (bottom - top) / ((maxY - minY) * v.base)));
     const S = v.base * zoom;
     const px = (left + v.W) / 2;
     const py = (top + bottom) / 2;
